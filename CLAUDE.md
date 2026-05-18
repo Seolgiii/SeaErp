@@ -3,6 +3,12 @@
 기술 스택: Next.js 15 + Airtable + Vercel + zod + Vitest + Resend
 개발 방식: 1인 기획/개발 + Claude Code
 
+■ 최근 변경 (2026-05-18)
+- 재고조회 → 카트 페이지 핸드오프 통일 (`e263bca`). BulkSubmitSheet 제거 + sessionStorage 핸드오프 + 카트 페이지에 첫 LOT 자동 선택/다음 자동 이어짐 + 대기 칩 UI. LOT마다 다른 판매처/판매가/보관처 부여 가능. admin/dashboard 일괄 승인(B안) 추가 + EXPENSE는 100만원 권한 분기로 제외. outbound LOT 보관처 fallback 안전망.
+- Airtable 출고관리 컬럼 정리 (`e263bca`). 출고수량 → 출고요청수량 rename + 실출고수량 formula 신설(반려 시 0) + 출고시점 판매금액(currency) 폐기(판매금액 formula로 대체). 반려 시 보존 정책 변경: 출고시점 판매원가만 보존, 나머지 6개 클리어. 멱등 가드 기준: 판매원가 → 단가.
+- 옛 입고관리·LOT link 일괄 backfill (`d114b44`). LOT 품목마스터 180건 + 입고관리 보관처/품목마스터 179건 자동 PATCH. 출고관리.품목명 transitive lookup 자동 갱신 검증. 남은 17건은 갈치 16(품목마스터 미등록) + 빈 record 1.
+- transfer-revert partial failure 보상 트랜잭션 (`748fc53`). `rollbackToCharged` 헬퍼 + 단계 2/3/4 모두 보상 패턴 — 출고 반려와 완전 대칭. 이전엔 단계 3/4 실패가 success:true 반환되어 admin.ts가 반려 PATCH 진행 → 모순 상태 진입(CRITICAL) 위험 해소. 통합 +8 시나리오. 단위 110 / 통합 85.
+
 ■ 최근 변경 (2026-05-15)
 - C안 + 동결비 특례 — 수매가 절반 버그 + 박스당/총액 단위 일관성 fix. 수매가 박스당 그대로(이전엔 ratio로 절반화), 이월 4개 박스당×이동박스수(총액), sourceInboxQty 분모로 이동 사이 출고 끼는 케이스도 정확. 동결비 특례: 이동된 LOT 동결비=0 + 이월동결비는 원본 cost basis 박스당 보존(N단계 일관). LOT.판매원가 formula 갱신(박스당 비용 × 입고수량). 단위 110 / 통합 77 통과.
 - 일일 보고서 운영 건강도 5항목 추가 (🩺 섹션) — 음수 재고 LOT / 잔여수량 정합성 / 출고시점 비용 NULL(E1 가드 실패 조기 발견) / 잠긴 PIN / 어제 신청 당일 처리율. 빨강·초록 색 코딩.
