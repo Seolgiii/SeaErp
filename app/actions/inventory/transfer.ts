@@ -670,7 +670,7 @@ export async function revertTransferOnReject(
     }
   }
 
-  // 원본 LOT 복구
+  // 원본 LOT 복구 (단계 1)
   const origLotFields = await fetchRecord("LOT별 재고", originalLotRecordId);
   if (!origLotFields) {
     logError(
@@ -691,8 +691,61 @@ export async function revertTransferOnReject(
     return { success: false, message: "원본 LOT 재고수량 복구에 실패했습니다." };
   }
 
-  // 원본 입고관리 복구
+  // 보상 트랜잭션 — 이미 적용된 복구를 차감 상태로 되돌림 (출고 반려와 대칭).
+  // 어느 한 단계라도 실패하면 admin.ts가 반려 처리를 진행하지 않게 success:false 반환 +
+  // 보상 결과를 [INTEGRITY-ALERT] 로그로 기록 — 보상 자체가 실패하면 수동 보정 안내.
+  // 위 검사 통과 시점에 originalLotRecordId·newLotRecordId 모두 non-null 검증됨 (line 563-575)
   const origInboundRecordId = firstLink(origLotFields["입고관리링크"]);
+  const origLotId: string = originalLotRecordId;
+  const newLotId: string = newLotRecordId;
+  async function rollbackToCharged(state: {
+    originalLotRestored: boolean;
+    origInboundRestored: boolean;
+    newLotZeroed: boolean;
+  }): Promise<{ ok: boolean; details: Record<string, unknown> }> {
+    const details: Record<string, unknown> = {};
+    let ok = true;
+    if (state.originalLotRestored) {
+      const refresh = await fetchRecord("LOT별 재고", origLotId);
+      const refreshedStock = num(refresh?.["재고수량"]);
+      if (Number.isFinite(refreshedStock)) {
+        const r = await patchRecord("LOT별 재고", origLotId, {
+          재고수량: refreshedStock - 이동수량,
+        });
+        details.originalLotRolled = r;
+        if (!r) ok = false;
+      } else {
+        details.originalLotRolled = "refreshFailed";
+        ok = false;
+      }
+    }
+    if (state.origInboundRestored && origInboundRecordId) {
+      const refresh = await fetchRecord("입고 관리", origInboundRecordId);
+      const refreshedRemain = num(refresh?.["잔여수량"]);
+      if (Number.isFinite(refreshedRemain)) {
+        const r = await patchRecord("입고 관리", origInboundRecordId, {
+          잔여수량: refreshedRemain - 이동수량,
+        });
+        details.origInboundRolled = r;
+        if (!r) ok = false;
+      } else {
+        details.origInboundRolled = "refreshFailed";
+        ok = false;
+      }
+    }
+    if (state.newLotZeroed) {
+      // 신규 LOT 재고 = 이동수량으로 복원 (검사 (a) 통과 시점 상태)
+      const r = await patchRecord("LOT별 재고", newLotId, {
+        재고수량: 이동수량,
+      });
+      details.newLotRolled = r;
+      if (!r) ok = false;
+    }
+    return { ok, details };
+  }
+
+  // 원본 입고관리 복구 (단계 2)
+  let origInboundRestored = false;
   if (origInboundRecordId) {
     const origInboundFields = await fetchRecord("입고 관리", origInboundRecordId);
     if (origInboundFields) {
@@ -701,21 +754,34 @@ export async function revertTransferOnReject(
         잔여수량: origRemain + 이동수량,
       });
       if (!inboundPatchOk) {
+        const rb = await rollbackToCharged({
+          originalLotRestored: true,
+          origInboundRestored: false,
+          newLotZeroed: false,
+        });
         logError(
-          "[INTEGRITY-ALERT][revertTransferOnReject] 원본 입고관리 잔여수량 복구 PATCH 실패 — 원본 LOT은 이미 복구됨, 수동 정합 필요:",
+          "[INTEGRITY-ALERT][revertTransferOnReject] 원본 입고관리 잔여수량 복구 PATCH 실패 — 보상 트랜잭션 결과:",
           {
             transferRecordId,
             originalLotRecordId,
             origInboundRecordId,
             origRemain,
             이동수량,
+            compensationOk: rb.ok,
+            ...rb.details,
+            note: rb.ok
+              ? "원본 LOT 재고 원복 성공 — 양쪽 모두 차감 상태로 일치"
+              : "원본 LOT 원복도 실패 — 입고관리(-) / LOT(+) 불일치, 수동 보정 필요",
           },
         );
         return {
           success: false,
-          message: "원본 입고관리 잔여수량 복구에 실패했습니다. (원본 LOT 재고수량은 이미 복구됨 — 수동 정합 확인 필요)",
+          message: rb.ok
+            ? "원본 입고관리 복구에 실패해 원본 LOT 재고를 원복했습니다. 다시 시도해주세요."
+            : "원본 입고관리 복구에 실패했습니다. 수동 정합 확인이 필요합니다.",
         };
       }
+      origInboundRestored = true;
     } else {
       logWarn(
         "[revertTransferOnReject] 원본 입고관리 레코드 없음 — 잔여수량 복구 생략:",
@@ -729,28 +795,66 @@ export async function revertTransferOnReject(
     );
   }
 
-  // 신규 LOT soft delete
+  // 신규 LOT soft delete (단계 3)
   const newLotZeroOk = await patchRecord("LOT별 재고", newLotRecordId, {
     재고수량: 0,
   });
   if (!newLotZeroOk) {
+    const rb = await rollbackToCharged({
+      originalLotRestored: true,
+      origInboundRestored,
+      newLotZeroed: false,
+    });
     logError(
-      "[INTEGRITY-ALERT][revertTransferOnReject] 신규 LOT 재고수량 0 PATCH 실패 — 원본 복구는 완료, 신규 LOT 수동 정리 필요:",
-      { transferRecordId, newLotRecordId },
+      "[INTEGRITY-ALERT][revertTransferOnReject] 신규 LOT 재고 0 PATCH 실패 — 보상 트랜잭션 결과:",
+      {
+        transferRecordId,
+        newLotRecordId,
+        compensationOk: rb.ok,
+        ...rb.details,
+        note: rb.ok
+          ? "원본 LOT/입고관리 원복 성공 — 차감 상태로 일치"
+          : "보상도 일부 실패 — 수동 보정 필요",
+      },
     );
+    return {
+      success: false,
+      message: rb.ok
+        ? "신규 LOT soft delete에 실패해 원본 복구를 원복했습니다. 다시 시도해주세요."
+        : "신규 LOT soft delete에 실패했습니다. 수동 정합 확인이 필요합니다.",
+    };
   }
 
-  // 신규 입고관리 soft delete
+  // 신규 입고관리 soft delete (단계 4)
   if (newInboundRecordId) {
     const newInboundClearOk = await patchRecord("입고 관리", newInboundRecordId, {
       잔여수량: 0,
       승인상태: "반려",
     });
     if (!newInboundClearOk) {
+      const rb = await rollbackToCharged({
+        originalLotRestored: true,
+        origInboundRestored,
+        newLotZeroed: true,
+      });
       logError(
-        "[INTEGRITY-ALERT][revertTransferOnReject] 신규 입고관리 soft delete PATCH 실패 — 수동 정리 필요:",
-        { transferRecordId, newInboundRecordId },
+        "[INTEGRITY-ALERT][revertTransferOnReject] 신규 입고관리 soft delete PATCH 실패 — 보상 트랜잭션 결과:",
+        {
+          transferRecordId,
+          newInboundRecordId,
+          compensationOk: rb.ok,
+          ...rb.details,
+          note: rb.ok
+            ? "원본 + 신규 LOT 모두 원복 성공 — 차감 상태로 일치"
+            : "보상도 일부 실패 — 수동 보정 필요",
+        },
       );
+      return {
+        success: false,
+        message: rb.ok
+          ? "신규 입고관리 soft delete에 실패해 원본·신규 LOT를 원복했습니다. 다시 시도해주세요."
+          : "신규 입고관리 soft delete에 실패했습니다. 수동 정합 확인이 필요합니다.",
+      };
     }
   }
 

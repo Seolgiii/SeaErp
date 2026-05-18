@@ -50,3 +50,28 @@ TRANSFER 반려 시 안전 가드 3종 통과하면 자동 복구. 후속 작업
 
 ## 테스트
 - `test/integration/transfer-revert.test.ts` — 3 시나리오 (정상 / 출고 차단 / 재이동 차단)
+- `test/integration/transfer-revert-partial-fail.test.ts` — 4 시나리오 (단계 2/3/4 partial fail 보상 + 정상 흐름)
+
+## 2026-05-18 추가 — partial failure 보상 트랜잭션 (출고 반려와 대칭)
+
+### 배경
+출고 반려(`restoreStockOnOutboundReject`)는 LOT 재고 PATCH 실패 시 입고관리 잔여수량을 원복하는
+보상 트랜잭션이 있어 정합 유지. 이동 반려는 같은 시점에 보상이 없어서 단계별 PATCH 실패 시
+부분 복구 상태로 남아 정합이 깨질 수 있었음 (예: 원본 LOT는 +복구, 원본 입고관리는 -차감 유지).
+
+### 변경 내용
+`revertTransferOnReject`에 `rollbackToCharged` 헬퍼 추가 + 4단계 모두 보상 패턴 적용:
+
+| 실패 단계 | 보상 동작 | 결과 |
+|---|---|---|
+| 단계 1 (원본 LOT) | 변경 없음 → return false | admin.ts 반려 처리 중단 — 안전 |
+| 단계 2 (원본 입고관리) | 원본 LOT 원복(-이동수량) → return false | 모두 차감 상태로 일치 |
+| 단계 3 (신규 LOT 0) | 원본 LOT/입고관리 원복 → return false | 모두 차감 상태로 일치 |
+| 단계 4 (신규 입고관리 soft delete) | 원본 LOT/입고관리 원복 + 신규 LOT 재고 복원(=이동수량) → return false | 모두 차감 상태로 일치 |
+
+이전엔 단계 3/4 실패가 `success:true`로 반환되어 admin.ts가 반려 PATCH를 진행 →
+"승인상태 = 반려"인데 신규 LOT/입고관리는 활성 = 모순 상태 진입 위험이 있었음 (CRITICAL).
+이제 모든 partial failure에서 admin.ts 반려 처리 차단 + 차감 상태 일치 유지.
+
+보상 자체가 실패하는 극단 케이스는 `[INTEGRITY-ALERT]` 로그 + "수동 보정 필요" 메시지로
+운영자 안내.
