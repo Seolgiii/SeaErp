@@ -61,7 +61,7 @@ export type OutboundCostInput = {
   inboundDate: string;
   /** 출고 관리.출고일 (YYYY-MM-DD) */
   outboundDate: string;
-  /** 출고 관리.출고수량 (박스) */
+  /** 출고 관리.출고요청수량 (박스). "출고요청수량"은 사용자가 신청한 수량으로 반려돼도 보존됨 — 실제 차감용 비용 계산 input. */
   outQty: number;
 };
 

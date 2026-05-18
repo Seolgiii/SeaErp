@@ -342,7 +342,7 @@ export async function buildDailyReport(threshold: number): Promise<DailyReport> 
       // 판매금액(총액)이 있으면 손익 합산에 사용, 없으면 판매가×수량 fallback
       const saleAmount = num(item.raw["판매금액"]);
       const salePrice = num(item.raw["판매가"]);
-      const qty = num(item.raw["출고수량"]);
+      const qty = num(item.raw["출고요청수량"]);
       salesTotal += saleAmount > 0 ? saleAmount : salePrice * qty;
       continue;
     }
@@ -376,7 +376,7 @@ export async function buildDailyReport(threshold: number): Promise<DailyReport> 
       productName: item.title || "-",
       spec: item.spec || str(item.raw["규격"]),
       misu: item.misu || str(item.raw["미수"]),
-      qty: num(item.raw["출고수량"]),
+      qty: num(item.raw["출고요청수량"]),
       remaining: lotRecId ? (lotRemainMap[lotRecId] ?? 0) : 0,
       salePrice: num(item.raw["판매가"]),
     });

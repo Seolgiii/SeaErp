@@ -77,6 +77,29 @@ function firstLinkedRecordId(raw: unknown): string | null {
 }
 
 /**
+ * LOT별 재고 레코드에서 보관처 link 첫 번째 record id 추출 (fallback용).
+ *
+ * 입고관리.보관처 link가 비어 있을 때 (옛 backfill 데이터 누락 등) LOT의 보관처를
+ * 안전망으로 사용. 2026-05-18 사고 — 옛 입고관리 record 22%가 보관처 link 누락 상태.
+ */
+async function getStorageIdFromLot(lotRecordId: string): Promise<string | null> {
+  const lotTable = encodeURIComponent("LOT별 재고");
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${lotTable}/${lotRecordId}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) {
+    logWarn("[getStorageIdFromLot] LOT 조회 실패 (fallback 포기):", res.status, lotRecordId);
+    return null;
+  }
+  const data = await res.json();
+  const fields = data.fields as Record<string, unknown> | undefined;
+  if (!fields) return null;
+  return firstLinkedRecordId(fields["보관처"]);
+}
+
+/**
  * LOT별 재고 레코드에서 `LOT_TO_INBOUND_FIELD`(기본 `입고관리링크`)의 첫 linked record id 추출
  * 출고 시 LOT 재고 레코드를 통해 원래 입고 관리 레코드를 찾아야 잔여수량을 차감할 수 있습니다.
  */
@@ -301,7 +324,18 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
         error: `입고 관리의 ${INBOUND_REMAINING_QTY_FIELD}를 확인할 수 없습니다.`,
       };
     }
-    const { currentQty: currentRemain, storageId } = inboundRemain;
+    let { currentQty: currentRemain, storageId } = inboundRemain;
+    // 입고관리.보관처 link가 비면 LOT.보관처로 fallback (옛 backfill 데이터 누락 대비)
+    if (!storageId) {
+      const lotStorageId = await getStorageIdFromLot(lotInventoryRecordId);
+      if (lotStorageId) {
+        logWarn(
+          "[createOutboundRecord] 입고관리.보관처 누락 — LOT.보관처로 fallback:",
+          { inboundRecordId, lotRecordId: lotInventoryRecordId, lotStorageId },
+        );
+        storageId = lotStorageId;
+      }
+    }
     if (qty > currentRemain) {
       // 출고 요청 수량이 잔여 재고보다 많으면 신청 자체를 거부
       logError("[createOutboundRecord] 잔여수량 부족(출고 관리 미생성):", {
@@ -328,7 +362,7 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
     const fields: Record<string, unknown> = {
       "출고일": payload?.date,
       "입고관리": [inboundRecordId],         // 입고 관리 레코드 링크 (출고 승인 시 잔여수량 차감용)
-      "출고수량": qty,
+      "출고요청수량": qty,
       "작업자": [workerRecordId],
       "승인상태": "승인 대기",
       "LOT재고레코드ID": lotInventoryRecordId, // LOT별 재고 레코드 ID (승인 시 재고수량 차감용)

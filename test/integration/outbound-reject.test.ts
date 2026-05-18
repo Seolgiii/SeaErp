@@ -13,8 +13,8 @@ import {
  *
  * 정책 (admin.ts restoreStockOnOutboundReject):
  *   - 승인 완료 → 반려 시:
- *     - 입고관리.잔여수량 += 출고수량 (복구)
- *     - LOT별 재고.재고수량 += 출고수량 (복구)
+ *     - 입고관리.잔여수량 += 출고요청수량 (복구)
+ *     - LOT별 재고.재고수량 += 출고요청수량 (복구)
  *     - 출고시점 비용 7개 필드 null로 클리어 (손익 보고서 제외)
  */
 
@@ -85,16 +85,20 @@ describe("시나리오 7 — 출고 반려 시 재고 복구", () => {
     // LOT 재고 복구
     expect(store.get("LOT별 재고", lot.id)!.fields.재고수량).toBe(100);
 
-    // 출고시점 비용 7개 필드 null
+    // 출고시점 비용 6개 클리어 + 판매원가 보존 (2026-05-18 정책)
+    // 보존: 출고시점 판매원가 ("이 정도 금액에 시도했었다" 지표)
+    // 클리어: 단가/냉장료/입출고비/노조비/동결비/손익
+    // 제거된 컬럼: 출고시점 판매금액 (판매금액 formula로 대체)
     const outAfter = store.get("출고 관리", outbound.id)!;
     expect(outAfter.fields.승인상태).toBe("반려");
     expect(outAfter.fields["출고시점 단가"]).toBeNull();
     expect(outAfter.fields["출고시점 냉장료"]).toBeNull();
     expect(outAfter.fields["출고시점 입출고비"]).toBeNull();
     expect(outAfter.fields["출고시점 노조비"]).toBeNull();
-    expect(outAfter.fields["출고시점 판매원가"]).toBeNull();
-    expect(outAfter.fields["출고시점 판매금액"]).toBeNull();
+    expect(outAfter.fields["출고시점 동결비"]).toBeNull();
     expect(outAfter.fields["출고시점 손익"]).toBeNull();
+    // 판매원가는 보존 — 신청 시도 cost basis 분석용
+    expect(Number(outAfter.fields["출고시점 판매원가"])).toBeGreaterThan(0);
     // 반려사유
     expect(outAfter.fields.반려사유).toBe("판매처 변경 요청");
   });

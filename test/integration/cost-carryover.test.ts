@@ -232,7 +232,8 @@ describe("동결비 통합", () => {
     out = store.get("출고 관리", outbound.id)!;
     expect(out.fields["출고시점 동결비"]).toBeNull();
     expect(out.fields["출고시점 단가"]).toBeNull();
-    expect(out.fields["출고시점 판매원가"]).toBeNull();
+    // 판매원가는 반려 시 보존 (2026-05-18 정책 변경) — "이 정도 금액에 시도했었다" 지표
+    expect(Number(out.fields["출고시점 판매원가"])).toBeGreaterThan(0);
   });
 });
 
@@ -486,8 +487,8 @@ describe("재고 이동 — C안 + 동결비 특례 (이월 경비 박스당×�
     expect(out.fields["출고시점 노조비"]).toBe(4_500);
     expect(out.fields["출고시점 동결비"]).toBe(3_000); // 원본 동결비 cost basis 박스당 보존
 
-    // 판매금액 = 70000 × 10 = 700_000, 손익 = 700_000 - 671_750 = 28_250
-    expect(out.fields["출고시점 판매금액"]).toBe(700_000);
+    // 판매금액 = 70000 × 10 = 700_000 (formula 컬럼), 손익 = 700_000 - 671_750 = 28_250
+    expect(Number(out.fields["판매금액"])).toBe(700_000);
     expect(out.fields["출고시점 손익"]).toBe(28_250);
   });
 
@@ -604,7 +605,7 @@ describe("재고 이동 — C안 + 동결비 특례 (이월 경비 박스당×�
 });
 
 describe("판매금액 자동 계산 (Airtable formula)", () => {
-  test("정상 — 출고시점 판매금액 = 판매가 × 출고수량, 손익 = 판매금액 − 판매원가", async () => {
+  test("정상 — 판매금액(formula) = 판매가 × 출고요청수량, 손익 = 판매금액 − 판매원가", async () => {
     store.seed("작업자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
@@ -652,7 +653,7 @@ describe("판매금액 자동 계산 (Airtable formula)", () => {
 
     const out = store.get("출고 관리", outbound.id)!;
     const expectedSaleAmount = 55_000 * 30;
-    expect(Number(out.fields["출고시점 판매금액"])).toBe(expectedSaleAmount);
+    expect(Number(out.fields["판매금액"])).toBe(expectedSaleAmount);
 
     // 손익 = 판매금액 − 판매원가
     const totalCost = Number(out.fields["출고시점 판매원가"]);
@@ -662,7 +663,7 @@ describe("판매금액 자동 계산 (Airtable formula)", () => {
     );
   });
 
-  test("판매가 누락 — 판매금액·출고시점 판매금액 = 0, 재고 차감/판매원가 PATCH는 정상", async () => {
+  test("판매가 누락 — 판매금액 = 0, 재고 차감/판매원가 PATCH는 정상", async () => {
     store.seed("작업자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
@@ -717,7 +718,7 @@ describe("판매금액 자동 계산 (Airtable formula)", () => {
     // 판매원가 등 비용 PATCH는 정상 동작
     expect(Number(out.fields["출고시점 판매원가"])).toBeGreaterThan(0);
     // 판매금액은 0 — 손익은 -판매원가 (음수)
-    expect(Number(out.fields["출고시점 판매금액"])).toBe(0);
+    expect(Number(out.fields["판매금액"])).toBe(0);
     expect(Number(out.fields["출고시점 손익"])).toBe(
       -Number(out.fields["출고시점 판매원가"]),
     );

@@ -597,7 +597,7 @@ export async function getMyRequests(
     const rawStatus = String(f["승인상태"] ?? "승인 대기").trim();
     const status = normalizeStatus(rawStatus);
 
-    const qty = f["출고수량"] ?? "";
+    const qty = f["출고요청수량"] ?? "";
     const spec = String(f["규격"] ?? "");
     const misu = String(f["미수"] ?? "");
 

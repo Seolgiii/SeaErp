@@ -18,7 +18,8 @@ const ADMIN_TABS: { key: AdminTabKey; label: string }[] = [
 import RejectBottomSheet from "@/app/components/RejectBottomSheet";
 import CompletedItemActionSheet from "@/app/components/CompletedItemActionSheet";
 import { useConfirm } from "@/app/components/ConfirmBottomSheet";
-import { updateApprovalStatus, getMyRequests } from "@/app/actions";
+import { updateApprovalStatus, updateApprovalStatusBulk, getMyRequests } from "@/app/actions";
+import { CheckCircleIcon, ExclamationCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useSyncQueryParams } from "@/lib/use-sync-query-params";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession, isSessionExpired } from "@/lib/session";
@@ -73,6 +74,31 @@ export default function AdminDashboardPage() {
   const [selectedItem, setSelectedItem] = useState<RequestItem | null>(null);
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
   const [actionSheetItem, setActionSheetItem] = useState<RequestItem | null>(null);
+
+  // ── 일괄 승인 ───────────────────────────────────────────────────────────
+  // PENDING + (INBOUND|OUTBOUND|TRANSFER) 항목만 선택 가능. EXPENSE는 100만원
+  // 권한 분기가 있어 일괄에 부적합 → 체크박스 비활성화.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  type BulkResult = {
+    results: { recordId: string; lotNumber: string; success: boolean; message?: string }[];
+    successCount: number;
+    failCount: number;
+  };
+  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const isBulkEligible = (item: RequestItem): boolean =>
+    PENDING_STATUSES.includes(item.status) &&
+    (item.type === "INBOUND" || item.type === "OUTBOUND" || item.type === "TRANSFER");
 
   useEffect(() => {
     const session = readSession();
@@ -202,6 +228,63 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleBulkApprove = async () => {
+    if (selectedIds.size === 0) return;
+
+    const session = readSession();
+    if (!session?.workerId) {
+      toast("로그인 정보를 확인해주세요.");
+      return;
+    }
+
+    const targetItems = items.filter(
+      (i) => selectedIds.has(i.id) && isBulkEligible(i),
+    );
+    if (targetItems.length === 0) return;
+
+    const ok = await confirm({
+      title: `${targetItems.length}건을 일괄 승인할까요?`,
+      message: "각 건은 순차 처리되며 일부 실패해도 성공한 건은 그대로 적용됩니다.",
+      confirmLabel: `${targetItems.length}건 승인`,
+      accent: "blue",
+    });
+    if (!ok) return;
+
+    setIsBulkProcessing(true);
+    const payload = targetItems.map((it) => ({ recordId: it.id, type: it.type as "INBOUND" | "OUTBOUND" | "TRANSFER" }));
+
+    try {
+      const res = await updateApprovalStatusBulk(session.workerId, payload);
+      // 성공 ID는 UI overrides 적용
+      const successIds = new Set(res.results.filter((r) => r.success).map((r) => r.recordId));
+      setUiOverrides((prev) => {
+        const next = { ...prev };
+        for (const id of successIds) next[id] = "COMPLETED";
+        return next;
+      });
+      setBulkResult({
+        results: res.results.map((r) => {
+          const it = targetItems.find((t) => t.id === r.recordId);
+          return {
+            recordId: r.recordId,
+            lotNumber: it?.lotNumber || it?.title || "—",
+            success: r.success,
+            message: r.message,
+          };
+        }),
+        successCount: res.successCount,
+        failCount: res.failCount,
+      });
+      setSelectedIds(new Set());
+      setTimeout(() => loadData(), 1500);
+    } catch (err) {
+      logError("[handleBulkApprove] uncaught error", err);
+      toast("일괄 승인 중 오류가 발생했습니다.");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   const handleOpenReject = (item: RequestItem) => {
     setSelectedItem(item);
     setIsModalOpen(true);
@@ -287,10 +370,14 @@ export default function AdminDashboardPage() {
       ? " cursor-pointer hover:shadow-md active:scale-[0.99] transition-all"
       : "";
 
+    const bulkEligible = isBulkEligible(item) && !uiState;
+    const checked = selectedIds.has(item.id);
+    const cardRingClass = bulkEligible && checked ? " ring-2 ring-[#3182F6]" : "";
+
     return (
       <div
         key={item.id}
-        className={baseClass + interactiveClass}
+        className={baseClass + interactiveClass + cardRingClass}
         onClick={canChangeStatus ? () => handleOpenActionSheet(item) : undefined}
         role={canChangeStatus ? "button" : undefined}
         tabIndex={canChangeStatus ? 0 : undefined}
@@ -305,6 +392,23 @@ export default function AdminDashboardPage() {
             : undefined
         }
       >
+        {bulkEligible && (
+          <div className="flex items-center gap-2 -mb-1">
+            <label className="inline-flex items-center gap-2 select-none cursor-pointer active:scale-95 transition-transform">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-5 h-5 rounded border-gray-300 text-[#3182F6] focus:ring-[#3182F6]"
+                aria-label="일괄 승인 대상으로 선택"
+              />
+              <span className="text-[12px] font-bold text-gray-400">
+                일괄 승인 대상
+              </span>
+            </label>
+          </div>
+        )}
         {isExpense ? (
           <div className="flex justify-between items-center gap-2">
             <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
@@ -535,6 +639,114 @@ export default function AdminDashboardPage() {
         onRevertToReject={handleActionSheetRevert}
         onChangeToApprove={handleActionSheetApprove}
       />
+
+      {/* 일괄 승인 floating bar — 선택된 게 1개 이상일 때만 표시 */}
+      {selectedIds.size > 0 && !bulkResult && (
+        <div
+          className="fixed left-0 right-0 z-30 px-5 pt-3"
+          style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
+        >
+          <div className="bg-[#191F28] text-white rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.18)] p-4 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[15px] font-black">{selectedIds.size}건 선택됨</p>
+              <p className="text-[12px] font-medium text-gray-300">순차 처리 · 부분 성공 허용</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="shrink-0 text-[13px] font-bold text-gray-300 px-3 py-2 rounded-xl active:scale-95"
+            >
+              선택 해제
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkApprove}
+              disabled={isBulkProcessing}
+              className="shrink-0 bg-[#3182F6] text-white font-black text-[14px] px-5 py-3 rounded-xl active:scale-95 transition-transform disabled:opacity-50"
+            >
+              {isBulkProcessing ? "처리 중..." : "일괄 승인"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 일괄 승인 결과 모달 */}
+      {bulkResult && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setBulkResult(null)} />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-[0_-8px_40px_rgba(0,0,0,0.15)] flex flex-col"
+            style={{ maxHeight: "85vh" }}
+          >
+            <div className="flex justify-center pt-3 pb-1 shrink-0">
+              <div className="w-10 h-[5px] rounded-full bg-gray-200" />
+            </div>
+            <div className="flex items-start justify-between px-6 pt-2 pb-3 shrink-0">
+              <div>
+                <h2 className="text-[18px] font-black text-gray-900">일괄 승인 결과</h2>
+                <p className="text-[13px] font-medium text-gray-500 mt-0.5">
+                  성공 {bulkResult.successCount}건 · 실패 {bulkResult.failCount}건
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBulkResult(null)}
+                className="p-1 -mr-1 active:scale-90 transition-transform"
+                aria-label="닫기"
+              >
+                <XMarkIcon className="w-6 h-6 text-gray-400" />
+              </button>
+            </div>
+            <div className="px-6 py-2 space-y-4 overflow-y-auto flex-1">
+              {bulkResult.successCount > 0 && (
+                <div className="bg-green-50 border border-green-100 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                    <p className="text-[14px] font-black text-green-700">
+                      {bulkResult.successCount}건 승인 완료
+                    </p>
+                  </div>
+                  <ul className="text-[12px] font-medium text-green-700 space-y-1 pl-7">
+                    {bulkResult.results.filter((r) => r.success).map((r) => (
+                      <li key={r.recordId} className="truncate font-mono">{r.lotNumber}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {bulkResult.failCount > 0 && (
+                <div className="bg-red-50 border border-red-100 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ExclamationCircleIcon className="w-5 h-5 text-[#FF3B30]" />
+                    <p className="text-[14px] font-black text-[#FF3B30]">
+                      {bulkResult.failCount}건 실패
+                    </p>
+                  </div>
+                  <ul className="space-y-2 pl-7">
+                    {bulkResult.results.filter((r) => !r.success).map((r) => (
+                      <li key={r.recordId} className="text-[12px]">
+                        <p className="font-bold text-gray-800 truncate font-mono">{r.lotNumber}</p>
+                        <p className="text-gray-500 mt-0.5">{r.message ?? "알 수 없는 오류"}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div
+              className="px-6 pt-3 shrink-0"
+              style={{ paddingBottom: "max(20px, env(safe-area-inset-bottom))" }}
+            >
+              <button
+                type="button"
+                onClick={() => setBulkResult(null)}
+                className="w-full py-4 rounded-2xl bg-[#191F28] text-white text-[16px] font-black active:scale-[0.98] transition-all"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* 하단 탭바 */}
       <BottomTabBar<AdminTabKey>

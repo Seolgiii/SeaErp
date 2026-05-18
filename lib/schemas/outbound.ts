@@ -21,12 +21,12 @@ export const OutboundFieldsSchema = z
     LOT번호: LookupValue, // 룩업
     LOT재고레코드ID: z.string().optional(),
 
-    출고수량: NumberLike,
+    출고요청수량: NumberLike,
     작업자: LinkedRecord,
     보관처: LinkedRecord,
     판매처: z.string().optional(),
     판매가: NumberLike,
-    /** formula 필드: 판매가 × 출고수량 (Airtable이 자동 계산) */
+    /** formula 필드: 판매가 × 출고요청수량 (Airtable이 자동 계산) */
     판매금액: NumberLike,
     규격: z.string().optional(),
     미수: z.string().optional(),
@@ -36,14 +36,13 @@ export const OutboundFieldsSchema = z
     반려사유: z.string().optional(),
     출고증URL: z.string().optional(),
 
-    // 출고 승인 시 스냅샷되는 비용 8개 필드
+    // 출고 승인 시 스냅샷되는 비용 7개 필드 (2026-05-18 "출고시점 판매금액" 제거 — 판매금액 formula로 대체)
     "출고시점 단가": NumberLike,
     "출고시점 냉장료": NumberLike,
     "출고시점 입출고비": NumberLike,
     "출고시점 노조비": NumberLike,
     "출고시점 동결비": NumberLike,
     "출고시점 판매원가": NumberLike,
-    "출고시점 판매금액": NumberLike,
     "출고시점 손익": NumberLike,
 
     영수증사진: AttachmentArray,

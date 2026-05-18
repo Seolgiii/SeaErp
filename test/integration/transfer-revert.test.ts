@@ -136,7 +136,7 @@ describe("TRANSFER 반려 자동 복구", () => {
       id: "recOUTBOUNDNEW001",
       fields: {
         출고일: "2026-05-07",
-        출고수량: 10,
+        출고요청수량: 10,
         판매가: 80000,
         입고관리: [newInbound.id],
         LOT재고레코드ID: newLot.id,

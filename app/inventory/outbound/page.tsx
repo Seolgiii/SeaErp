@@ -13,6 +13,33 @@ import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
 import { formatIntKo, fromGroupedIntegerInput } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
+import {
+  PENDING_OUTBOUND_LOTS_KEY,
+  readPendingCartLots,
+  type PendingCartLot,
+} from '@/lib/pending-cart-lots';
+
+// LOT 검색 결과 — Airtable 응답을 구조화하지 않고 그대로 사용
+// (필드 키가 베이스 마이그레이션에 따라 가변적이라 인덱스 시그니처로 표현)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LotSearchResult = { id: string; fields: Record<string, any> };
+
+/** 핸드오프된 PendingCartLot을 LotSearchResult 모양으로 합성 (status에서 모르는 보관처는 빈 값) */
+function pendingToOutboundLot(p: PendingCartLot): LotSearchResult {
+  return {
+    id: p.lotRecordId,
+    fields: {
+      'LOT번호': p.lotNumber,
+      '품목명': p.productName,
+      '규격': p.spec,
+      '미수': p.misu,
+      '상세규격_표기': p.misu,
+      '재고수량': p.stockQty,
+      '원산지': p.origin ?? '',
+      '보관처': '',
+    },
+  };
+}
 
 type CartItem = {
   cartId: string;
@@ -28,17 +55,14 @@ type CartItem = {
   salePrice: number | undefined;
 };
 
-// LOT 검색 결과 — Airtable 응답을 구조화하지 않고 그대로 사용
-// (필드 키가 베이스 마이그레이션에 따라 가변적이라 인덱스 시그니처로 표현)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type LotSearchResult = { id: string; fields: Record<string, any> };
-
 function formatMisuDisplay(raw: unknown): string {
   const s = String(raw ?? '').trim();
   if (!s) return '—';
   if (s.endsWith('미')) return s;
   return `${s} 미`;
 }
+
+// LotSearchResult / pendingToOutboundLot은 import 영역에서 정의됨 (sessionStorage 핸드오프용).
 
 export default function OutboundRecordPage() {
   const router = useRouter();
@@ -57,6 +81,10 @@ export default function OutboundRecordPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
 
+  // 재고 조회 → 핸드오프된 대기 LOT (mount 시 1회 hydrate)
+  const [pending, setPending] = useState<PendingCartLot[]>([]);
+  const [pendingTotal, setPendingTotal] = useState(0);
+
   // ── 묶음 처리 결과 (B안: 부분 성공·실패 표시) ─────────────────────────────
   // status 페이지의 handleBulkOutbound 패턴과 동일한 형태로 정렬.
   // cart는 동일 LOT을 다른 판매처/판매가로 여러 번 담을 수 있으므로
@@ -71,6 +99,17 @@ export default function OutboundRecordPage() {
   useEffect(() => {
     const s = readSession();
     if (s) setWorkerId(s.workerId);
+  }, []);
+
+  // sessionStorage 핸드오프: 첫 LOT 자동 선택 + 수량 자동 입력. 큐 전체 유지.
+  useEffect(() => {
+    const lots = readPendingCartLots(PENDING_OUTBOUND_LOTS_KEY);
+    if (lots.length === 0) return;
+    setPending(lots);
+    setPendingTotal(lots.length);
+    const first = lots[0];
+    setSelectedLot(pendingToOutboundLot(first));
+    setQuantity(String(first.quantity));
   }, []);
 
   // ── 검색 공통 로직 ────────────────────────────────────────────────────────
@@ -138,11 +177,45 @@ export default function OutboundRecordPage() {
       },
     ]);
 
-    // 검색결과·키워드 유지, 입력값만 초기화 → 같은 리스트에서 다음 LOT 선택
-    setSelectedLot(null);
-    setQuantity('');
-    setSeller('');
-    setSalePrice('');
+    // 대기 큐에서 현재 LOT 제거 + 다음 LOT 자동 선택. 판매처/판매가는 유지(같은 거래처 가능성↑).
+    const currentLotId = selectedLot.id;
+    const remaining = pending.filter((p) => p.lotRecordId !== currentLotId);
+    setPending(remaining);
+
+    if (remaining.length > 0) {
+      const next = remaining[0];
+      setSelectedLot(pendingToOutboundLot(next));
+      setQuantity(String(next.quantity));
+      // 판매처/판매가는 유지 — 같은 거래처로 묶음 출고가 흔함
+    } else {
+      // 일반 검색 모드 — 입력값 초기화 (검색결과·키워드는 유지하여 다음 LOT 선택 가능)
+      setSelectedLot(null);
+      setQuantity('');
+      setSeller('');
+      setSalePrice('');
+    }
+  };
+
+  /** 핸드오프 큐에서 임의 순서로 LOT 선택 (대기 칩 클릭) */
+  const pickPending = (lotRecordId: string) => {
+    if (selectedLot) {
+      toast('현재 LOT 입력을 먼저 마치거나 [다시 검색]을 눌러주세요.', 'info');
+      return;
+    }
+    const picked = pending.find((p) => p.lotRecordId === lotRecordId);
+    if (!picked) return;
+    setSelectedLot(pendingToOutboundLot(picked));
+    setQuantity(String(picked.quantity));
+  };
+
+  /** 핸드오프 큐에서 LOT 영구 제거 (취소) */
+  const dismissPending = (lotRecordId: string) => {
+    setPending((prev) => prev.filter((p) => p.lotRecordId !== lotRecordId));
+    setPendingTotal((n) => Math.max(0, n - 1));
+    if (selectedLot?.id === lotRecordId) {
+      setSelectedLot(null);
+      setQuantity('');
+    }
   };
 
   // ── 출고 신청 ─────────────────────────────────────────────────────────────
@@ -229,6 +302,59 @@ export default function OutboundRecordPage() {
       <div className="p-4 space-y-4">
         {!bulkResult && (
           <>
+        {/* 재고 조회에서 핸드오프된 대기 LOT 안내 — 첫 LOT은 자동 선택, 다음 LOT은 + 추가 시 자동 이어짐 */}
+        {pending.length > 0 && (
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-black text-[#FF3B30]">
+                재고 조회 가져온 LOT {pendingTotal}건 · 남은 {pending.length}건
+              </p>
+              <p className="text-[11px] font-bold text-red-400">
+                현재 처리 완료 후 자동 이어집니다
+              </p>
+            </div>
+            <ul className="flex flex-wrap gap-2">
+              {pending.map((p) => {
+                const isCurrent = selectedLot?.id === p.lotRecordId;
+                return (
+                  <li
+                    key={p.lotRecordId}
+                    className={`flex items-center gap-1 rounded-full pl-3 pr-1 py-1 border ${
+                      isCurrent
+                        ? 'bg-[#FF3B30] border-[#FF3B30] text-white'
+                        : 'bg-white border-red-200 text-gray-700'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => !isCurrent && pickPending(p.lotRecordId)}
+                      disabled={isCurrent}
+                      className="text-[12px] font-bold active:scale-95 disabled:cursor-default"
+                      aria-label={isCurrent ? `${p.lotNumber} 현재 처리 중` : `${p.lotNumber} 먼저 선택`}
+                    >
+                      {isCurrent && <span className="mr-1">●</span>}
+                      <span className="font-mono">{p.lotNumber}</span>
+                      <span className={`ml-1 ${isCurrent ? 'text-white/90' : 'text-[#FF3B30]'}`}>
+                        ·{p.quantity}박스
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dismissPending(p.lotRecordId)}
+                      className={`w-5 h-5 rounded-full text-[12px] active:scale-90 ${
+                        isCurrent ? 'text-white/70 hover:text-white' : 'text-gray-300 hover:text-red-500'
+                      }`}
+                      aria-label={`${p.lotNumber} 큐에서 제거`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {/* ── 검색 · 선택 카드 ──────────────────────────────────────────── */}
         <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
 

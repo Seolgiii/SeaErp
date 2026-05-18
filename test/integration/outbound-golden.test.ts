@@ -13,7 +13,7 @@ import {
  *
  * 흐름:
  *   1. 이미 승인된 입고 + 재고 100박스 LOT 준비 (seed)
- *   2. 작업자가 출고 신청 (createOutboundRecord) — 출고수량 30박스
+ *   2. 작업자가 출고 신청 (createOutboundRecord) — 출고요청수량 30박스
  *      → 출고 관리 레코드 생성 (승인 대기)
  *      → 잔여수량/LOT재고는 그대로 (승인 시점에 차감)
  *   3. 관리자가 승인 (updateApprovalStatus OUTBOUND, "승인 완료")
@@ -69,7 +69,7 @@ describe("출고 골든패스", () => {
     expect(outboundRecords).toHaveLength(1);
     const outbound = outboundRecords[0];
     expect(outbound.fields.승인상태).toBe("승인 대기");
-    expect(outbound.fields.출고수량).toBe(30);
+    expect(outbound.fields.출고요청수량).toBe(30);
     expect(outbound.fields.판매처).toBe("○○수산");
     expect(outbound.fields.LOT재고레코드ID).toBe(lot.id);
 
@@ -94,7 +94,8 @@ describe("출고 골든패스", () => {
     expect(store.get("입고 관리", inbound.id)!.fields.잔여수량).toBe(70);
     expect(store.get("LOT별 재고", lot.id)!.fields.재고수량).toBe(70);
 
-    // 출고시점 비용 7개 필드 PATCH
+    // 출고시점 비용 7개 필드 PATCH (단가/냉장료/입출고비/노조비/동결비/판매원가/손익)
+    // 판매금액은 formula(판매가 × 출고요청수량)로 자동 채워짐
     const outAfter = store.get("출고 관리", outbound.id)!;
     expect(outAfter.fields.승인상태).toBe("승인 완료");
     expect(Number(outAfter.fields["출고시점 단가"])).toBeGreaterThan(0);
@@ -102,8 +103,9 @@ describe("출고 골든패스", () => {
     expect(outAfter.fields["출고시점 입출고비"]).toBeDefined();
     expect(outAfter.fields["출고시점 노조비"]).toBeDefined();
     expect(Number(outAfter.fields["출고시점 판매원가"])).toBeGreaterThan(0);
-    expect(outAfter.fields["출고시점 판매금액"]).toBeDefined();
     expect(outAfter.fields["출고시점 손익"]).toBeDefined();
+    // 판매금액은 formula 컬럼 — 신청 시점부터 자동 채워짐
+    expect(Number(outAfter.fields["판매금액"])).toBeGreaterThan(0);
 
     // 출고증 PDF URL
     expect(String(outAfter.fields.출고증URL ?? "")).toMatch(

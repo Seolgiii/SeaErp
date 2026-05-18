@@ -160,10 +160,10 @@ describe("시나리오 E4 — 출고 반려 시 LOT 복구 실패 보상", () =>
     // 정상 복구: 양쪽 100
     expect(store.get("입고 관리", inbound.id)!.fields.잔여수량).toBe(100);
     expect(store.get("LOT별 재고", lot.id)!.fields.재고수량).toBe(100);
-    // 출고시점 비용 7필드 null
+    // 출고시점 비용 6필드 null + 판매원가 보존 (2026-05-18 정책)
     const outAfter = store.get("출고 관리", outbound.id)!;
     expect(outAfter.fields.승인상태).toBe("반려");
-    expect(outAfter.fields["출고시점 판매원가"]).toBeNull();
+    expect(Number(outAfter.fields["출고시점 판매원가"])).toBeGreaterThan(0);
 
     errorSpy.mockRestore();
   });

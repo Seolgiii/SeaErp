@@ -8,6 +8,24 @@ import { searchTransferLot, createTransferRecord, getStorageOptions } from '@/ap
 import type { TransferLotResult } from '@/app/actions/inventory/transfer';
 import { readSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
+import {
+  PENDING_TRANSFER_LOTS_KEY,
+  readPendingCartLots,
+  type PendingCartLot,
+} from '@/lib/pending-cart-lots';
+
+function pendingToTransferLot(p: PendingCartLot): TransferLotResult {
+  return {
+    lotRecordId: p.lotRecordId,
+    lotNumber: p.lotNumber,
+    productName: p.productName,
+    spec: p.spec,
+    misu: p.misu,
+    stockQty: p.stockQty,
+    storage: '',
+    inboundRecordId: p.inboundRecordId ?? '',
+  };
+}
 
 function todayKST(): string {
   const now = new Date();
@@ -57,6 +75,11 @@ export default function TransferPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 재고 조회 → 핸드오프된 대기 LOT 목록 (mount 시 1회 hydrate)
+  // pending은 cart에 들어가지 않은 모든 후보를 포함. 첫 LOT은 자동 selectedLot.
+  const [pending, setPending] = useState<PendingCartLot[]>([]);
+  const [pendingTotal, setPendingTotal] = useState(0);
+
   useEffect(() => {
     const s = readSession();
     if (s) setWorkerId(s.workerId);
@@ -66,6 +89,18 @@ export default function TransferPage() {
     getStorageOptions()
       .then(setStorageOptions)
       .catch(() => {});
+  }, []);
+
+  // sessionStorage 핸드오프: 첫 LOT 자동 선택 + 수량 자동 입력.
+  // pending 큐는 첫 LOT 포함 전체 유지 — [다시 검색]으로 자동 선택을 취소해도 큐에 그대로 남아 다시 선택 가능.
+  useEffect(() => {
+    const lots = readPendingCartLots(PENDING_TRANSFER_LOTS_KEY);
+    if (lots.length === 0) return;
+    setPending(lots);
+    setPendingTotal(lots.length);
+    const first = lots[0];
+    setSelectedLot(pendingToTransferLot(first));
+    setTransferQty(String(first.quantity));
   }, []);
 
   // 보관처 드롭다운 바깥 클릭 닫기
@@ -148,13 +183,48 @@ export default function TransferPage() {
       },
     ]);
 
-    setSelectedLot(null);
-    setTransferQty('');
-    setStorageQuery('');
-    setTargetStorageId('');
-    setTargetStorageName('');
-    setKeyword('');
-    setSearchResults([]);
+    // 대기 큐에서 현재 LOT 제거. 다음 LOT 있으면 자동 선택 + 보관처/날짜 유지(같은 곳 가능성↑).
+    // 비어 있으면 일반 검색 모드로 전환.
+    const remaining = pending.filter((p) => p.lotRecordId !== selectedLot.lotRecordId);
+    setPending(remaining);
+
+    if (remaining.length > 0) {
+      const next = remaining[0];
+      setSelectedLot(pendingToTransferLot(next));
+      setTransferQty(String(next.quantity));
+      setKeyword('');
+      setSearchResults([]);
+    } else {
+      setSelectedLot(null);
+      setTransferQty('');
+      setStorageQuery('');
+      setTargetStorageId('');
+      setTargetStorageName('');
+      setKeyword('');
+      setSearchResults([]);
+    }
+  };
+
+  /** 핸드오프 큐에서 임의 순서로 LOT 선택 (대기 칩 클릭) */
+  const pickPending = (lotRecordId: string) => {
+    if (selectedLot) {
+      toast('현재 LOT 입력을 먼저 마치거나 [다시 검색]을 눌러주세요.', 'info');
+      return;
+    }
+    const picked = pending.find((p) => p.lotRecordId === lotRecordId);
+    if (!picked) return;
+    setSelectedLot(pendingToTransferLot(picked));
+    setTransferQty(String(picked.quantity));
+  };
+
+  /** 핸드오프 큐에서 LOT 영구 제거 (취소) */
+  const dismissPending = (lotRecordId: string) => {
+    setPending((prev) => prev.filter((p) => p.lotRecordId !== lotRecordId));
+    setPendingTotal((n) => Math.max(0, n - 1));
+    if (selectedLot?.lotRecordId === lotRecordId) {
+      setSelectedLot(null);
+      setTransferQty('');
+    }
   };
 
   const handleSubmitAll = async () => {
@@ -193,6 +263,59 @@ export default function TransferPage() {
       />
 
       <main className="p-4 flex flex-col gap-4">
+
+        {/* 재고 조회에서 핸드오프된 대기 LOT 안내 — 첫 LOT은 자동 선택, 다음 LOT은 + 추가 시 자동 이어짐 */}
+        {pending.length > 0 && (
+          <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-black text-[#FF8C00]">
+                재고 조회 가져온 LOT {pendingTotal}건 · 남은 {pending.length}건
+              </p>
+              <p className="text-[11px] font-bold text-orange-400">
+                현재 처리 완료 후 자동 이어집니다
+              </p>
+            </div>
+            <ul className="flex flex-wrap gap-2">
+              {pending.map((p) => {
+                const isCurrent = selectedLot?.lotRecordId === p.lotRecordId;
+                return (
+                  <li
+                    key={p.lotRecordId}
+                    className={`flex items-center gap-1 rounded-full pl-3 pr-1 py-1 border ${
+                      isCurrent
+                        ? 'bg-[#FF8C00] border-[#FF8C00] text-white'
+                        : 'bg-white border-orange-200 text-gray-700'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => !isCurrent && pickPending(p.lotRecordId)}
+                      disabled={isCurrent}
+                      className="text-[12px] font-bold active:scale-95 disabled:cursor-default"
+                      aria-label={isCurrent ? `${p.lotNumber} 현재 처리 중` : `${p.lotNumber} 먼저 선택`}
+                    >
+                      {isCurrent && <span className="mr-1">●</span>}
+                      <span className="font-mono">{p.lotNumber}</span>
+                      <span className={`ml-1 ${isCurrent ? 'text-white/90' : 'text-[#FF8C00]'}`}>
+                        ·{p.quantity}박스
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dismissPending(p.lotRecordId)}
+                      className={`w-5 h-5 rounded-full text-[12px] active:scale-90 ${
+                        isCurrent ? 'text-white/70 hover:text-white' : 'text-gray-300 hover:text-red-500'
+                      }`}
+                      aria-label={`${p.lotNumber} 큐에서 제거`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {/* LOT 검색 + 이동 정보 카드 */}
         <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">

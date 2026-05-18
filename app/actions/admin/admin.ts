@@ -255,7 +255,7 @@ async function generateAndSaveOutboundPdf(recordId: string): Promise<void> {
   const pdfBuffer = await generateOutboundPdf({
     lotNumber,
     productName,
-    quantity: Number(fields["출고수량"] ?? 0),
+    quantity: Number(fields["출고요청수량"] ?? 0),
     buyer: String(fields["판매처"] ?? ""),
     saleAmount: Number(fields["판매금액"] ?? 0),
     date: String(fields["출고일"] ?? ""),
@@ -498,7 +498,7 @@ async function revertLotOnInboundReject(
 async function deductStockOnOutboundApproval(
   outboundRecordId: string,
 ): Promise<{ success: boolean; message?: string }> {
-  // 1. 출고 관리 레코드 조회 (출고수량, 연결된 입고 관리 ID 확인)
+  // 1. 출고 관리 레코드 조회 (출고요청수량, 연결된 입고 관리 ID 확인)
   const outFields = await fetchRecord("출고 관리", outboundRecordId);
   if (!outFields) {
     return { success: false, message: "출고 레코드를 찾을 수 없습니다." };
@@ -514,22 +514,25 @@ async function deductStockOnOutboundApproval(
     );
   }
 
-  // 멱등 가드: 출고시점 판매원가가 양수로 채워져 있으면 이미 차감 완료된 것으로 간주
-  // (반려 시 restoreStockOnOutboundReject가 7개 출고시점 필드를 null로 클리어하므로
-  //  반려 → 재승인 케이스에서는 정상적으로 가드 통과)
-  const existingTotalCost = outFields["출고시점 판매원가"];
-  const totalCostNum = Number(
-    Array.isArray(existingTotalCost) ? existingTotalCost[0] : existingTotalCost,
+  // 멱등 가드: 출고시점 단가가 양수면 이미 차감 완료된 것으로 간주.
+  //
+  // 2026-05-18 기준 변경:
+  //   - 이전: "출고시점 판매원가"로 가드. 반려 시 판매원가도 클리어돼서 재승인 시 가드 통과.
+  //   - 변경: "출고시점 단가"로 가드. 판매원가는 반려 시 보존되므로 더 이상 가드 기준으로 부적합.
+  //   - 단가는 LOT.수매가/무게 기반이라 정상 LOT은 항상 양수. 반려 시 null 클리어되어 재승인 가능.
+  const existingUnitCost = outFields["출고시점 단가"];
+  const unitCostNum = Number(
+    Array.isArray(existingUnitCost) ? existingUnitCost[0] : existingUnitCost,
   );
-  if (Number.isFinite(totalCostNum) && totalCostNum > 0) {
+  if (Number.isFinite(unitCostNum) && unitCostNum > 0) {
     log(
       "[deductStockOnOutboundApproval] 이미 재고 차감 완료 — 중복 처리 생략:",
-      { outboundRecordId, existingTotalCost: totalCostNum },
+      { outboundRecordId, existingUnitCost: unitCostNum },
     );
     return { success: true };
   }
 
-  const outQty = Number(outFields["출고수량"]);
+  const outQty = Number(outFields["출고요청수량"]);
   if (!Number.isFinite(outQty) || outQty <= 0) {
     return { success: false, message: "출고 수량이 올바르지 않습니다." };
   }
@@ -643,6 +646,9 @@ async function deductStockOnOutboundApproval(
       // 5. 출고시점 비용 계산 → 출고 관리에 저장
       // E1: 이 PATCH가 실패하면 멱등 가드(출고시점 판매원가>0)가 동작하지 않아
       //     재승인 시 이중 차감 위험. 실패 시 입고/LOT 재고를 원복하고 승인 실패 반환.
+      //
+      // 2026-05-18: "출고시점 판매금액" 컬럼 제거 — 판매금액 formula(판매가 × 출고요청수량)와
+      //              항상 같으므로 중복 컬럼 정리. formula는 신청 시점부터 모든 record에 자동 채워짐.
       let costPatchOk = false;
       let costPatchError: unknown = null;
       try {
@@ -675,7 +681,6 @@ async function deductStockOnOutboundApproval(
           "출고시점 노조비": breakdown.unionFee,
           "출고시점 동결비": breakdown.freezeFee,
           "출고시점 판매원가": breakdown.totalCost,
-          "출고시점 판매금액": saleAmount,
           "출고시점 손익": breakdown.profit,
         });
       } catch (e) {
@@ -746,7 +751,7 @@ async function restoreStockOnOutboundReject(
     return { success: false, message: "출고 레코드를 찾을 수 없습니다." };
   }
 
-  const outQty = Number(outFields["출고수량"]);
+  const outQty = Number(outFields["출고요청수량"]);
   if (!Number.isFinite(outQty) || outQty <= 0) {
     return { success: false, message: "출고 수량을 확인할 수 없습니다." };
   }
@@ -866,15 +871,22 @@ async function restoreStockOnOutboundReject(
     );
   }
 
-  // 3. 출고시점 비용 8개 필드 클리어 (반려된 출고가 손익 보고서에 잡히지 않도록)
+  // 3. 출고시점 비용 클리어 — 단, "출고시점 판매원가"는 보존
+  //
+  // 2026-05-18 정책 변경:
+  //   - 보존: 출고시점 판매원가 ("이 정도 금액에 시도했었다"는 cost basis 지표로 가치 있음)
+  //   - 클리어: 단가/냉장료/입출고비/노조비/동결비/손익 — 반려된 거래는 미발생이라 분해 비용·손익 의미 없음
+  //   - 제거된 키: "출고시점 판매금액" — currency 컬럼 자체 제거됨 (판매금액 formula로 대체)
+  //
+  // 멱등 가드(deductStockOnOutboundApproval)는 여전히 "출고시점 판매원가>0"으로 동작.
+  // 반려 시에도 판매원가가 남아있어 재승인 차단되므로 별도 reset 필요 → 보존하면서도 재승인을 막진 않음.
+  // 사실 반려→재승인은 admin.ts의 currentStatus 분기에서 별도 처리(deductStockOnOutboundApproval 재호출).
   const clearOk = await patchRecord("출고 관리", outboundRecordId, {
     "출고시점 단가": null,
     "출고시점 냉장료": null,
     "출고시점 입출고비": null,
     "출고시점 노조비": null,
     "출고시점 동결비": null,
-    "출고시점 판매원가": null,
-    "출고시점 판매금액": null,
     "출고시점 손익": null,
   });
   if (!clearOk) {
@@ -1098,4 +1110,41 @@ export async function updateApprovalStatus(
     logError("[updateApprovalStatus] error", msg);
     return { success: false, message: msg };
   }
+}
+
+/**
+ * 일괄 승인 — admin/dashboard에서 여러 PENDING 항목을 한 번에 '승인 완료'로 처리.
+ *
+ * 정책 (B안 — outbound-bulk-policy.test.ts와 동일):
+ *  - 순차 호출 (LOT 일련번호 등 자원 경합 회피)
+ *  - 부분 성공 허용 (첫 실패 시 중단하지 않음, 끝까지 순회)
+ *  - 결과는 항목별 success/message로 반환 → 클라이언트가 결과 화면 표시
+ *
+ * EXPENSE는 100만원 권한 분기가 있어 일괄에 부적합 — 클라이언트에서 체크박스 비활성화 권장.
+ * 그래도 호출이 들어오면 updateApprovalStatus의 자체 권한 검증이 실패 메시지 반환.
+ */
+export async function updateApprovalStatusBulk(
+  adminWorkerId: string,
+  items: { recordId: string; type: "INBOUND" | "OUTBOUND" | "TRANSFER" | "EXPENSE" }[],
+): Promise<{
+  results: { recordId: string; success: boolean; message?: string }[];
+  successCount: number;
+  failCount: number;
+}> {
+  const results: { recordId: string; success: boolean; message?: string }[] = [];
+  for (const item of items) {
+    const r = await updateApprovalStatus(
+      adminWorkerId,
+      item.recordId,
+      item.type,
+      "승인 완료",
+    );
+    results.push({ recordId: item.recordId, success: r.success, message: r.message });
+  }
+  const successCount = results.filter((r) => r.success).length;
+  return {
+    results,
+    successCount,
+    failCount: results.length - successCount,
+  };
 }

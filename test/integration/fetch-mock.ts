@@ -65,14 +65,14 @@ function pickFault(
  * in-memory store는 formula를 계산하지 않으므로, 실제 Airtable과 동일한 동작을
  * 위해 POST/PATCH 직후 formula 결과 필드를 직접 채워준다.
  *
- *  - 출고 관리.판매금액 = 판매가 × 출고수량 (operational formula 필드)
+ *  - 출고 관리.판매금액 = 판매가 × 출고요청수량 (operational formula 필드)
  */
 function applyFormulas(table: string, recordId: string): void {
   if (table !== "출고 관리") return;
   const rec = store.get(table, recordId);
   if (!rec) return;
   const salePrice = Number(rec.fields["판매가"]);
-  const qty = Number(rec.fields["출고수량"]);
+  const qty = Number(rec.fields["출고요청수량"]);
   const saleAmount =
     Number.isFinite(salePrice) && Number.isFinite(qty) ? salePrice * qty : 0;
   store.patch(table, recordId, { 판매금액: saleAmount });
