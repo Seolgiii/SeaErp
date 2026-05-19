@@ -4,9 +4,9 @@
 개발 방식: 1인 기획/개발 + Claude Code
 
 ■ 최근 변경 (2026-05-19)
-- Airtable 승인상태 색상 5개 테이블 통일 (수동 UI). 노랑/초록/빨강/회색 + 지출결의의 주황. Web API가 singleSelect choices 변경 미지원(422)이라 수동 가이드 + `get_table_schema` 검증.
-- LOT별 재고 상태 7개 필드 전면 활성 (0dbaca6/d677a61/c6166b8). 세트 A(상태+상태사유=lifecycle) + B(승인상태+결정자+결정일시+반려사유+반려메모=workflow). inbound·outbound·transfer 모든 결재 분기에서 PATCH. 결정자는 작업자 link 타입 변경 후 admin.id 자동 채움. RejectBottomSheet 옵션 5종 칩(수량 불일치/품질 이상/서류 미비/검역 문제/기타) + 메모 textarea. LOT.반려사유는 옵션명 그대로, 다른 테이블 반려사유는 합성 텍스트.
-- Vercel 빌드 fix(`prefer-const`, 2c36b4b) + origin remote URL 갱신(SeaErp.git).
+- Airtable 승인상태 색상 5개 테이블 통일(수동 UI) + LOT별 재고 상태 7개 필드 전면 활성(0dbaca6/d677a61/c6166b8, 세트 A=lifecycle / B=workflow) + 반려사유 5종 칩 UI(c6166b8). Vercel 빌드 fix(`prefer-const`, 2c36b4b) + origin remote URL 갱신(SeaErp.git).
+- PIN 마이그레이션을 `next/server.after()`로 전환(`a3743d7`) — Vercel 조기 종료 시 평문 PIN 영구 잔존 위험 해소 + `security.test.ts` flaky 동시 해결. 사내 공지 5건 + A4 인쇄용 HTML 시안(`6f7832a`, `docs/notices/`). 직원 톤 가이드 메모리 저장.
+- **입고증·출고증 발행 시나리오 정립**(`c0e9cf7`). 자사창고/외부창고/가공공장/기타 4분류 × 7가지 케이스 매트릭스로 자사창고 끝점이 있을 때만 우리(SeaERP) PDF 발행. 보관처 마스터 `구분`(4분류) + 재고이동 `출고증 URL` 신설. `lib/storage.ts:isOwnStorage`(미분류 default true, 자사창고만 true, 가공공장은 외부 취급), admin/transfer PDF 트리거 분기, OutboundPDF에 `isTransfer` prop(판매처→이동처 + 판매금액 행 제거) + QR 추가.
 
 ■ 최근 변경 (2026-05-18)
 - 재고조회 → 카트 페이지 핸드오프 통일 (`e263bca`). BulkSubmitSheet 제거 + sessionStorage 핸드오프 + 카트 페이지에 첫 LOT 자동 선택/다음 자동 이어짐 + 대기 칩 UI. LOT마다 다른 판매처/판매가/보관처 부여 가능. admin/dashboard 일괄 승인(B안) 추가 + EXPENSE는 100만원 권한 분기로 제외. outbound LOT 보관처 fallback 안전망.
