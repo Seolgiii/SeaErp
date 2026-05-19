@@ -58,6 +58,12 @@ export const LotFieldsSchema = z
     이월동결비: NumberLike,
 
     승인상태: z.string().optional(),
+    상태: z.string().optional(),
+    상태사유: z.string().optional(),
+    결정자: LinkedRecord,
+    결정일시: z.string().optional(),
+    반려사유: z.string().optional(),
+    반려메모: z.string().optional(),
     비고: z.string().optional(),
     입고자: LinkedRecord,
   })

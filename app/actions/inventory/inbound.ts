@@ -337,6 +337,8 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
       ...(isRecordId(String(formData?.["storageRecordId"] ?? "")) && { 보관처: [String(formData?.["storageRecordId"])] }),
       "입고수량(BOX)": qty,
       ...(isRecordId(supplierRecordId) && { 매입처: [supplierRecordId] }),
+      승인상태: "승인 대기",
+      상태: "승인 대기",
     };
     if (Number.isFinite(purchasePrice) && purchasePrice > 0) {
       lotFields["수매가"] = purchasePrice;

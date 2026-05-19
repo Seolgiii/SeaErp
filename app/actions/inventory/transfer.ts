@@ -465,6 +465,10 @@ export async function approveTransfer(
     "이월노조비": pricing.newCarriedUnionFee,
     "이월동결비": pricing.newCarriedFreezeFee,
     "LOT번호(이동출처)": [lotRecordId],
+    "승인상태": "승인 완료",
+    "상태": "승인 완료",
+    "상태사유": "이동 입고",
+    "결정일시": new Date().toISOString(),
   };
   if (newStorageId) lotInventoryFields["보관처"] = [newStorageId];
 
@@ -485,10 +489,15 @@ export async function approveTransfer(
   if (!newLot?.id) return { success: false, message: "신규 LOT별 재고 레코드 생성 실패" };
 
   // 8. 원본 재고 차감
+  const newOrigStock = Math.max(0, currentStock - 이동수량);
+  const origLotPatch: Record<string, unknown> = { "재고수량": newOrigStock };
+  if (newOrigStock === 0) {
+    // 원본 LOT이 모두 이동돼서 소진된 경우
+    origLotPatch["상태"] = "소진";
+    origLotPatch["상태사유"] = "이동 출고";
+  }
   await Promise.all([
-    patchRecord("LOT별 재고", lotRecordId, {
-      "재고수량": Math.max(0, currentStock - 이동수량),
-    }),
+    patchRecord("LOT별 재고", lotRecordId, origLotPatch),
     patchRecord("입고 관리", inboundRecordId, {
       "잔여수량": Math.max(0, currentRemain - 이동수량),
     }),
@@ -542,6 +551,7 @@ export async function approveTransfer(
  */
 export async function revertTransferOnReject(
   transferRecordId: string,
+  rejectReason: string = "",
 ): Promise<{ success: boolean; message?: string }> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
     return { success: false, message: "환경변수 누락" };
@@ -680,9 +690,16 @@ export async function revertTransferOnReject(
     return { success: false, message: "원본 LOT 레코드를 찾을 수 없습니다." };
   }
   const origLotStock = num(origLotFields["재고수량"]);
-  const lotPatchOk = await patchRecord("LOT별 재고", originalLotRecordId, {
+  // 원본 LOT.상태가 "소진"이었으면 "승인 완료"로 복원 (이동 출고 → 이동 반려).
+  // 상태사유는 이전 라이프사이클(신규 입고/이동 입고)을 모를 수 있어 건드리지 않음.
+  const prevOrigStatus = String(origLotFields["상태"] ?? "").trim();
+  const origLotRestorePatch: Record<string, unknown> = {
     재고수량: origLotStock + 이동수량,
-  });
+  };
+  if (prevOrigStatus === "소진") {
+    origLotRestorePatch["상태"] = "승인 완료";
+  }
+  const lotPatchOk = await patchRecord("LOT별 재고", originalLotRecordId, origLotRestorePatch);
   if (!lotPatchOk) {
     logError(
       "[INTEGRITY-ALERT][revertTransferOnReject] 원본 LOT 재고수량 복구 PATCH 실패:",
@@ -798,6 +815,11 @@ export async function revertTransferOnReject(
   // 신규 LOT soft delete (단계 3)
   const newLotZeroOk = await patchRecord("LOT별 재고", newLotRecordId, {
     재고수량: 0,
+    승인상태: "반려",
+    상태: "반려",
+    상태사유: "이동 반려",
+    결정일시: new Date().toISOString(),
+    반려메모: rejectReason || null,
   });
   if (!newLotZeroOk) {
     const rb = await rollbackToCharged({

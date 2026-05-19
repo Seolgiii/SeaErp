@@ -386,7 +386,16 @@ async function createLotOnInboundApproval(
   // 3. 재고수량 + 입고자를 실제 값으로 PATCH (0 → 실제 입고수량, 입고자 링크 설정)
   // 입고 관리의 작업자 링크 필드에서 worker record ID를 추출하여 입고자에 저장
   const workerLinkId = firstLinkId(inboundFields["작업자"]);
-  const lotPatchFields: Record<string, unknown> = { 재고수량: qty };
+  const lotPatchFields: Record<string, unknown> = {
+    재고수량: qty,
+    승인상태: "승인 완료",
+    상태: "승인 완료",
+    상태사유: "신규 입고",
+    결정일시: new Date().toISOString(),
+    // 반려 → 재승인 케이스에서 이전 반려 메타 클리어
+    반려사유: null,
+    반려메모: null,
+  };
   if (workerLinkId) {
     lotPatchFields["입고자"] = [workerLinkId]; // 작업자 테이블 링크 배열 형태로 저장
   }
@@ -426,6 +435,7 @@ async function createLotOnInboundApproval(
  */
 async function revertLotOnInboundReject(
   inboundRecordId: string,
+  rejectReason: string = "",
 ): Promise<{ success: boolean; message?: string }> {
   const inboundFields = await fetchRecord("입고 관리", inboundRecordId);
   if (!inboundFields) {
@@ -470,6 +480,11 @@ async function revertLotOnInboundReject(
     입출고비: null,
     노조비: null,
     동결비: null,
+    승인상태: "반려",
+    상태: "반려",
+    상태사유: "입고 반려",
+    결정일시: new Date().toISOString(),
+    반려메모: rejectReason || null,
   });
   if (!ok) {
     logError(
@@ -611,10 +626,15 @@ async function deductStockOnOutboundApproval(
     if (lotFields) {
       const rawQty = lotFields["재고수량"];
       const currentLotQty = Number(Array.isArray(rawQty) ? rawQty[0] : rawQty) || 0;
+      const newLotQty = Math.max(0, currentLotQty - outQty);
       // Math.max(0, ...) 로 음수 방지 (혹시라도 마이너스 재고가 되지 않도록)
-      await patchRecord("LOT별 재고", lotInventoryRecordId, {
-        재고수량: Math.max(0, currentLotQty - outQty),
-      });
+      // 재고 = 0이 되면 LOT 상태를 "소진" + "출고 완료"로 자동 분류
+      const outboundLotPatch: Record<string, unknown> = { 재고수량: newLotQty };
+      if (newLotQty === 0) {
+        outboundLotPatch["상태"] = "소진";
+        outboundLotPatch["상태사유"] = "출고 완료";
+      }
+      await patchRecord("LOT별 재고", lotInventoryRecordId, outboundLotPatch);
 
       // E2: LOT 재고수량 race 감지 모니터링
       {
@@ -808,9 +828,16 @@ async function restoreStockOnOutboundReject(
     if (lotFields) {
       const rawQty = lotFields["재고수량"];
       const currentLotQty = Number(Array.isArray(rawQty) ? rawQty[0] : rawQty) || 0;
-      const ok = await patchRecord("LOT별 재고", lotInventoryRecordId, {
+      // LOT.상태가 "소진"이었으면 "승인 완료"로 되돌림 (재고가 0 이상으로 복구되므로).
+      // 상태사유는 이전 라이프사이클(신규 입고/이동 입고)을 모를 수 있어 건드리지 않음.
+      const prevLotStatus = String(lotFields["상태"] ?? "").trim();
+      const restorePatch: Record<string, unknown> = {
         재고수량: currentLotQty + outQty,
-      });
+      };
+      if (prevLotStatus === "소진") {
+        restorePatch["상태"] = "승인 완료";
+      }
+      const ok = await patchRecord("LOT별 재고", lotInventoryRecordId, restorePatch);
       if (!ok) {
         // E4: LOT 복구 실패 — inbound가 이미 복구되었다면 정합 깨짐(+outQty 입고 / 0 LOT).
         // 보상 트랜잭션으로 inbound 잔여수량을 원복해 두 테이블 상태를 일치시킴.
@@ -1032,7 +1059,7 @@ export async function updateApprovalStatus(
       log("[updateApprovalStatus] 이미 반려 상태 — 재고 처리 생략:", { type, recordId });
     } else if (currentStatus === "승인 완료") {
       if (type === "INBOUND") {
-        const revertResult = await revertLotOnInboundReject(recordId);
+        const revertResult = await revertLotOnInboundReject(recordId, rejectReason);
         if (!revertResult.success) {
           return { success: false, message: revertResult.message };
         }
@@ -1045,7 +1072,7 @@ export async function updateApprovalStatus(
         // 재고 이동 반려는 신규 LOT/입고관리에서 후속 작업(출고/재이동)이 일어났으면
         // 자동 복구가 데이터를 망가뜨릴 수 있음. revertTransferOnReject 내부에서
         // 안전 가드 3가지를 검사한 뒤 통과 시에만 복구를 진행한다.
-        const revertResult = await revertTransferOnReject(recordId);
+        const revertResult = await revertTransferOnReject(recordId, rejectReason);
         if (!revertResult.success) {
           return { success: false, message: revertResult.message };
         }
