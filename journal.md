@@ -598,6 +598,47 @@ UX (3건):
 
 ---
 
+### 2026-05-19 (저녁)
+
+**완료한 작업**
+- security.test.ts PIN 마이그레이션 flaky 해소 (`a3743d7`). `verifyWorkerPin`의 fire-and-forget `void hashPin().then(patch)`를 `next/server.after()`로 전환. Vercel runtime이 응답 후 background task 완료까지 함수 유지 — 평문 PIN 영구 잔존 위험 해소 + 테스트 10/10 PASS. 테스트 환경엔 `vi.mock('next/server')`로 callback 큐잉 + `drainAfter()` 헬퍼.
+- `recFbuYf7BgUj4fy9` 빈 record 정리 (사용자 직접 삭제). 마킹 → 검증 → 삭제 흐름.
+- 사내 공지 5건 + A4 인쇄용 HTML 시안 (`6f7832a`). `docs/notices/*.md` 5건 (PIN 보호 / 30분 자동 로그아웃 / QR 스캔 / 카트 신청 통일 / 신청 결과 확인) + `preview.html`. 직원 연령대·아날로그 친화 톤·비관 회피 가이드 적용. 메모리 저장 `feedback_employee_notices.md`.
+- **입고증·이동 출고증 발행 정책 + 자사창고 분기 도입**. Airtable: 보관처 마스터에 `구분` singleSelect 4분류(자사창고/외부창고/가공공장/기타) + 재고이동에 `출고증 URL` (url) 필드 신설. 코드: `lib/storage.ts` 신설(`getStorageKind`, `isOwnStorage` — 미분류 default true, 자사창고만 true, 가공공장은 외부 취급), `admin.ts:generateAndSaveInboundPdf`에 자사 조건 분기, `transfer.ts:approveTransfer`에 이동 입고증·이동 출고증 발행 트리거, `lib/generate-pdf.server.tsx:OutboundPDF`에 `isTransfer` prop 추가(판매처→이동처 라벨 + 판매금액 행 제거) + QR 코드 추가.
+
+**결정 사항**
+- 자사창고 분류 = `구분` singleSelect 4분류(자사창고/외부창고/가공공장/기타). 가공공장은 위탁 가공이라 출고증·입고증 발행 주체 X(자사창고 끝점이 기준).
+- 미분류(`구분` 빈 값) default = `true` — 운영 분류 점진 진행 중 회귀 방지. 분류 완료 후 외부 시설 자연스럽게 발행 X로 전환.
+- **PDF 발행 정책** — 시나리오별:
+  | 시나리오 | 입고증 | 출고증 |
+  |---|---|---|
+  | 자사창고 최초 입고 | O | (이동 아님) |
+  | 외부창고/가공공장/기타 최초 입고 | X | (이동 아님) |
+  | 자사 → 자사 (이동) | O | O |
+  | 자사 → 외부/가공공장 (이동) | X | O |
+  | 외부/가공공장 → 자사 (이동) | O | X (외부가 자체 출고증 발급) |
+  | 외부 → 외부 (이동) | X | X |
+  | 거래처 출고 | (이동 아님) | O (현 동작 유지 — 모든 출고) |
+- 이동 출고증 = `generateOutboundPdf(data, isTransfer=true)`로 일반 출고증과 PDF 양식 공유. 라벨 "판매처"→"이동처" + "판매금액" 행 제거. 출고증·입고증 모두 QR 포함(`/inventory/lot/{LOT번호}`).
+
+**미해결 이슈 (별도 세션)**
+- **C·D 결정 필요** — QR 외부 페이지 신설 검토. 거래처가 QR 스캔하면 현재 SeaERP 로그인 차단됨. 해결안 별도 의사결정 라운드 필요:
+  - **C**: 외부 노출 정보 범위 (LOT번호·품목·규격·미수·원산지·입고일·매입처 등 어디까지 공개? 가격·재고수량·작업자·이력은 비공개?)
+  - **D**: 인증 방식 — (i) 공개 URL — 누구나 (ii) 토큰 기반 — QR에 short-token 포함 (iii) IP/도메인 화이트리스트
+- **재고 부착용 태그** 신규 PDF — 라벨 크기·포함 필드·인쇄 형식 결정 필요. ~3시간 (별도 세션).
+- **자사 분기 시나리오 통합 테스트** 추가 미작성 — 코드는 작성·회귀 0 확인됐으나 새 시나리오 명시 케이스(외부창고 입고 시 입고증 발행 X / 자사→외부 이동 출고증 발행 등) 미커버. 별도 세션.
+- 보관처 마스터 86건 `구분` 분류 — 사용자가 운영 환경에서 직접 분류 (자사창고·가공공장 식별). 분류 전엔 default true로 현 동작 유지.
+
+**다음 작업 후보**
+- C·D 결정 (외부 페이지 노출 정보 범위 + 인증 방식)
+- 외부 LOT 공개 페이지 신설 (~2h)
+- 재고 부착용 태그 PDF (~3h)
+- 보관처 86건 `구분` 분류 (운영 작업)
+- 자사 분기 시나리오 통합 테스트 추가 (~1h)
+- 5/19 다음 후보 잔여: B(재고 200건 비용) / C(갈치 16건) / D(Phase 1 BulkResultsPanel)
+
+---
+
 ## 누적 통계 (2026-05-18 기준)
 
 - 단위 테스트: 5 files / **110 pass** (변동 없음)
