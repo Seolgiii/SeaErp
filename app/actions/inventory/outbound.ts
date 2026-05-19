@@ -324,7 +324,8 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
         error: `입고 관리의 ${INBOUND_REMAINING_QTY_FIELD}를 확인할 수 없습니다.`,
       };
     }
-    let { currentQty: currentRemain, storageId } = inboundRemain;
+    const { currentQty: currentRemain } = inboundRemain;
+    let { storageId } = inboundRemain;
     // 입고관리.보관처 link가 비면 LOT.보관처로 fallback (옛 backfill 데이터 누락 대비)
     if (!storageId) {
       const lotStorageId = await getStorageIdFromLot(lotInventoryRecordId);
