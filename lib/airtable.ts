@@ -5,6 +5,7 @@ import "server-only";
 // 공통 함수들을 모아둔 곳입니다.
 // 서버에서만 실행 가능하며, API 키 등 민감한 정보를 안전하게 처리합니다.
 // ─────────────────────────────────────────────────────────────────────────────
+import { after } from "next/server";
 import { AIRTABLE_TABLE, WORKER_FIELDS } from "@/lib/airtable-schema";
 import { hashPin, isHashedPin, verifyHashedPin } from "@/lib/pin-hash";
 import { log, logWarn } from "@/lib/logger";
@@ -343,17 +344,20 @@ export async function verifyWorkerPin(
     const storedPlain = normalizePin4(fields[WORKER_FIELDS.pin]);
     if (storedPlain && storedPlain === normalizedPin) {
       matched = true;
-      // 비동기 백그라운드 마이그레이션 — 응답을 막지 않음
-      void hashPin(normalizedPin)
-        .then((newHash) =>
-          patchAirtableRecord(table, recordId, { [PIN_HASH_FIELD]: newHash }),
-        )
-        .then(() => {
+      // 응답 반환 후에도 Vercel runtime이 함수를 유지하도록 after()로 등록.
+      // 이전엔 fire-and-forget이라 Vercel 함수 조기 종료 시 마이그레이션이
+      // 영영 완료되지 않을 수 있었음 (평문 PIN 영구 잔존 위험).
+      after(async () => {
+        try {
+          const newHash = await hashPin(normalizedPin);
+          await patchAirtableRecord(table, recordId, {
+            [PIN_HASH_FIELD]: newHash,
+          });
           log("[verifyWorkerPin] PIN 자동 해시화 완료:", recordId);
-        })
-        .catch((e) => {
+        } catch (e) {
           logWarn("[verifyWorkerPin] PIN 자동 해시화 실패:", recordId, e);
-        });
+        }
+      });
     }
   }
 

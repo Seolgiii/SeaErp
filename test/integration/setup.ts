@@ -46,6 +46,33 @@ vi.mock("next/cache", () => ({
 
 // next/server의 cookies/headers는 server action 컨텍스트 외부에선 동작 X
 // 다행히 우리 server-auth는 workerId를 인자로 받아 동작하므로 영향 없음
+//
+// next/server.after()는 테스트 환경에 Vercel runtime이 없으므로
+// 등록된 callback을 큐에 모았다가 drainAfter()로 명시 실행시킨다.
+const { afterCallbacks } = vi.hoisted(() => ({
+  afterCallbacks: [] as Array<() => unknown | Promise<unknown>>,
+}));
+vi.mock("next/server", async () => {
+  const actual = await vi.importActual<typeof import("next/server")>(
+    "next/server",
+  );
+  return {
+    ...actual,
+    after: (fn: () => unknown | Promise<unknown>) => {
+      afterCallbacks.push(fn);
+    },
+  };
+});
+
+/** 큐에 쌓인 모든 after() callback을 순차 실행하고 비운다. */
+export async function drainAfter(): Promise<void> {
+  while (afterCallbacks.length > 0) {
+    const batch = afterCallbacks.splice(0);
+    for (const fn of batch) {
+      await fn();
+    }
+  }
+}
 
 // ── fetch 모킹 설치 ──
 beforeAll(() => {
@@ -55,6 +82,7 @@ beforeAll(() => {
 // ── 각 테스트마다 store 초기화 ──
 beforeEach(async () => {
   store.reset();
+  afterCallbacks.length = 0;
   // server-auth 캐시도 초기화 (요청 간 누수 방지)
   const { invalidateWorkerCache } = await import("@/lib/server-auth");
   invalidateWorkerCache();

@@ -7,6 +7,7 @@ import {
   WORKER_INACTIVE,
   WORKER_NORMAL,
 } from "./fixtures";
+import { drainAfter } from "./setup";
 
 /**
  * 시나리오 13 — 비활성 작업자 차단
@@ -104,8 +105,8 @@ describe("시나리오 14 — PIN 5회 실패 잠금 (Airtable 영속화)", () =
     expect(result).not.toBeNull();
     expect(result!.role).toBe("WORKER");
 
-    // 자동 마이그레이션은 비동기 (.then) — 잠시 대기 후 확인
-    await new Promise((r) => setTimeout(r, 50));
+    // 마이그레이션은 next/server.after()로 등록 — 테스트에선 명시적으로 drain
+    await drainAfter();
 
     const workerAfter = store.get("작업자", WORKER_NORMAL.id)!;
     // pin_hash가 채워져 있어야 함 (scrypt:salt:hash 형태)
