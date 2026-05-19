@@ -4,8 +4,9 @@
 개발 방식: 1인 기획/개발 + Claude Code
 
 ■ 최근 변경 (2026-05-19)
-- Airtable 승인상태 색상 5개 테이블 통일 (수동 UI 작업). 노랑=대기 / 초록=완료 / 빨강=반려 / 회색=취소 + 지출결의의 주황=최종 승인 대기. Web API가 singleSelect choices 변경 미지원이라 수동 변경 가이드로 진행.
-- LOT별 재고 상태 필드 7개를 코드와 연결 (5/15 backfill 이후 dead 상태였던 6개를 채우는 쪽만 활성). 세트 A(상태 + 상태사유) = 라이프사이클, 세트 B(승인상태/결정자/결정일시/반려사유/반려메모) = 결재 워크플로우. inbound 신청·승인 / outbound 승인·반려 / transfer 승인·반려 모두 PATCH 추가. 결정자(singleCollaborator)는 매칭 불가로 skip — 작업자 link로 타입 변경 권장. 반려사유(singleSelect)도 자유 텍스트 PATCH 불가라 반려메모(multilineText)에만 저장.
+- Airtable 승인상태 색상 5개 테이블 통일 (수동 UI). 노랑/초록/빨강/회색 + 지출결의의 주황. Web API가 singleSelect choices 변경 미지원(422)이라 수동 가이드 + `get_table_schema` 검증.
+- LOT별 재고 상태 7개 필드 전면 활성 (0dbaca6/d677a61/c6166b8). 세트 A(상태+상태사유=lifecycle) + B(승인상태+결정자+결정일시+반려사유+반려메모=workflow). inbound·outbound·transfer 모든 결재 분기에서 PATCH. 결정자는 작업자 link 타입 변경 후 admin.id 자동 채움. RejectBottomSheet 옵션 5종 칩(수량 불일치/품질 이상/서류 미비/검역 문제/기타) + 메모 textarea. LOT.반려사유는 옵션명 그대로, 다른 테이블 반려사유는 합성 텍스트.
+- Vercel 빌드 fix(`prefer-const`, 2c36b4b) + origin remote URL 갱신(SeaErp.git).
 
 ■ 최근 변경 (2026-05-18)
 - 재고조회 → 카트 페이지 핸드오프 통일 (`e263bca`). BulkSubmitSheet 제거 + sessionStorage 핸드오프 + 카트 페이지에 첫 LOT 자동 선택/다음 자동 이어짐 + 대기 칩 UI. LOT마다 다른 판매처/판매가/보관처 부여 가능. admin/dashboard 일괄 승인(B안) 추가 + EXPENSE는 100만원 권한 분기로 제외. outbound LOT 보관처 fallback 안전망.
