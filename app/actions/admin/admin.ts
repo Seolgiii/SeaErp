@@ -441,6 +441,7 @@ async function revertLotOnInboundReject(
   inboundRecordId: string,
   rejectReason: string = "",
   adminWorkerId: string = "",
+  rejectReasonCode: string = "",
 ): Promise<{ success: boolean; message?: string }> {
   const inboundFields = await fetchRecord("입고 관리", inboundRecordId);
   if (!inboundFields) {
@@ -489,6 +490,7 @@ async function revertLotOnInboundReject(
     상태: "반려",
     상태사유: "입고 반려",
     결정일시: new Date().toISOString(),
+    반려사유: rejectReasonCode || null,
     반려메모: rejectReason || null,
   };
   if (adminWorkerId && /^rec/.test(adminWorkerId)) {
@@ -958,6 +960,7 @@ export async function updateApprovalStatus(
   type: "INBOUND" | "OUTBOUND" | "EXPENSE" | "TRANSFER",
   newStatus: string,
   rejectReason: string = "",
+  rejectReasonCode: string = "",
 ): Promise<{ success: boolean; message?: string }> {
   log("[updateApprovalStatus] entered", { adminWorkerId, recordId, type, newStatus, rejectReason });
 
@@ -1068,7 +1071,7 @@ export async function updateApprovalStatus(
       log("[updateApprovalStatus] 이미 반려 상태 — 재고 처리 생략:", { type, recordId });
     } else if (currentStatus === "승인 완료") {
       if (type === "INBOUND") {
-        const revertResult = await revertLotOnInboundReject(recordId, rejectReason, admin.id);
+        const revertResult = await revertLotOnInboundReject(recordId, rejectReason, admin.id, rejectReasonCode);
         if (!revertResult.success) {
           return { success: false, message: revertResult.message };
         }
@@ -1081,7 +1084,7 @@ export async function updateApprovalStatus(
         // 재고 이동 반려는 신규 LOT/입고관리에서 후속 작업(출고/재이동)이 일어났으면
         // 자동 복구가 데이터를 망가뜨릴 수 있음. revertTransferOnReject 내부에서
         // 안전 가드 3가지를 검사한 뒤 통과 시에만 복구를 진행한다.
-        const revertResult = await revertTransferOnReject(recordId, rejectReason, admin.id);
+        const revertResult = await revertTransferOnReject(recordId, rejectReason, admin.id, rejectReasonCode);
         if (!revertResult.success) {
           return { success: false, message: revertResult.message };
         }

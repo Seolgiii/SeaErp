@@ -290,7 +290,7 @@ export default function AdminDashboardPage() {
     setIsModalOpen(true);
   };
 
-  const handleRejectSubmit = async (reason: string) => {
+  const handleRejectSubmit = async (reasonCode: string, reasonNote: string) => {
     if (!selectedItem) return;
 
     const session = readSession();
@@ -301,7 +301,17 @@ export default function AdminDashboardPage() {
 
     setUiOverrides((prev) => ({ ...prev, [selectedItem.id]: "PROCESSING" }));
 
-    const result = await updateApprovalStatus(session.workerId, selectedItem.id, selectedItem.type, "반려", reason);
+    // 입고관리/출고관리/이동/지출.반려사유 (multilineText)는 합성 텍스트로 저장.
+    // LOT.반려사유 (singleSelect) = reasonCode, LOT.반려메모 = reasonNote 는 admin.ts가 분리 처리.
+    const composed = reasonNote ? `${reasonCode} — ${reasonNote}` : reasonCode;
+    const result = await updateApprovalStatus(
+      session.workerId,
+      selectedItem.id,
+      selectedItem.type,
+      "반려",
+      composed,
+      reasonCode,
+    );
 
     if (result.success) {
       setUiOverrides((prev) => ({ ...prev, [selectedItem.id]: "REJECTED" }));

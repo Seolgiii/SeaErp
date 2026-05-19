@@ -555,6 +555,7 @@ export async function revertTransferOnReject(
   transferRecordId: string,
   rejectReason: string = "",
   adminWorkerId: string = "",
+  rejectReasonCode: string = "",
 ): Promise<{ success: boolean; message?: string }> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
     return { success: false, message: "환경변수 누락" };
@@ -822,6 +823,7 @@ export async function revertTransferOnReject(
     상태: "반려",
     상태사유: "이동 반려",
     결정일시: new Date().toISOString(),
+    반려사유: rejectReasonCode || null,
     반려메모: rejectReason || null,
   };
   if (adminWorkerId && /^rec/.test(adminWorkerId)) {

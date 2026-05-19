@@ -2,19 +2,33 @@
 
 import { useState, useEffect } from "react";
 
+const REJECT_REASONS = [
+  "수량 불일치",
+  "품질 이상",
+  "서류 미비",
+  "검역 문제",
+  "기타",
+] as const;
+
+type RejectReasonCode = (typeof REJECT_REASONS)[number];
+
 interface RejectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (reason: string) => void;
+  onSubmit: (reasonCode: string, reasonNote: string) => void;
   requesterName: string;
 }
 
 export default function RejectBottomSheet({ isOpen, onClose, onSubmit, requesterName }: RejectModalProps) {
-  const [reason, setReason] = useState("");
+  const [reasonCode, setReasonCode] = useState<RejectReasonCode | "">("");
+  const [reasonNote, setReasonNote] = useState("");
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      // 새로 열릴 때마다 입력 초기화
+      setReasonCode("");
+      setReasonNote("");
     } else {
       document.body.style.overflow = "unset";
     }
@@ -22,32 +36,56 @@ export default function RejectBottomSheet({ isOpen, onClose, onSubmit, requester
 
   if (!isOpen) return null;
 
+  // 옵션이 선택돼야 확인 가능. "기타"는 추가로 메모 필수.
+  const canSubmit =
+    reasonCode !== "" && (reasonCode !== "기타" || reasonNote.trim().length > 0);
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4">
-      {/* 배경 어두워짐 (애니메이션 추가) */}
-      <div 
-        className="fixed inset-0 bg-black/50 animate-fade-in" 
+      <div
+        className="fixed inset-0 bg-black/50 animate-fade-in"
         onClick={onClose}
       />
 
-      {/* 바텀 시트 (animate-slide-up 적용) */}
       <div className="relative bg-white w-full max-w-md rounded-t-[28px] sm:rounded-[28px] p-7 pb-10 sm:pb-7 shadow-2xl animate-slide-up">
-        {/* 드래그 핸들 (모바일 전용 시각 요소) */}
         <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-8 sm:hidden" />
 
         <h3 className="text-[22px] font-bold text-gray-900 mb-2 leading-tight">
-          반려 사유를<br/>입력해주세요
+          반려 사유를<br/>선택해주세요
         </h3>
-        <p className="text-gray-500 font-medium mb-8 text-[15px]">
+        <p className="text-gray-500 font-medium mb-6 text-[15px]">
           {requesterName}님에게 알림톡이 전송됩니다.
         </p>
 
+        <div className="flex flex-wrap gap-2 mb-5">
+          {REJECT_REASONS.map((r) => {
+            const active = reasonCode === r;
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setReasonCode(r)}
+                className={`px-4 py-2.5 rounded-full font-semibold text-sm transition-all active:scale-95 ${
+                  active
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {r}
+              </button>
+            );
+          })}
+        </div>
+
         <textarea
-        value={reason || ""} // ""을 추가해서 항상 '문자열'임을 보장합니다.
-        onChange={(e) => setReason(e.target.value)}
-          placeholder="이유를 간단히 적어주세요"
-          className="w-full bg-gray-100 text-gray-900 text-lg rounded-2xl p-5 min-h-[140px] outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all resize-none mb-8"
-          autoFocus
+          value={reasonNote}
+          onChange={(e) => setReasonNote(e.target.value)}
+          placeholder={
+            reasonCode === "기타"
+              ? "구체적인 사유를 입력해주세요 (필수)"
+              : "상세 메모 (선택)"
+          }
+          className="w-full bg-gray-100 text-gray-900 text-base rounded-2xl p-4 min-h-[100px] outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all resize-none mb-8"
         />
 
         <div className="flex gap-3">
@@ -58,10 +96,15 @@ export default function RejectBottomSheet({ isOpen, onClose, onSubmit, requester
             취소
           </button>
           <button
-            onClick={() => { if(reason) { onSubmit(reason); onClose(); } }}
-            disabled={!reason.trim()}
+            onClick={() => {
+              if (canSubmit) {
+                onSubmit(reasonCode, reasonNote.trim());
+                onClose();
+              }
+            }}
+            disabled={!canSubmit}
             className={`flex-[2] font-bold text-lg py-4 rounded-2xl transition-all active:scale-95 ${
-              reason.trim() ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "bg-gray-200 text-gray-400"
+              canSubmit ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "bg-gray-200 text-gray-400"
             }`}
           >
             확인

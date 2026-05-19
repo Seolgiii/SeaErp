@@ -145,7 +145,7 @@ LOT별 재고 상태 필드 7개 (2026-05-15 도입, 2026-05-19 코드 연결):
   - 승인상태: 승인 대기 / 승인 완료 / 반려 / 취소 (5개 테이블 통일)
   - 결정자: 작업자 link(multipleRecordLinks, 단일) — 2026-05-19 타입 변경 후 admin worker record ID로 채움. 결재 액션 수행자 추적.
   - 결정일시: ISO 8601 (new Date().toISOString())
-  - 반려사유: singleSelect (수량 불일치/품질 이상/서류 미비/검역 문제/기타) — 자유 텍스트 PATCH 불가. 현재는 비워두고 자유 텍스트는 반려메모에만 저장.
+  - 반려사유: singleSelect (수량 불일치/품질 이상/서류 미비/검역 문제/기타) — RejectBottomSheet UI 칩에서 선택. LOT.반려사유에 옵션명 그대로 저장. 입고관리/출고관리/이동.반려사유(multilineText)에는 `${code} — ${note}` 합성 텍스트.
   - 반려메모: multilineText — updateApprovalStatus(rejectReason) 자유 텍스트 그대로 저장.
 - B → A 동기화: 결재 액션이 라이프사이클까지 함께 갱신 (Airtable Automation 트리거 없이 코드에서 직접 PATCH).
 - 활성화: app/actions/inventory/inbound.ts(신청), app/actions/admin/admin.ts(승인/반려), app/actions/inventory/transfer.ts(이동 승인·반려). 읽는 코드는 차후 PC phase에서 활성화.
