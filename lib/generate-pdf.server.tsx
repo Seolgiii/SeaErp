@@ -144,31 +144,45 @@ export type OutboundPdfData = {
   lotNumber: string;              // LOT 번호
   productName: string;            // 품목명
   quantity: string | number;      // 출고수량
-  buyer: string;                  // 판매처
-  saleAmount: string | number;    // 판매금액
+  buyer: string;                  // 판매처 (일반 출고) / 이동처 (이동 출고증)
+  saleAmount?: string | number;   // 판매금액 (일반 출고만 — 이동 출고증은 미사용)
   date: string;                   // 출고일
   requester: string;              // 신청자명
 };
 
 /**
  * 출고증 PDF 레이아웃 컴포넌트
- * 제목 "출 고 증"과 항목별 표를 그린 후 하단에 확인 문구를 출력합니다.
+ * 제목 "출 고 증"과 항목별 표를 그린 후 QR 코드와 확인 문구를 출력합니다.
+ *
+ * isTransfer = true (자사창고 → 외부/가공공장 이동 출고증):
+ *   - "판매처" 라벨이 "이동처"로 변경
+ *   - "판매금액" 행은 표시되지 않음
  */
-function OutboundPDF({ data }: { data: OutboundPdfData }) {
+function OutboundPDF({
+  data,
+  qrDataUrl,
+  isTransfer = false,
+}: {
+  data: OutboundPdfData;
+  qrDataUrl?: string;
+  isTransfer?: boolean;
+}) {
   const rows: [string, string][] = [
     ["LOT 번호", data.lotNumber],
     ["품목명", data.productName],
     ["출고수량", data.quantity ? String(data.quantity) : "-"],
-    ["판매처", data.buyer],
-    [
+    [isTransfer ? "이동처" : "판매처", data.buyer],
+  ];
+  if (!isTransfer) {
+    rows.push([
       "판매금액",
       data.saleAmount
         ? `${Number(data.saleAmount).toLocaleString("ko-KR")} 원`
         : "-",
-    ],
-    ["출고일", data.date],
-    ["신청자", data.requester],
-  ];
+    ]);
+  }
+  rows.push(["출고일", data.date]);
+  rows.push(["신청자", data.requester]);
 
   return (
     <Document>
@@ -186,6 +200,20 @@ function OutboundPDF({ data }: { data: OutboundPdfData }) {
             </View>
           ))}
         </View>
+
+        {/* QR코드: LOT 정보 확인용 */}
+        {qrDataUrl && (
+          <View style={{ marginTop: 28, alignItems: "center" }}>
+            <Image src={qrDataUrl} style={{ width: 100, height: 100 }} />
+            <Text style={{ marginTop: 6, fontSize: 9, color: "#555" }}>
+              LOT: {data.lotNumber}
+            </Text>
+            <Text style={{ marginTop: 2, fontSize: 8, color: "#999" }}>
+              QR코드를 스캔하면 LOT 정보를 확인할 수 있습니다
+            </Text>
+          </View>
+        )}
+
         <Text style={s.footer}>위 내용으로 출고가 승인되었음을 확인합니다.</Text>
       </Page>
     </Document>
@@ -324,9 +352,31 @@ export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> 
 
 /**
  * 출고증 PDF를 생성하여 Buffer(바이너리 데이터)로 반환합니다.
+ * LOT 번호를 QR코드로 변환해 PDF에 삽입합니다.
+ *
+ * @param isTransfer 자사창고 → 외부/가공공장 이동 출고증이면 true
+ *                   (라벨 "판매처"→"이동처", 판매금액 행 미표시)
  */
-export async function generateOutboundPdf(data: OutboundPdfData): Promise<Buffer> {
-  return renderToBuffer(<OutboundPDF data={data} />) as Promise<Buffer>;
+export async function generateOutboundPdf(
+  data: OutboundPdfData,
+  isTransfer = false,
+): Promise<Buffer> {
+  let qrDataUrl: string | undefined;
+  if (data.lotNumber) {
+    try {
+      const qrContent = `${getBaseUrl()}/inventory/lot/${encodeURIComponent(data.lotNumber)}`;
+      qrDataUrl = await QRCode.toDataURL(qrContent, {
+        errorCorrectionLevel: "M",
+        width: 300,
+        margin: 2,
+      });
+    } catch (e) {
+      console.warn("[generateOutboundPdf] QR 코드 생성 실패 (PDF는 계속 생성):", e);
+    }
+  }
+  return renderToBuffer(
+    <OutboundPDF data={data} qrDataUrl={qrDataUrl} isTransfer={isTransfer} />,
+  ) as Promise<Buffer>;
 }
 
 /**

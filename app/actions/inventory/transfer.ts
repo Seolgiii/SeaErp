@@ -2,10 +2,16 @@
 import { log, logError, logWarn } from '@/lib/logger';
 
 import { revalidatePath } from "next/cache";
+import { put } from "@vercel/blob";
 import { getStorageCostForLot } from "@/lib/storage-cost";
 import { AuthError, requireWorker } from "@/lib/server-auth";
 import { calculateTransferPricing } from "@/lib/cost-calc";
 import { generateUniqueLotNumber } from "@/lib/lot-sequence";
+import {
+  generateInboundPdf,
+  generateOutboundPdf,
+} from "@/lib/generate-pdf.server";
+import { isOwnStorage } from "@/lib/storage";
 import { TransferFieldsSchema, reportSchemaIssue } from "@/lib/schemas";
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -509,6 +515,72 @@ export async function approveTransfer(
   await patchRecord("재고 이동", transferRecordId, {
     "신규 LOT번호": [newLot.id],
   });
+
+  // 10. PDF 발행 (자사창고 끝점이 있을 때만)
+  //  - 이동 입고증: 이동 후 보관처가 자사창고면 신규 입고관리에 발행
+  //  - 이동 출고증: 이동 전 보관처가 자사창고면 재고이동에 발행 (isTransfer=true)
+  //    그 외(외부창고/가공공장/기타)는 해당 시설이 자체 PDF 발급
+  const oldStorageId = firstLink(inboundFields["보관처"]);
+  const [ownNewStorage, ownOldStorage] = await Promise.all([
+    newStorageId ? isOwnStorage(newStorageId) : Promise.resolve(false),
+    oldStorageId ? isOwnStorage(oldStorageId) : Promise.resolve(false),
+  ]);
+
+  const workerNameFields = workerId ? await fetchRecord("작업자", workerId) : null;
+  const requesterName = String(workerNameFields?.["작업자명"] ?? "").trim();
+  const oldStorageName = oldStorageId ? await resolveStorageName(oldStorageId) : "";
+
+  if (ownNewStorage) {
+    try {
+      const buf = await generateInboundPdf({
+        lotNumber: newLotNumber,
+        productName,
+        spec,
+        quantity: 이동수량,
+        storage: newStorageName,
+        origin: 원산지,
+        purchasePrice: pricing.newPurchasePrice,
+        date: 이동일,
+        requester: requesterName,
+      });
+      const blob = await put(
+        `pdfs/transfer-in-${newInbound.id}-${Date.now()}.pdf`,
+        buf,
+        { access: "public", contentType: "application/pdf" },
+      );
+      await patchRecord("입고 관리", newInbound.id, { "입고증URL": blob.url });
+      log("[approveTransfer] 이동 입고증 발행 완료:", blob.url);
+    } catch (e) {
+      logWarn("[approveTransfer] 이동 입고증 발행 실패 (승인 계속 진행):", e);
+    }
+  }
+
+  if (ownOldStorage) {
+    try {
+      const buf = await generateOutboundPdf(
+        {
+          lotNumber: originalLotNumber,
+          productName,
+          quantity: 이동수량,
+          buyer: newStorageName, // 이동처
+          date: 이동일,
+          requester: requesterName,
+        },
+        true, // isTransfer
+      );
+      const blob = await put(
+        `pdfs/transfer-out-${transferRecordId}-${Date.now()}.pdf`,
+        buf,
+        { access: "public", contentType: "application/pdf" },
+      );
+      await patchRecord("재고 이동", transferRecordId, { "출고증 URL": blob.url });
+      log("[approveTransfer] 이동 출고증 발행 완료:", blob.url);
+    } catch (e) {
+      logWarn("[approveTransfer] 이동 출고증 발행 실패 (승인 계속 진행):", e);
+    }
+  } else {
+    void oldStorageName; // 외부에서 들어오는 케이스는 별도 처리 없음
+  }
 
   log("[approveTransfer] 완료:", {
     transferRecordId,

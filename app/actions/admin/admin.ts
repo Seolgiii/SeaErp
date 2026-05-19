@@ -21,6 +21,7 @@ import {
   revertTransferOnReject,
 } from "../inventory/transfer";
 import { getStorageCostForLot } from "@/lib/storage-cost";
+import { isOwnStorage } from "@/lib/storage";
 import { seoulDateString } from "@/lib/date";
 import {
   generateInboundPdf,
@@ -175,6 +176,18 @@ async function generateAndSaveInboundPdf(recordId: string): Promise<void> {
     if (!fields) {
       logError("[generateAndSaveInboundPdf] 입고 관리 레코드 조회 실패:", recordId);
       return;
+    }
+
+    // 자사창고로의 입고만 우리(SeaERP)가 입고증 발행.
+    // 외부창고/가공공장/기타는 해당 시설이 자체 입고증 발급.
+    // 보관처 마스터의 `구분` 분류 전엔 default true (운영 회귀 방지).
+    const storageRecId = firstLinkId(fields["보관처"]);
+    if (storageRecId) {
+      const ownStorage = await isOwnStorage(storageRecId);
+      if (!ownStorage) {
+        log("[generateAndSaveInboundPdf] 외부 보관처 — 입고증 발행 스킵:", storageRecId);
+        return;
+      }
     }
 
     const workerRecId = firstLinkId(fields["작업자"]);
