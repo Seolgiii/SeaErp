@@ -297,6 +297,7 @@ export async function createTransferRecord(payload: {
  */
 export async function approveTransfer(
   transferRecordId: string,
+  adminWorkerId: string = "",
 ): Promise<{ success: boolean; message?: string }> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return { success: false, message: "환경변수 누락" };
 
@@ -469,6 +470,7 @@ export async function approveTransfer(
     "상태": "승인 완료",
     "상태사유": "이동 입고",
     "결정일시": new Date().toISOString(),
+    ...(adminWorkerId && /^rec/.test(adminWorkerId) && { "결정자": [adminWorkerId] }),
   };
   if (newStorageId) lotInventoryFields["보관처"] = [newStorageId];
 
@@ -552,6 +554,7 @@ export async function approveTransfer(
 export async function revertTransferOnReject(
   transferRecordId: string,
   rejectReason: string = "",
+  adminWorkerId: string = "",
 ): Promise<{ success: boolean; message?: string }> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
     return { success: false, message: "환경변수 누락" };
@@ -813,14 +816,18 @@ export async function revertTransferOnReject(
   }
 
   // 신규 LOT soft delete (단계 3)
-  const newLotZeroOk = await patchRecord("LOT별 재고", newLotRecordId, {
+  const newLotRejectPatch: Record<string, unknown> = {
     재고수량: 0,
     승인상태: "반려",
     상태: "반려",
     상태사유: "이동 반려",
     결정일시: new Date().toISOString(),
     반려메모: rejectReason || null,
-  });
+  };
+  if (adminWorkerId && /^rec/.test(adminWorkerId)) {
+    newLotRejectPatch["결정자"] = [adminWorkerId];
+  }
+  const newLotZeroOk = await patchRecord("LOT별 재고", newLotRecordId, newLotRejectPatch);
   if (!newLotZeroOk) {
     const rb = await rollbackToCharged({
       originalLotRestored: true,

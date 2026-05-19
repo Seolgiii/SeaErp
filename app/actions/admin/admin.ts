@@ -318,6 +318,7 @@ async function generateAndSaveExpensePdf(recordId: string): Promise<void> {
  */
 async function createLotOnInboundApproval(
   inboundRecordId: string,
+  adminWorkerId: string = "",
 ): Promise<{ success: boolean; message?: string }> {
   // 1. 입고 관리 레코드에서 입고수량 확인
   const inboundFields = await fetchRecord("입고 관리", inboundRecordId);
@@ -399,6 +400,9 @@ async function createLotOnInboundApproval(
   if (workerLinkId) {
     lotPatchFields["입고자"] = [workerLinkId]; // 작업자 테이블 링크 배열 형태로 저장
   }
+  if (adminWorkerId && /^rec/.test(adminWorkerId)) {
+    lotPatchFields["결정자"] = [adminWorkerId];
+  }
 
   // 입고일자 기준으로 보관처 비용 이력에서 냉장료단가·입출고비·노조비·동결비를 조회해 LOT에 저장
   const storage = await resolveStorageName(inboundFields["보관처"]);
@@ -436,6 +440,7 @@ async function createLotOnInboundApproval(
 async function revertLotOnInboundReject(
   inboundRecordId: string,
   rejectReason: string = "",
+  adminWorkerId: string = "",
 ): Promise<{ success: boolean; message?: string }> {
   const inboundFields = await fetchRecord("입고 관리", inboundRecordId);
   if (!inboundFields) {
@@ -474,7 +479,7 @@ async function revertLotOnInboundReject(
   }
 
   // 재고수량 0 + 보관처 비용 필드 클리어 (Airtable number 필드는 null로 비움)
-  const ok = await patchRecord("LOT별 재고", lotRecord.id, {
+  const rejectLotPatch: Record<string, unknown> = {
     재고수량: 0,
     냉장료단가: null,
     입출고비: null,
@@ -485,7 +490,11 @@ async function revertLotOnInboundReject(
     상태사유: "입고 반려",
     결정일시: new Date().toISOString(),
     반려메모: rejectReason || null,
-  });
+  };
+  if (adminWorkerId && /^rec/.test(adminWorkerId)) {
+    rejectLotPatch["결정자"] = [adminWorkerId];
+  }
+  const ok = await patchRecord("LOT별 재고", lotRecord.id, rejectLotPatch);
   if (!ok) {
     logError(
       "[INTEGRITY-ALERT][revertLotOnInboundReject] LOT 재고 0 PATCH 실패 — 수동 정합 확인 필요:",
@@ -1026,7 +1035,7 @@ export async function updateApprovalStatus(
   // 입고 승인 시 LOT별 재고 생성 (상태 업데이트 전에 먼저 재고 반영)
   // 반려 → 승인 재변경 케이스도 동일한 함수가 재사용되어 LOT 재고를 자동 복원합니다.
   if (type === "INBOUND" && newStatus === "승인 완료") {
-    const createResult = await createLotOnInboundApproval(recordId);
+    const createResult = await createLotOnInboundApproval(recordId, admin.id);
     if (!createResult.success) {
       return { success: false, message: createResult.message };
     }
@@ -1042,7 +1051,7 @@ export async function updateApprovalStatus(
 
   // 재고 이동 승인 시 새 LOT 생성 + 원본 재고 차감
   if (type === "TRANSFER" && newStatus === "승인 완료") {
-    const transferResult = await approveTransfer(recordId);
+    const transferResult = await approveTransfer(recordId, admin.id);
     if (!transferResult.success) {
       return { success: false, message: transferResult.message };
     }
@@ -1059,7 +1068,7 @@ export async function updateApprovalStatus(
       log("[updateApprovalStatus] 이미 반려 상태 — 재고 처리 생략:", { type, recordId });
     } else if (currentStatus === "승인 완료") {
       if (type === "INBOUND") {
-        const revertResult = await revertLotOnInboundReject(recordId, rejectReason);
+        const revertResult = await revertLotOnInboundReject(recordId, rejectReason, admin.id);
         if (!revertResult.success) {
           return { success: false, message: revertResult.message };
         }
@@ -1072,7 +1081,7 @@ export async function updateApprovalStatus(
         // 재고 이동 반려는 신규 LOT/입고관리에서 후속 작업(출고/재이동)이 일어났으면
         // 자동 복구가 데이터를 망가뜨릴 수 있음. revertTransferOnReject 내부에서
         // 안전 가드 3가지를 검사한 뒤 통과 시에만 복구를 진행한다.
-        const revertResult = await revertTransferOnReject(recordId, rejectReason);
+        const revertResult = await revertTransferOnReject(recordId, rejectReason, admin.id);
         if (!revertResult.success) {
           return { success: false, message: revertResult.message };
         }
