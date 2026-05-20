@@ -21,3 +21,4 @@ obsidian-vault/.obsidian/workspace.json
 obsidian-vault/.obsidian/cache
 obsidian-vault/.trash/
 obsidian-vault/.obsidian/plugins/*/data.json
+.env*.local

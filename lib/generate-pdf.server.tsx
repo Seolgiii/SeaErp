@@ -159,16 +159,16 @@ function CompanyFooter() {
 
   // QR ↔ 회사 정보 간격이 너무 멀어 어색하다는 피드백 반영:
   // bottom을 110pt로 올려 QR과의 거리를 절반(~115pt)으로 축소.
-  // 페이지 padding(48pt) 안쪽 기준이라 실제 회사 정보 텍스트 끝은
-  // 페이지 끝에서 48+110 = 158pt 위에 위치.
+  // 좌우는 페이지 padding(48pt)과 동일하게 맞춰 표↔QR divider와
+  // 구분선 좌우 길이를 통일 (absolute는 page border 기준이라 직접 지정 필요).
   return (
     <View
       style={[
         s.divider,
         {
           position: "absolute",
-          left: 0,
-          right: 0,
+          left: 48,
+          right: 48,
           bottom: 110,
           marginTop: 0,
           alignItems: "center",
@@ -280,20 +280,26 @@ function InboundPDF({ data, qrDataUrl }: { data: InboundPdfData; qrDataUrl?: str
 export type OutboundPdfData = {
   lotNumber: string;              // LOT 번호
   productName: string;            // 품목명
-  quantity: string | number;      // 출고수량
+  spec: string;                   // 규격 (단위: kg)
+  detailSpec: string;             // 미수 (단위: 미)
+  quantity: string | number;      // 출고수량 (단위: ct)
+  origin: string;                 // 원산지
+  storage: string;                // 보관처 (출고하는 LOT의 출발 보관처)
   buyer: string;                  // 판매처 (일반 출고) / 이동처 (이동 출고증)
-  saleAmount?: string | number;   // 판매금액 (일반 출고만 — 이동 출고증은 미사용)
   date: string;                   // 출고일
-  requester: string;              // 신청자명
+  requester: string;              // 출고자명 (출고 신청한 작업자)
+  memo: string;                   // 비고 (입고관리.비고 lookup)
 };
 
 /**
- * 출고증 PDF 레이아웃 컴포넌트
- * 제목 "출 고 증"과 항목별 표를 그린 후 QR 코드와 확인 문구를 출력합니다.
+ * 출고증 PDF 레이아웃 컴포넌트 (입고증과 동일 패턴 — 5/20 통일)
+ *
+ * 표1(LOT/거래 정보 10필드, 4컬럼 2-윈 5행) + 표2(비고 full-width)
+ * + 표↔QR 구분선 + QR + QR↔회사 구분선 + 회사 정보 푸터.
  *
  * isTransfer = true (자사창고 → 외부/가공공장 이동 출고증):
- *   - "판매처" 라벨이 "이동처"로 변경
- *   - "판매금액" 행은 표시되지 않음
+ *   - 표1 5행 좌측 "판매처" 라벨이 "이동처"로 변경
+ *   - 보관처는 출발지(원본 LOT 위치) 그대로 표시
  */
 function OutboundPDF({
   data,
@@ -304,54 +310,61 @@ function OutboundPDF({
   qrDataUrl?: string;
   isTransfer?: boolean;
 }) {
-  const rows: [string, string][] = [
-    ["LOT 번호", data.lotNumber],
-    ["품목명", data.productName],
-    ["출고수량", data.quantity ? String(data.quantity) : "-"],
-    [isTransfer ? "이동처" : "판매처", data.buyer],
+  const primary: PairRow[] = [
+    [["출고일", data.date || "-"], ["LOT 번호", data.lotNumber || "-"]],
+    [["출고자", data.requester || "-"], ["품목명", data.productName || "-"]],
+    [["규격", formatSpec(data.spec)], ["미수", formatMisu(data.detailSpec)]],
+    [["출고수량", formatQuantity(data.quantity)], ["원산지", data.origin || "-"]],
+    [[isTransfer ? "이동처" : "판매처", data.buyer || "-"], ["보관처", data.storage || "-"]],
   ];
-  if (!isTransfer) {
-    rows.push([
-      "판매금액",
-      data.saleAmount
-        ? `${Number(data.saleAmount).toLocaleString("ko-KR")} 원`
-        : "-",
-    ]);
-  }
-  rows.push(["출고일", data.date]);
-  rows.push(["신청자", data.requester]);
+
+  const renderPairRow = ([left, right]: PairRow, idx: number) => (
+    <View key={idx} style={s.row}>
+      <View style={s.thHalf}>
+        <Text>{left[0]}</Text>
+      </View>
+      <View style={s.tdHalf}>
+        <Text>{left[1]}</Text>
+      </View>
+      <View style={s.thHalf}>
+        <Text>{right ? right[0] : ""}</Text>
+      </View>
+      <View style={s.tdHalf}>
+        <Text>{right ? right[1] : ""}</Text>
+      </View>
+    </View>
+  );
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
         <Text style={s.title}>출 고 증</Text>
-        <View style={s.table}>
-          {rows.map(([label, value]) => (
-            <View key={label} style={s.row}>
-              <View style={s.th}>
-                <Text>{label}</Text>
+
+        <View style={s.table}>{primary.map(renderPairRow)}</View>
+
+        <View style={{ marginTop: 14 }}>
+          <View style={s.table}>
+            <View style={s.row}>
+              <View style={s.thHalf}>
+                <Text>비고</Text>
               </View>
-              <View style={s.td}>
-                <Text>{value || "-"}</Text>
+              <View style={s.tdFull}>
+                <Text>{data.memo || "-"}</Text>
               </View>
             </View>
-          ))}
+          </View>
         </View>
 
-        {/* QR코드: LOT 정보 확인용 */}
         {qrDataUrl && (
-          <View style={{ marginTop: 28, alignItems: "center" }}>
-            <Image src={qrDataUrl} style={{ width: 100, height: 100 }} />
-            <Text style={{ marginTop: 6, fontSize: 9, color: "#555" }}>
-              LOT: {data.lotNumber}
-            </Text>
-            <Text style={{ marginTop: 2, fontSize: 8, color: "#999" }}>
+          <View style={[s.divider, { alignItems: "center" }]}>
+            <Image src={qrDataUrl} style={{ width: 90, height: 90 }} />
+            <Text style={{ marginTop: 4, fontSize: 8, color: "#999" }}>
               QR코드를 스캔하면 LOT 정보를 확인할 수 있습니다
             </Text>
           </View>
         )}
 
-        <Text style={s.footer}>위 내용으로 출고가 승인되었음을 확인합니다.</Text>
+        <CompanyFooter />
       </Page>
     </Document>
   );

@@ -580,10 +580,15 @@ export async function approveTransfer(
         {
           lotNumber: originalLotNumber,
           productName,
+          spec,
+          detailSpec: misu,
           quantity: 이동수량,
+          origin: 원산지,
+          storage: oldStorageName, // 출발 보관처
           buyer: newStorageName, // 이동처
           date: 이동일,
           requester: requesterName,
+          memo: "재고 이동",
         },
         true, // isTransfer
       );

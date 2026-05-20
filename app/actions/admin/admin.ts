@@ -277,8 +277,10 @@ async function generateAndSaveOutboundPdf(recordId: string): Promise<void> {
   const workerRecId = firstLinkId(fields["작업자"]);
   const lotLinkId = firstLinkId(fields["입고관리"]);
 
-  // 품목명: LOT링크 → 입고 관리 → 품목마스터 체인
+  // 품목명 + 비고: LOT링크 → 입고 관리 → 품목마스터/비고 체인
+  // (출고 관리엔 비고 필드가 없어 입고관리.비고를 그대로 사용)
   let productName = "";
+  let memo = "";
   if (lotLinkId) {
     const inboundFields = await fetchRecord("입고 관리", lotLinkId);
     if (inboundFields) {
@@ -286,6 +288,7 @@ async function generateAndSaveOutboundPdf(recordId: string): Promise<void> {
         inboundFields["품목마스터"] ?? inboundFields["품목"],
       );
       if (productRecId) productName = await fetchProductName(productRecId);
+      memo = String(inboundFields["비고"] ?? "");
     }
   }
 
@@ -295,17 +298,24 @@ async function generateAndSaveOutboundPdf(recordId: string): Promise<void> {
     Array.isArray(lotDisplay) ? String(lotDisplay[0] ?? "") : String(lotDisplay ?? "")
   ).trim();
 
-  const requester = workerRecId ? await fetchWorkerName(workerRecId) : "";
+  const [requester, storageName] = await Promise.all([
+    workerRecId ? fetchWorkerName(workerRecId) : Promise.resolve(""),
+    resolveStorageName(fields["보관처"]),
+  ]);
 
   // 출고증 PDF 생성
   const pdfBuffer = await generateOutboundPdf({
     lotNumber,
     productName,
+    spec: String(fields["규격"] ?? ""),
+    detailSpec: String(fields["미수"] ?? ""),
     quantity: Number(fields["출고요청수량"] ?? 0),
+    origin: String(fields["원산지"] ?? ""),
+    storage: storageName,
     buyer: String(fields["판매처"] ?? ""),
-    saleAmount: Number(fields["판매금액"] ?? 0),
     date: String(fields["출고일"] ?? ""),
     requester,
+    memo,
   });
 
   // PDF를 Vercel Blob에 업로드하고 URL을 출고 관리 레코드에 저장
