@@ -27,6 +27,7 @@ export type LotDetail = {
   supplier: string;
   purchaser: string;
   shipName: string;
+  origin: string;
 };
 
 function escapeFormulaString(s: string): string {
@@ -151,6 +152,7 @@ export async function fetchLotDetailByNumber(
   let inboundStorageName = "";
   let inboundSupplierName = "";
   let inboundQty = 0;
+  let inboundOrigin = "";
   // 이동입고일 우선, 없으면 최초입고일
   let inboundDate =
     asString(lotFields[LOT_FIELDS.transferInboundDate]) ||
@@ -165,6 +167,7 @@ export async function fetchLotDetailByNumber(
       asString(inboundFields["입고일"]) ||
       asString(inboundFields["입고일자"]) ||
       inboundDate;
+    inboundOrigin = asString(inboundFields["원산지"]);
 
     const purchaserId = firstLinkedId(inboundFields["매입자"]);
     const inboundStorageId = firstLinkedId(inboundFields["보관처"]);
@@ -212,6 +215,7 @@ export async function fetchLotDetailByNumber(
     supplier: lotSupplierName || inboundSupplierName,
     purchaser: purchaserName,
     shipName,
+    origin: asString(lotFields["원산지"]) || inboundOrigin,
   };
 }
 

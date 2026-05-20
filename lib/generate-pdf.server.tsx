@@ -337,7 +337,7 @@ export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> 
   let qrDataUrl: string | undefined;
   if (data.lotNumber) {
     try {
-      const qrContent = `${getBaseUrl()}/inventory/lot/${encodeURIComponent(data.lotNumber)}`;
+      const qrContent = `${getBaseUrl()}/lot/${encodeURIComponent(data.lotNumber)}`;
       qrDataUrl = await QRCode.toDataURL(qrContent, {
         errorCorrectionLevel: "M",
         width: 300,
@@ -364,7 +364,7 @@ export async function generateOutboundPdf(
   let qrDataUrl: string | undefined;
   if (data.lotNumber) {
     try {
-      const qrContent = `${getBaseUrl()}/inventory/lot/${encodeURIComponent(data.lotNumber)}`;
+      const qrContent = `${getBaseUrl()}/lot/${encodeURIComponent(data.lotNumber)}`;
       qrDataUrl = await QRCode.toDataURL(qrContent, {
         errorCorrectionLevel: "M",
         width: 300,

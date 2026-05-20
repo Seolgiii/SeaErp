@@ -12,7 +12,8 @@ import {
 import SessionExpiryBanner from './SessionExpiryBanner';
 
 // 세션 검사 없이 누구나 접근 가능한 경로
-const PUBLIC_PATHS = ['/login'];
+// /lot/{LOT번호} — QR 외부 공개 페이지. 옵션 B 5필드만 노출.
+const PUBLIC_PATHS = ['/login', '/lot'];
 
 const CHECK_INTERVAL_MS = 30_000;        // 30초마다 만료 여부 확인
 const WARN_THRESHOLD_MS = 5 * 60 * 1000; // 5분 이하 남으면 배너 노출
@@ -38,6 +39,12 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
     const session = readSession();
     if (!session || isSessionExpired(session)) {
       clearSession();
+      // 옛 PDF의 QR이 가리키는 /inventory/lot/{LOT}은 공개 라우트 /lot/{LOT}으로 리다이렉트.
+      // (거래처가 가진 옛 PDF를 회수·재배포할 수 없으므로 라우팅 호환만 보장.)
+      if (pathname.startsWith('/inventory/lot/')) {
+        router.replace(pathname.replace('/inventory/lot/', '/lot/'));
+        return;
+      }
       // 현재 URL을 callbackUrl로 보존해 로그인 후 원래 페이지로 돌아올 수 있게 합니다.
       const callbackUrl = window.location.pathname + window.location.search;
       const target = callbackUrl === '/' || callbackUrl === ''
