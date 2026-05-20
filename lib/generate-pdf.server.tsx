@@ -20,6 +20,7 @@ import {
 import QRCode from "qrcode";
 import { NOTO_SANS_KR_REGULAR, NOTO_SANS_KR_BOLD } from "./fonts-base64";
 import { getBaseUrl } from "./base-url";
+import { getCompanyInfo } from "./company-info";
 
 // prebuild 스크립트가 폰트를 base64 data URI 상수로 번들에 포함시킵니다.
 // 파일 시스템 접근이 없으므로 Vercel 서버리스에서도 안정적으로 동작합니다.
@@ -70,68 +71,157 @@ const s = StyleSheet.create({
 export type InboundPdfData = {
   lotNumber: string;               // LOT 번호
   productName: string;             // 품목명
-  spec: string;                    // 규격
-  quantity: string | number;       // 입고수량
+  spec: string;                    // 규격 (단위: kg)
+  detailSpec: string;              // 미수 (단위: 미)
+  quantity: string | number;       // 입고수량 (단위: ct)
   storage: string;                 // 보관처
   origin: string;                  // 원산지
   purchasePrice: string | number;  // 수매가
   date: string;                    // 입고일자
-  requester: string;               // 신청자명
+  requester: string;               // 입고자명 (입고 신청한 작업자)
+  supplier: string;                // 매입처
+  purchaser: string;               // 매입자
+  shipName: string;                // 선박명
+  memo: string;                    // 비고
 };
+
+function formatSpec(spec: string): string {
+  const t = spec?.trim();
+  if (!t) return "-";
+  return /[a-zA-Z가-힣]/.test(t) ? t : `${t}kg`;
+}
+
+function formatMisu(misu: string): string {
+  const t = misu?.trim();
+  if (!t) return "-";
+  return /[가-힣]/.test(t) ? t : `${t}미`;
+}
+
+function formatQuantity(qty: string | number): string {
+  if (qty == null || qty === "") return "-";
+  const n = Number(qty);
+  if (!Number.isFinite(n) || n <= 0) return String(qty);
+  return `${n.toLocaleString("ko-KR")}ct`;
+}
+
+function formatPrice(price: string | number): string {
+  if (price == null || price === "") return "-";
+  const n = Number(price);
+  if (!Number.isFinite(n) || n <= 0) return "-";
+  return `${n.toLocaleString("ko-KR")} 원`;
+}
+
+function CompanyFooter() {
+  const c = getCompanyInfo();
+  if (!c.name && !c.address && !c.phone) return null;
+
+  const line1 = [c.name, c.representative && `대표자 ${c.representative}`]
+    .filter(Boolean)
+    .join("  |  ");
+  const line2 = c.businessNumber ? `사업자등록번호 ${c.businessNumber}` : "";
+  const line3 = c.address;
+  const contactParts: string[] = [];
+  if (c.phone) contactParts.push(`T. ${c.phone}`);
+  if (c.fax) contactParts.push(`F. ${c.fax}`);
+  if (c.email) contactParts.push(c.email);
+  const line4 = contactParts.join("  |  ");
+
+  return (
+    <View
+      style={{
+        marginTop: 24,
+        paddingTop: 12,
+        borderTop: "0.5pt solid #ccc",
+        alignItems: "center",
+      }}
+    >
+      {line1 && (
+        <Text style={{ fontSize: 9, color: "#333", fontWeight: "bold", marginBottom: 3 }}>
+          {line1}
+        </Text>
+      )}
+      {line2 && (
+        <Text style={{ fontSize: 8, color: "#666", marginBottom: 2 }}>{line2}</Text>
+      )}
+      {line3 && (
+        <Text style={{ fontSize: 8, color: "#666", marginBottom: 2 }}>{line3}</Text>
+      )}
+      {line4 && (
+        <Text style={{ fontSize: 8, color: "#666" }}>{line4}</Text>
+      )}
+    </View>
+  );
+}
 
 /**
  * 입고증 PDF 레이아웃 컴포넌트
- * 제목 "입 고 증"과 항목별 표를 그린 후 QR코드와 확인 문구를 출력합니다.
+ *
+ * 표1(상품/재고 정보 10필드) + 표2(거래 정보 4필드) + QR + 회사 정보 푸터.
  */
 function InboundPDF({ data, qrDataUrl }: { data: InboundPdfData; qrDataUrl?: string }) {
-  const rows: [string, string][] = [
-    ["LOT 번호", data.lotNumber],
-    ["품목명", data.productName],
-    ["규격", data.spec],
-    ["입고수량", data.quantity ? String(data.quantity) : "-"],
-    ["보관처", data.storage],
-    ["원산지", data.origin],
-    [
-      "수매가",
-      data.purchasePrice
-        ? `${Number(data.purchasePrice).toLocaleString("ko-KR")} 원`
-        : "-",
-    ],
-    ["입고일자", data.date],
-    ["신청자", data.requester],
+  const primary: [string, string][] = [
+    ["입고일", data.date || "-"],
+    ["입고자", data.requester || "-"],
+    ["LOT 번호", data.lotNumber || "-"],
+    ["품목명", data.productName || "-"],
+    ["규격", formatSpec(data.spec)],
+    ["미수", formatMisu(data.detailSpec)],
+    ["입고수량", formatQuantity(data.quantity)],
+    ["원산지", data.origin || "-"],
+    ["수매가", formatPrice(data.purchasePrice)],
+    ["보관처", data.storage || "-"],
+  ];
+
+  const secondary: [string, string][] = [
+    ["매입처", data.supplier || "-"],
+    ["매입자", data.purchaser || "-"],
+    ["선박명", data.shipName || "-"],
+    ["비고", data.memo || "-"],
   ];
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
         <Text style={s.title}>입 고 증</Text>
+
         <View style={s.table}>
-          {rows.map(([label, value]) => (
+          {primary.map(([label, value]) => (
             <View key={label} style={s.row}>
               <View style={s.th}>
                 <Text>{label}</Text>
               </View>
               <View style={s.td}>
-                <Text>{value || "-"}</Text>
+                <Text>{value}</Text>
               </View>
             </View>
           ))}
         </View>
 
-        {/* QR코드: 현장 스캔용 */}
+        <View style={{ marginTop: 14 }}>
+          <View style={s.table}>
+            {secondary.map(([label, value]) => (
+              <View key={label} style={s.row}>
+                <View style={s.th}>
+                  <Text>{label}</Text>
+                </View>
+                <View style={s.td}>
+                  <Text>{value}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
         {qrDataUrl && (
-          <View style={{ marginTop: 28, alignItems: "center" }}>
-            <Image src={qrDataUrl} style={{ width: 100, height: 100 }} />
-            <Text style={{ marginTop: 6, fontSize: 9, color: "#555" }}>
-              LOT: {data.lotNumber}
-            </Text>
-            <Text style={{ marginTop: 2, fontSize: 8, color: "#999" }}>
-              QR코드를 스캔하면 LOT 번호를 바로 입력할 수 있습니다
+          <View style={{ marginTop: 20, alignItems: "center" }}>
+            <Image src={qrDataUrl} style={{ width: 90, height: 90 }} />
+            <Text style={{ marginTop: 4, fontSize: 8, color: "#999" }}>
+              QR코드를 스캔하면 LOT 정보를 확인할 수 있습니다
             </Text>
           </View>
         )}
 
-        <Text style={s.footer}>위 내용으로 입고가 승인되었음을 확인합니다.</Text>
+        <CompanyFooter />
       </Page>
     </Document>
   );

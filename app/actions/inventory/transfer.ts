@@ -530,18 +530,37 @@ export async function approveTransfer(
   const requesterName = String(workerNameFields?.["작업자명"] ?? "").trim();
   const oldStorageName = oldStorageId ? await resolveStorageName(oldStorageId) : "";
 
+  // 이동 입고증의 매입처/매입자는 원본 LOT의 정보 유지 (이동 시 매입 정보는 그대로 상속)
+  const [supplierName, purchaserName] = await Promise.all([
+    supplierId
+      ? fetchRecord("매입처 마스터", supplierId).then((f) =>
+          String(f?.["매입처명"] ?? ""),
+        )
+      : Promise.resolve(""),
+    purchaserId
+      ? fetchRecord("작업자", purchaserId).then((f) =>
+          String(f?.["작업자명"] ?? ""),
+        )
+      : Promise.resolve(""),
+  ]);
+
   if (ownNewStorage) {
     try {
       const buf = await generateInboundPdf({
         lotNumber: newLotNumber,
         productName,
         spec,
+        detailSpec: misu,
         quantity: 이동수량,
         storage: newStorageName,
         origin: 원산지,
         purchasePrice: pricing.newPurchasePrice,
         date: 이동일,
         requester: requesterName,
+        supplier: supplierName,
+        purchaser: purchaserName,
+        shipName,
+        memo: "재고 이동",
       });
       const blob = await put(
         `pdfs/transfer-in-${newInbound.id}-${Date.now()}.pdf`,

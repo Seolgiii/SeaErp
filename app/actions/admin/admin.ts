@@ -165,6 +165,20 @@ async function resolveStorageName(rawField: unknown): Promise<string> {
   return String(data.fields?.["보관처명"] ?? "");
 }
 
+/** 매입처 link 필드 값(record id 배열) → 매입처명 문자열 변환 */
+async function resolveSupplierName(rawField: unknown): Promise<string> {
+  const id = firstLinkId(rawField);
+  if (!id) return "";
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("매입처 마스터")}/${id}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) return "";
+  const data = await res.json();
+  return String(data.fields?.["매입처명"] ?? "");
+}
+
 /**
  * 입고 승인 후 입고증 PDF를 생성하여 Vercel Blob 스토리지에 저장합니다.
  * 저장된 PDF URL을 입고 관리 레코드의 '입고증URL' 필드에 기록합니다.
@@ -192,24 +206,43 @@ async function generateAndSaveInboundPdf(recordId: string): Promise<void> {
 
     const workerRecId = firstLinkId(fields["작업자"]);
     const productRecId = firstLinkId(fields["품목마스터"] ?? fields["품목"]);
-    log("[generateAndSaveInboundPdf] 연결 ID:", { workerRecId, productRecId });
+    const purchaserRecId = firstLinkId(fields["매입자"]);
+    log("[generateAndSaveInboundPdf] 연결 ID:", {
+      workerRecId,
+      productRecId,
+      purchaserRecId,
+    });
 
-    const [requester, productName] = await Promise.all([
-      workerRecId ? fetchWorkerName(workerRecId) : Promise.resolve(""),
-      productRecId ? fetchProductName(productRecId) : Promise.resolve(""),
-    ]);
-    log("[generateAndSaveInboundPdf] 이름 조회 완료:", { requester, productName });
+    const [requester, productName, supplierName, purchaserName, storageName] =
+      await Promise.all([
+        workerRecId ? fetchWorkerName(workerRecId) : Promise.resolve(""),
+        productRecId ? fetchProductName(productRecId) : Promise.resolve(""),
+        resolveSupplierName(fields["매입처"]),
+        purchaserRecId ? fetchWorkerName(purchaserRecId) : Promise.resolve(""),
+        resolveStorageName(fields["보관처"]),
+      ]);
+    log("[generateAndSaveInboundPdf] 이름 조회 완료:", {
+      requester,
+      productName,
+      supplierName,
+      purchaserName,
+    });
 
     const pdfData = {
       lotNumber: String(fields["LOT번호"] ?? ""),
       productName,
       spec: String(fields["규격"] ?? ""),
+      detailSpec: String(fields["미수"] ?? ""),
       quantity: Number(fields["입고수량"] ?? 0),
-      storage: await resolveStorageName(fields["보관처"]),
+      storage: storageName,
       origin: String(fields["원산지"] ?? ""),
       purchasePrice: Number(fields["수매가"] ?? 0),
       date: String(fields["입고일"] ?? ""),
       requester,
+      supplier: supplierName,
+      purchaser: purchaserName,
+      shipName: String(fields["선박명"] ?? ""),
+      memo: String(fields["비고"] ?? ""),
     };
     log("[generateAndSaveInboundPdf] PDF 데이터:", pdfData);
 
