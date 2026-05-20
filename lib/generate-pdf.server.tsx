@@ -37,16 +37,16 @@ Font.registerHyphenationCallback((word) => [word]);
 const s = StyleSheet.create({
   page: { padding: 48, fontFamily: "NotoSansKR", fontSize: 10, color: "#111" },
   title: {
-    fontSize: 20,
+    fontSize: 28,
     textAlign: "center",
     fontWeight: "bold",
-    marginBottom: 28,
+    marginBottom: 36,
     letterSpacing: 4,
   },
   // 내용을 담는 표 전체 테두리
   table: { borderTop: "1pt solid #333", borderLeft: "1pt solid #333" },
   row: { flexDirection: "row" },
-  // 표 왼쪽 열(항목 이름): 회색 배경으로 강조
+  // 표 왼쪽 열(항목 이름): 회색 배경으로 강조 — 단일 컬럼 표(28/72) 용
   th: {
     width: "28%",
     backgroundColor: "#f5f5f5",
@@ -54,13 +54,44 @@ const s = StyleSheet.create({
     padding: "6pt 8pt",
     borderRight: "1pt solid #333",
     borderBottom: "1pt solid #333",
+    textAlign: "center",
   },
-  // 표 오른쪽 열(실제 값)
+  // 표 오른쪽 열(실제 값) — 단일 컬럼 표(28/72) 용
   td: {
     width: "72%",
     padding: "6pt 8pt",
     borderRight: "1pt solid #333",
     borderBottom: "1pt solid #333",
+  },
+  // 4컬럼 2-윈 표(라벨-값-라벨-값) 용 라벨 셀 — 18%
+  thHalf: {
+    width: "18%",
+    backgroundColor: "#f5f5f5",
+    fontWeight: "bold",
+    padding: "6pt 8pt",
+    borderRight: "1pt solid #333",
+    borderBottom: "1pt solid #333",
+    textAlign: "center",
+  },
+  // 4컬럼 2-윈 표 값 셀 — 32%
+  tdHalf: {
+    width: "32%",
+    padding: "6pt 8pt",
+    borderRight: "1pt solid #333",
+    borderBottom: "1pt solid #333",
+  },
+  // 비고 full-width 행: 라벨 18% + 값 82%
+  tdFull: {
+    width: "82%",
+    padding: "6pt 8pt",
+    borderRight: "1pt solid #333",
+    borderBottom: "1pt solid #333",
+  },
+  // 표 사이 / 표 ↔ QR 사이 구분선 (회사 정보 푸터와 동일 톤)
+  divider: {
+    marginTop: 18,
+    paddingTop: 18,
+    borderTop: "0.5pt solid #ccc",
   },
   footer: { marginTop: 40, textAlign: "center", color: "#777", fontSize: 9 },
 });
@@ -126,94 +157,110 @@ function CompanyFooter() {
   if (c.email) contactParts.push(c.email);
   const line4 = contactParts.join("  |  ");
 
+  // QR ↔ 회사 정보 간격이 너무 멀어 어색하다는 피드백 반영:
+  // bottom을 110pt로 올려 QR과의 거리를 절반(~115pt)으로 축소.
+  // 페이지 padding(48pt) 안쪽 기준이라 실제 회사 정보 텍스트 끝은
+  // 페이지 끝에서 48+110 = 158pt 위에 위치.
   return (
     <View
-      style={{
-        marginTop: 24,
-        paddingTop: 12,
-        borderTop: "0.5pt solid #ccc",
-        alignItems: "center",
-      }}
+      style={[
+        s.divider,
+        {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 110,
+          marginTop: 0,
+          alignItems: "center",
+        },
+      ]}
+      fixed
     >
       {line1 && (
-        <Text style={{ fontSize: 9, color: "#333", fontWeight: "bold", marginBottom: 3 }}>
+        <Text style={{ fontSize: 10, color: "#333", fontWeight: "bold", marginBottom: 4 }}>
           {line1}
         </Text>
       )}
       {line2 && (
-        <Text style={{ fontSize: 8, color: "#666", marginBottom: 2 }}>{line2}</Text>
+        <Text style={{ fontSize: 10, color: "#666", marginBottom: 3 }}>{line2}</Text>
       )}
       {line3 && (
-        <Text style={{ fontSize: 8, color: "#666", marginBottom: 2 }}>{line3}</Text>
+        <Text style={{ fontSize: 10, color: "#666", marginBottom: 3 }}>{line3}</Text>
       )}
       {line4 && (
-        <Text style={{ fontSize: 8, color: "#666" }}>{line4}</Text>
+        <Text style={{ fontSize: 10, color: "#666" }}>{line4}</Text>
       )}
     </View>
   );
 }
 
+/** 4컬럼 2-윈 표의 한 행: 좌측(라벨-값) + 우측(라벨-값) 짝지음 */
+type PairRow = [
+  [string, string], // 좌측
+  [string, string] | null, // 우측 (null이면 빈 셀)
+];
+
 /**
  * 입고증 PDF 레이아웃 컴포넌트
  *
- * 표1(상품/재고 정보 10필드) + 표2(거래 정보 4필드) + QR + 회사 정보 푸터.
+ * 표1(상품/재고 정보 10필드, 4컬럼 2-윈) + 표2(거래 정보 + 비고 full-width)
+ * + 표↔QR 구분선 + QR + QR↔회사 구분선 + 회사 정보 푸터.
  */
 function InboundPDF({ data, qrDataUrl }: { data: InboundPdfData; qrDataUrl?: string }) {
-  const primary: [string, string][] = [
-    ["입고일", data.date || "-"],
-    ["입고자", data.requester || "-"],
-    ["LOT 번호", data.lotNumber || "-"],
-    ["품목명", data.productName || "-"],
-    ["규격", formatSpec(data.spec)],
-    ["미수", formatMisu(data.detailSpec)],
-    ["입고수량", formatQuantity(data.quantity)],
-    ["원산지", data.origin || "-"],
-    ["수매가", formatPrice(data.purchasePrice)],
-    ["보관처", data.storage || "-"],
+  const primary: PairRow[] = [
+    [["입고일", data.date || "-"], ["LOT 번호", data.lotNumber || "-"]],
+    [["입고자", data.requester || "-"], ["품목명", data.productName || "-"]],
+    [["규격", formatSpec(data.spec)], ["미수", formatMisu(data.detailSpec)]],
+    [["입고수량", formatQuantity(data.quantity)], ["원산지", data.origin || "-"]],
+    [["수매가", formatPrice(data.purchasePrice)], ["보관처", data.storage || "-"]],
   ];
 
-  const secondary: [string, string][] = [
-    ["매입처", data.supplier || "-"],
-    ["매입자", data.purchaser || "-"],
-    ["선박명", data.shipName || "-"],
-    ["비고", data.memo || "-"],
+  const secondaryPairs: PairRow[] = [
+    [["매입처", data.supplier || "-"], ["매입자", data.purchaser || "-"]],
+    [["선박명", data.shipName || "-"], null],
   ];
+
+  const renderPairRow = ([left, right]: PairRow, idx: number) => (
+    <View key={idx} style={s.row}>
+      <View style={s.thHalf}>
+        <Text>{left[0]}</Text>
+      </View>
+      <View style={s.tdHalf}>
+        <Text>{left[1]}</Text>
+      </View>
+      <View style={s.thHalf}>
+        <Text>{right ? right[0] : ""}</Text>
+      </View>
+      <View style={s.tdHalf}>
+        <Text>{right ? right[1] : ""}</Text>
+      </View>
+    </View>
+  );
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
         <Text style={s.title}>입 고 증</Text>
 
-        <View style={s.table}>
-          {primary.map(([label, value]) => (
-            <View key={label} style={s.row}>
-              <View style={s.th}>
-                <Text>{label}</Text>
-              </View>
-              <View style={s.td}>
-                <Text>{value}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
+        <View style={s.table}>{primary.map(renderPairRow)}</View>
 
         <View style={{ marginTop: 14 }}>
           <View style={s.table}>
-            {secondary.map(([label, value]) => (
-              <View key={label} style={s.row}>
-                <View style={s.th}>
-                  <Text>{label}</Text>
-                </View>
-                <View style={s.td}>
-                  <Text>{value}</Text>
-                </View>
+            {secondaryPairs.map(renderPairRow)}
+            {/* 비고: 4컬럼이 아닌 full-width 별행 */}
+            <View style={s.row}>
+              <View style={s.thHalf}>
+                <Text>비고</Text>
               </View>
-            ))}
+              <View style={s.tdFull}>
+                <Text>{data.memo || "-"}</Text>
+              </View>
+            </View>
           </View>
         </View>
 
         {qrDataUrl && (
-          <View style={{ marginTop: 20, alignItems: "center" }}>
+          <View style={[s.divider, { alignItems: "center" }]}>
             <Image src={qrDataUrl} style={{ width: 90, height: 90 }} />
             <Text style={{ marginTop: 4, fontSize: 8, color: "#999" }}>
               QR코드를 스캔하면 LOT 정보를 확인할 수 있습니다
