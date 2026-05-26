@@ -107,6 +107,56 @@ export const ALL_MASTERS = {
   storageCosts: [STORAGE_COST_HANRIM, STORAGE_COST_BUSAN],
 };
 
+// ── 입출고증 발행 정책 테스트용 보관처 (`구분` 분류됨) ──
+// STORAGE_HANRIM/BUSAN은 `구분` 미설정(=미분류 default true)이라 발행 분기를
+// 검증할 수 없다. 아래는 자사창고/외부창고/가공공장으로 명시 분류된 보관처.
+// ALL_MASTERS에는 넣지 않음 — 기존 테스트 영향 0, 필요 테스트만 명시 seed.
+export const STORAGE_OWN: AirtableRecord = {
+  id: "recSTORAGEOWNA001",
+  fields: { 보관처명: "자사제1냉동", 구분: "자사창고" },
+};
+
+export const STORAGE_OWN_B: AirtableRecord = {
+  id: "recSTORAGEOWNB001",
+  fields: { 보관처명: "자사제2냉동", 구분: "자사창고" },
+};
+
+export const STORAGE_EXTERNAL: AirtableRecord = {
+  id: "recSTORAGEEXTN001",
+  fields: { 보관처명: "외부위탁냉동", 구분: "외부창고" },
+};
+
+export const STORAGE_PROCESSING: AirtableRecord = {
+  id: "recSTORAGEPROC001",
+  fields: { 보관처명: "가공공장A", 구분: "가공공장" },
+};
+
+function makeStorageCost(id: string, 보관처명: string): AirtableRecord {
+  return {
+    id,
+    fields: {
+      보관처명,
+      적용시작일: "2026-01-01",
+      적용종료일: "",
+      냉장료: 1500,
+      입출고비: 500,
+      노조비: 200,
+      동결비: 300,
+    },
+  };
+}
+
+/** 발행 정책 테스트용 묶음 — 분류된 보관처 4개 + 비용 이력 */
+export const PDF_POLICY_STORAGES = {
+  storages: [STORAGE_OWN, STORAGE_OWN_B, STORAGE_EXTERNAL, STORAGE_PROCESSING],
+  storageCosts: [
+    makeStorageCost("recSTGCOSTOWNA001", "자사제1냉동"),
+    makeStorageCost("recSTGCOSTOWNB001", "자사제2냉동"),
+    makeStorageCost("recSTGCOSTEXTN001", "외부위탁냉동"),
+    makeStorageCost("recSTGCOSTPROC001", "가공공장A"),
+  ],
+};
+
 /** 출고/이동 테스트용 — 이미 입고 승인된 상태의 입고 관리 레코드 */
 export function makeApprovedInboundRecord(opts: {
   id?: string;
