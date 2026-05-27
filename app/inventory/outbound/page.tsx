@@ -139,13 +139,12 @@ export default function OutboundRecordPage() {
     router.replace(`/inventory/lot/${encodeURIComponent(lot)}`);
   }, [router, searchParams]);
 
-  const resetForm = () => {
+  // "다시 검색" — 선택만 해제하고 직전 검색어·결과는 유지해 검색 결과 리스트로 복귀.
+  const backToSearchResults = () => {
     setSelectedLot(null);
     setQuantity('');
     setSeller('');
     setSalePrice('');
-    setKeyword('');
-    setSearchResults([]);
   };
 
   // ── 장바구니 추가 ─────────────────────────────────────────────────────────
@@ -155,6 +154,9 @@ export default function OutboundRecordPage() {
     if (!Number.isFinite(qty) || qty <= 0) { toast('출고 수량을 입력해 주세요.'); return; }
     const currentStock = Number(selectedLot.fields['재고수량'] ?? 0);
     if (qty > currentStock) { toast('현재 재고보다 많습니다!'); return; }
+    if (!seller.trim()) { toast('판매처를 입력해 주세요.'); return; }
+    const priceVal = fromGroupedIntegerInput(salePrice).value;
+    if (!Number.isFinite(priceVal) || priceVal <= 0) { toast('판매 금액을 입력해 주세요.'); return; }
 
     setCart((prev) => [
       ...prev,
@@ -169,7 +171,7 @@ export default function OutboundRecordPage() {
         storage: String(selectedLot.fields['보관처'] ?? ''),
         quantity: qty,
         seller: seller.trim(),
-        salePrice: salePrice ? fromGroupedIntegerInput(salePrice).value : undefined,
+        salePrice: priceVal,
       },
     ]);
 
@@ -421,7 +423,7 @@ export default function OutboundRecordPage() {
                     {selectedLot.fields['LOT번호']}
                   </p>
                 </div>
-                <button onClick={resetForm} className="text-[12px] text-gray-400 underline p-2 shrink-0">
+                <button onClick={backToSearchResults} className="text-[12px] text-gray-400 underline p-2 shrink-0">
                   다시 검색
                 </button>
               </div>
@@ -459,7 +461,7 @@ export default function OutboundRecordPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="text-[13px] font-bold text-gray-500 ml-1">판매처</label>
+                  <label className="text-[13px] font-bold text-gray-500 ml-1">판매처 <span className="text-[#FF3B30]">*</span></label>
                   <input
                     type="text"
                     placeholder="직접입력"
@@ -470,7 +472,7 @@ export default function OutboundRecordPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[13px] font-bold text-gray-500 ml-1">판매 금액</label>
+                  <label className="text-[13px] font-bold text-gray-500 ml-1">판매 금액 <span className="text-[#FF3B30]">*</span></label>
                   <input
                     type="text"
                     inputMode="numeric"

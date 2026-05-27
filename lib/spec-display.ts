@@ -15,9 +15,12 @@ export function formatSpecKgMisu(specRaw: string, misuRaw: string): string {
         ? spec
         : `${spec}kg`;
 
-  if (specKg && misu) return `${specKg} (${misu}미)`;
+  // 미수 값이 이미 "미"로 끝나면(예: "52/54미") 접미사를 또 붙이지 않는다 (중복 "미미" 방지).
+  const misuLabel = misu === "" ? "" : misu.endsWith("미") ? misu : `${misu}미`;
+
+  if (specKg && misuLabel) return `${specKg} (${misuLabel})`;
   if (specKg) return specKg;
-  if (misu) return `(${misu}미)`;
+  if (misuLabel) return `(${misuLabel})`;
   return "-";
 }
 
