@@ -294,7 +294,7 @@ export default function OutboundRecordPage() {
               type="button"
               onClick={() => setCartOpen(true)}
               aria-label={`출고 목록 ${cart.length}건 보기`}
-              className="relative w-9 h-9 mr-2 flex items-center justify-center rounded-xl active:bg-gray-100 transition-colors"
+              className="relative w-9 h-9 mr-2.5 flex items-center justify-center rounded-xl active:bg-gray-100 transition-colors"
             >
               <ShoppingCartIcon className="w-6 h-6 text-gray-800" />
               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FF3B30] text-white text-[11px] font-black flex items-center justify-center">
