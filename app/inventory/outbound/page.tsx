@@ -4,15 +4,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   MagnifyingGlassIcon,
-  TrashIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
+  ShoppingCartIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
 import LotProductSpec from '@/components/LotProductSpec';
+import OutboundCartSheet from '@/app/components/OutboundCartSheet';
 import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
 import { formatIntKo, fromGroupedIntegerInput } from '@/lib/number-format';
-import { formatSpecKgMisu } from '@/lib/spec-display';
 import { readSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { runBulkSubmit } from '@/lib/bulk-submit';
@@ -76,6 +76,7 @@ export default function OutboundRecordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
 
   // 재고 조회 → 핸드오프된 대기 LOT (mount 시 1회 hydrate)
   const [pending, setPending] = useState<PendingCartLot[]>([]);
@@ -174,6 +175,7 @@ export default function OutboundRecordPage() {
         salePrice: priceVal,
       },
     ]);
+    toast(`출고 목록에 담았어요 · ${cart.length + 1}건`, 'success');
 
     // 대기 큐에서 현재 LOT 제거 + 다음 LOT 자동 선택. 판매처/판매가는 유지(같은 거래처 가능성↑).
     const currentLotId = selectedLot.id;
@@ -251,6 +253,7 @@ export default function OutboundRecordPage() {
       return;
     }
 
+    setCartOpen(false);
     setBulkResult({ successCartIds, failures });
   };
 
@@ -285,6 +288,21 @@ export default function OutboundRecordPage() {
         subtitle="어떤 물건이 출고되나요?"
         onBack={() => router.push('/')}
         titleClassName="text-[#FF3B30] font-black"
+        rightSlot={
+          cart.length > 0 && !bulkResult ? (
+            <button
+              type="button"
+              onClick={() => setCartOpen(true)}
+              aria-label={`출고 목록 ${cart.length}건 보기`}
+              className="relative w-9 h-9 flex items-center justify-center rounded-xl active:bg-gray-100 transition-colors"
+            >
+              <ShoppingCartIcon className="w-6 h-6 text-gray-800" />
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FF3B30] text-white text-[11px] font-black flex items-center justify-center">
+                {cart.length}
+              </span>
+            </button>
+          ) : undefined
+        }
       />
 
       <div className="p-4 space-y-4">
@@ -496,58 +514,6 @@ export default function OutboundRecordPage() {
             </div>
           )}
         </div>
-
-        {/* ── 장바구니 리스트 ──────────────────────────────────────────────── */}
-        {cart.length > 0 && (
-          <div className="space-y-3">
-            <p className="text-[12px] font-bold text-gray-400 ml-1">
-              출고 목록 ({cart.length}건)
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {cart.map((item) => (
-                <div
-                  key={item.cartId}
-                  className="flex min-h-0 min-w-0 items-stretch gap-2 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-bold text-gray-400">{item.lotNumber}</p>
-                    <p className="truncate text-[14px] font-black text-gray-800">
-                      {item.productName}{' '}
-                      <span className="text-[12px] font-normal text-gray-500">
-                        {formatSpecKgMisu(item.spec, item.misu)}
-                      </span>
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <span className="text-[13px] font-bold text-[#FF3B30]">
-                        {formatIntKo(item.quantity)}박스
-                      </span>
-                      {item.seller && (
-                        <span className="text-[12px] text-gray-500">{item.seller}</span>
-                      )}
-                      {item.salePrice != null && (
-                        <span className="text-[12px] text-gray-500">
-                          {formatIntKo(item.salePrice)}원
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center justify-end">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCart((prev) => prev.filter((c) => c.cartId !== item.cartId))
-                      }
-                      className="p-2 text-gray-300 hover:text-red-500 active:scale-90 transition-all"
-                      aria-label="목록에서 삭제"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
           </>
         )}
 
@@ -624,16 +590,24 @@ export default function OutboundRecordPage() {
       ) : cart.length > 0 ? (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F4F6] border-t border-gray-200">
           <button
-            onClick={handleSubmitAll}
-            disabled={isSubmitting}
-            className={`w-full py-5 rounded-2xl text-[18px] font-black text-white shadow-lg transition-all ${
-              isSubmitting ? 'bg-red-300 cursor-not-allowed' : 'bg-[#FF3B30] active:scale-[0.98]'
-            }`}
+            type="button"
+            onClick={() => setCartOpen(true)}
+            className="w-full py-5 rounded-2xl text-[18px] font-black text-white shadow-lg transition-all bg-[#FF3B30] active:scale-[0.98] flex items-center justify-center gap-2"
           >
-            {isSubmitting ? '신청 중...' : `출고 신청 (${cart.length}건)`}
+            <ShoppingCartIcon className="w-5 h-5" />
+            출고 목록 {cart.length}건 · 신청하기
           </button>
         </div>
       ) : null}
+
+      <OutboundCartSheet
+        open={cartOpen}
+        items={cart}
+        isSubmitting={isSubmitting}
+        onClose={() => setCartOpen(false)}
+        onRemove={(id) => setCart((prev) => prev.filter((c) => c.cartId !== id))}
+        onSubmit={handleSubmitAll}
+      />
     </main>
   );
 }
