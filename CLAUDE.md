@@ -3,6 +3,11 @@
 기술 스택: Next.js 15 + Airtable + Vercel + zod + Vitest + Resend
 개발 방식: 1인 기획/개발 + Claude Code
 
+■ 최근 변경 (2026-05-27)
+- 출고·재고 이동 카트 UX 통일 — 헤더 🛒+바텀시트(확인 후 신청)/`LotProductSpec`로 규격·미수 표기 통일/"다시 검색" 결과 리스트 복귀/출고·이동 수량 재고 초과 자동 클램프/판매처·판매가 필수. 재고 이동 묶음 신청 A안→B안(`runBulkSubmit`). 컴포넌트 `OutboundCartSheet`·`TransferCartSheet`·`LotProductSpec` 신설.
+- Step 0 안전망 — cart 순회 정책을 `lib/bulk-submit.runBulkSubmit` 순수 함수로 추출 + 단위 테스트(A안 abort 회귀 가드, 변이 테스트로 효능 증명). `formatSpecKgMisu` 중복 '미'(`52/54미미`) 가드 + `lib/spec-display.test.ts`. 단위 125(+15)/통합 93.
+- 보관처 마스터 정리(MCP) — `㈜해원냉장`→`해원냉장` 병합(LOT↔입고 보관처 불일치 해소)·`동ㅇ원통영수산` 삭제(85→83), `.`(활성 800박스)·`해원냉동(구좌)` 보류. dev `COMPANY_*` 21건 encrypted 확정(저널 stale 정정).
+
 ■ 최근 변경 (2026-05-26)
 - 입출고증 발행 정책(자사창고 끝점 분기, 5/19 `isOwnStorage`) 통합 테스트 신규 — `test/integration/pdf-issuance-policy.test.ts` 8케이스(7매트릭스 + 미분류 회귀), fixture `PDF_POLICY_STORAGES` 추가. production 0줄 수정, 통합 85→93, 회귀 0.
 - 보관처 마스터 `구분` 운영 분류 완료 (Airtable MCP, 85건 전부) — 자사창고 4(한라에스앤에프/나림통상/사무실/한라양식수협) / 외부창고 81 / 미분류 0. 발행 분기 즉시 효력: 외부 입고는 입고증 미발행(런타임 데이터, 배포 불필요).
