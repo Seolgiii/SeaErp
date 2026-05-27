@@ -294,7 +294,7 @@ export default function OutboundRecordPage() {
               type="button"
               onClick={() => setCartOpen(true)}
               aria-label={`출고 목록 ${cart.length}건 보기`}
-              className="relative w-9 h-9 flex items-center justify-center rounded-xl active:bg-gray-100 transition-colors"
+              className="relative w-9 h-9 mr-2 flex items-center justify-center rounded-xl active:bg-gray-100 transition-colors"
             >
               <ShoppingCartIcon className="w-6 h-6 text-gray-800" />
               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FF3B30] text-white text-[11px] font-black flex items-center justify-center">
@@ -462,8 +462,14 @@ export default function OutboundRecordPage() {
                     value={quantity}
                     autoFocus
                     onChange={(e) => {
-                      const { display } = fromGroupedIntegerInput(e.target.value);
-                      setQuantity(display);
+                      const { display, value } = fromGroupedIntegerInput(e.target.value);
+                      const max = Number(selectedLot?.fields['재고수량'] ?? 0);
+                      if (max > 0 && value > max) {
+                        setQuantity(formatIntKo(max));
+                        toast(`재고 ${formatIntKo(max)}박스가 최대예요.`, 'info');
+                      } else {
+                        setQuantity(display);
+                      }
                     }}
                     className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-[#FF3B30] outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all"
                   />
