@@ -138,13 +138,10 @@ export default function TransferPage() {
     try {
       const res = await searchTransferLot(q);
       if (res.success) {
-        if (res.records.length === 0) {
-          toast('일치하는 재고가 없습니다.', 'info');
-        } else if (res.records.length === 1) {
-          setSelectedLot(res.records[0]);
-        } else {
-          setSearchResults(res.records);
-        }
+        if (res.records.length === 0) toast('일치하는 재고가 없습니다.', 'info');
+        // 결과를 항상 저장 → 1건이라 자동 선택돼도 [다시 검색] 시 결과 리스트로 복귀.
+        setSearchResults(res.records);
+        if (res.records.length === 1) setSelectedLot(res.records[0]);
       } else {
         toast(res.error ?? '검색 중 오류가 발생했습니다.');
       }
@@ -157,7 +154,6 @@ export default function TransferPage() {
 
   const handleSelect = (lot: TransferLotResult) => {
     setSelectedLot(lot);
-    setSearchResults([]);
     setTransferQty('');
   };
 
