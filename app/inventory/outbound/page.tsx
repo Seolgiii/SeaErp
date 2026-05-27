@@ -9,10 +9,13 @@ import {
   ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
+import LotProductSpec from '@/components/LotProductSpec';
 import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
 import { formatIntKo, fromGroupedIntegerInput } from '@/lib/number-format';
+import { formatSpecKgMisu } from '@/lib/spec-display';
 import { readSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
+import { runBulkSubmit } from '@/lib/bulk-submit';
 import {
   PENDING_OUTBOUND_LOTS_KEY,
   readPendingCartLots,
@@ -54,13 +57,6 @@ type CartItem = {
   seller: string;
   salePrice: number | undefined;
 };
-
-function formatMisuDisplay(raw: unknown): string {
-  const s = String(raw ?? '').trim();
-  if (!s) return '—';
-  if (s.endsWith('미')) return s;
-  return `${s} 미`;
-}
 
 // LotSearchResult / pendingToOutboundLot은 import 영역에서 정의됨 (sessionStorage 핸드오프용).
 
@@ -222,16 +218,16 @@ export default function OutboundRecordPage() {
   // B안 정책 (obsidian-vault/40_결정기록/출고이동_카트_UX_통일.md):
   //   첫 실패에서 abort 하지 않고 cart 끝까지 순회 → 성공/실패 분리 누적 →
   //   실패 1건 이상이면 결과 패널 표시. 모두 성공이면 기존 단일 toast + redirect.
-  // 회귀 방지 안전망: test/integration/outbound-bulk-policy.test.ts 4 시나리오.
+  //   순회 정책 본체는 lib/bulk-submit.runBulkSubmit으로 추출 (React 비의존 순수 함수).
+  // 회귀 방지 안전망: lib/bulk-submit.test.ts (client 순회 정책) +
+  //   test/integration/outbound-bulk-policy.test.ts (서버 부분성공 계약).
   const handleSubmitAll = async () => {
     if (cart.length === 0) return;
     setIsSubmitting(true);
 
-    const successCartIds: string[] = [];
-    const failures: { cartId: string; lotNumber: string; reason: string }[] = [];
-
-    for (const item of cart) {
-      const result = await createOutboundRecord({
+    // cart 순회(전체 순회·부분 성공)는 runBulkSubmit이 담당. 여기선 React 상태만 다룬다.
+    const { successCartIds, failures } = await runBulkSubmit(cart, (item) =>
+      createOutboundRecord({
         date: new Date().toISOString().split('T')[0],
         lotNumber: item.lotNumber,
         lotRecordId: item.lotId,
@@ -242,18 +238,8 @@ export default function OutboundRecordPage() {
         misu: item.misu,
         seller: item.seller || undefined,
         salePrice: item.salePrice,
-      });
-
-      if (result.success) {
-        successCartIds.push(item.cartId);
-      } else {
-        failures.push({
-          cartId: item.cartId,
-          lotNumber: item.lotNumber,
-          reason: result.error ?? '알 수 없는 오류',
-        });
-      }
-    }
+      }),
+    );
 
     setIsSubmitting(false);
 
@@ -403,13 +389,12 @@ export default function OutboundRecordPage() {
                     {lot.fields['LOT번호']}
                   </p>
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[15px] font-black text-gray-800">
-                      {lot.fields['품목명']}{' '}
-                      <span className="text-[13px] text-gray-500 font-normal">
-                        (규격 {lot.fields['규격']}kg /{' '}
-                        {formatMisuDisplay(lot.fields['미수'] ?? lot.fields['상세규격_표기'])})
-                      </span>
-                    </p>
+                    <LotProductSpec
+                      productName={String(lot.fields['품목명'] ?? '')}
+                      spec={String(lot.fields['규격'] ?? '')}
+                      misu={String(lot.fields['미수'] ?? lot.fields['상세규격_표기'] ?? '')}
+                      className="flex-1"
+                    />
                     <p className="text-[13px] font-bold text-blue-600 shrink-0">
                       {formatIntKo(Math.trunc(Number(lot.fields['재고수량'] ?? 0)))}박스
                     </p>
@@ -427,16 +412,11 @@ export default function OutboundRecordPage() {
                   <span className="inline-block px-2 py-1 bg-red-100 text-[#FF3B30] text-[11px] font-black rounded-md mb-2">
                     선택된 상품
                   </span>
-                  <p className="text-[15px] font-black text-gray-800">
-                    {selectedLot.fields['품목명']}{' '}
-                    <span className="text-[13px] text-gray-500 font-normal">
-                      (규격 {selectedLot.fields['규격']}kg /{' '}
-                      {formatMisuDisplay(
-                        selectedLot.fields['미수'] ?? selectedLot.fields['상세규격_표기'],
-                      )}
-                      )
-                    </span>
-                  </p>
+                  <LotProductSpec
+                    productName={String(selectedLot.fields['품목명'] ?? '')}
+                    spec={String(selectedLot.fields['규격'] ?? '')}
+                    misu={String(selectedLot.fields['미수'] ?? selectedLot.fields['상세규격_표기'] ?? '')}
+                  />
                   <p className="font-mono text-[12px] font-black text-[#FF3B30] tracking-tight mt-0.5">
                     {selectedLot.fields['LOT번호']}
                   </p>
@@ -532,7 +512,7 @@ export default function OutboundRecordPage() {
                     <p className="truncate text-[14px] font-black text-gray-800">
                       {item.productName}{' '}
                       <span className="text-[12px] font-normal text-gray-500">
-                        ({item.spec}kg / {formatMisuDisplay(item.misu)})
+                        {formatSpecKgMisu(item.spec, item.misu)}
                       </span>
                     </p>
                     <div className="mt-1 flex flex-wrap gap-2">
