@@ -126,26 +126,63 @@
 
 **목표**: 관리자(ADMIN, MASTER)가 Airtable 없이 모든 데이터 관리 가능
 
-**라우트 구조** (예정):
-- /admin/master/products — 제품 마스터 표
-- /admin/master/lots — LOT 마스터 표
-- /admin/master/storage — 보관처 마스터 표
-- /admin/master/suppliers — 공급업체 마스터 표
-- /admin/dashboard 확장 — 표 형태 결재 처리
-- /admin/reports — 분석/리포트
+### 관리자 PC IA — 6 카테고리 (2026-05-28 결정)
 
-**공통 화면 패턴**:
-- 표 + 필터 + 검색 + 인라인 편집
+1. **결재 (Workflow)** — 일상 1순위
+   - 결재 수신함 ✅ `/admin/dashboard`
+   - (확장) 결재 이력·검색
+   - (확장) 일괄 처리 표
+
+2. **재고 (Inventory)**
+   - LOT 마스터 ✅ `/admin/master/lots` (read-only)
+   - 재고 현황 집계 (보관처 × 품목)
+   - LOT 생애주기 추적 (입고 → 이동 → 출고 타임라인)
+   - 음수/이상 LOT 모니터 (daily-report HealthMetrics 화면화)
+
+3. **거래 이력 (Transactions)**
+   - 입고 이력 (PDF 재발행 포함)
+   - 출고 이력
+   - 이동 이력
+   - 지출 이력 (admin 관점)
+   - PDF 재발행 드롭존
+
+4. **원가·손익 (Cost & Profit Analysis)** — 관리회계 only
+   - 보관처 비용 이력 마스터 (storageCostHistory)
+   - LOT별 누적 비용 분석 (cost-calc 시각화)
+   - 손익 추이 (일·주·월)
+   - 매입 통계 (매입처 × 기간 × 금액)
+   - 외부 ERP export — 재무회계 프로그램으로 데이터 이관 채널
+
+   ※ 4번은 *관리회계*에 한정 (원가·손익 분석). 분개·전표·세금계산서 등
+     *재무회계*는 본 ERP 범위 외 — "명시적 보류 항목" 섹션 참조.
+
+5. **마스터 (Reference Data)**
+   - 품목 ✅ `/admin/master/products`
+   - 매입처 ✅ `/admin/master/suppliers`
+   - 보관처 ✅ `/admin/master/storage`
+   - 작업자·권한 (workers 테이블, PIN·role)
+   - 선박 정보 (입고 폼 사용 중)
+
+6. **시스템·운영 (Ops)**
+   - 일일 보고서 화면 (현재는 이메일만)
+   - 운영 건강도 (HealthMetrics 실시간)
+   - `[INTEGRITY-ALERT]` 로그 검색
+   - cron 실행 이력
+   - Airtable 동기화 상태 (`[SCHEMA-MISMATCH]`)
+
+### 공통 화면 패턴
+- 표 + 필터 + 검색 + 모달 편집 (인라인은 dogfooding 후 결정)
 - 키보드 단축키 지원 (검색 Ctrl+K, 저장 Ctrl+S 등)
-- 페이지네이션 또는 가상 스크롤
-- CSV 내보내기
+- 페이지네이션 또는 가상 스크롤 (TanStack Table은 화면 4개+ 누적 시 재검토)
+- CSV 내보내기 (4번 "외부 ERP export"의 1차 형태)
 
-**진행 방식**:
+### 진행 방식
 - 테이블별로 화면 1개씩 만들기 (단순한 것부터)
-- 우선순위: products → suppliers → storage → lots → dashboard 확장 → reports
+- 우선순위: products → suppliers → storage → lots(read-only) ✅ 완료
+  → 결재 확장 → 거래 이력 → 원가·손익 → 시스템·운영
 - 각 화면 완료 후 본인이 일주일간 Airtable 대신 사용해보고 검증
 
-**완료 기준**:
+### 완료 기준
 - 본인이 일상 관리 업무를 Airtable 없이 처리 가능
 - Airtable은 백엔드 DB로만 사용 (UI 접근 불필요)
 
@@ -186,6 +223,32 @@
 
 ---
 
+## 명시적 보류 항목 (의도된 비범위)
+
+본 ERP가 *하지 않기로 결정한* 영역. Phase 5+(조건부 미래)와 구분되는
+"개발 범위 외" 의미. (2026-05-28 결정)
+
+### 재무회계 영역
+
+대상:
+- 분개 전표 / 일반전표
+- 부가세 신고 자료
+- 전자세금계산서 발행
+- 결산 (월·분기·연)
+
+보류 사유:
+- 매년 세법 변경, 세무 리스크 큼
+- 더존·이카운트·smartbill 같은 *전문 회계 프로그램의 영역*
+- 1인 개발로 변동성을 추적하는 것이 비현실적
+
+처리 방향:
+- 본 ERP는 **관리회계(원가·손익 분석)까지** 자체 구현 (Phase 3 IA 4번 "원가·손익")
+- **재무회계는 외부 회계 프로그램으로 데이터 이관**
+- Phase 3 IA 4번 하위 *"외부 ERP export"* 가 그 연결 다리
+- export 포맷·수신 시스템(더존/이카운트/etc)은 별도 결정
+
+---
+
 ## 의사결정 기록
 
 이 로드맵의 주요 의사결정 맥락은 `obsidian-vault/40_결정기록/` 에 별도 보관.
@@ -194,3 +257,5 @@
 - 2026-05-12: 모바일 PWA + PC PWA 분리 구조 확정
 - 2026-05-12: PC 프로그램화는 Electron/Tauri가 아닌 PWA로 진행
 - 2026-05-12: 백엔드 리팩토링은 옵션 B+ 채택 (영문 매핑 없음, 한글 필드명 유지)
+- 2026-05-28: 관리자 PC IA = 6 카테고리 확정 (결재 / 재고 / 거래 이력 / 원가·손익 / 마스터 / 시스템)
+- 2026-05-28: 재무회계 영역 명시적 보류 — 외부 ERP export로 연결 (1인 개발 한계, 세법 리스크)
