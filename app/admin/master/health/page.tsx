@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ChevronDownIcon,
@@ -351,12 +352,12 @@ function LockedWorkersTable({ items }: { items: LockedWorker[] }) {
                   : '-'}
               </td>
               <td className="px-4 py-3">
-                <a
+                <Link
                   href="/admin/master/workers"
                   className="text-[12px] font-bold text-[#3182F6] hover:underline"
                 >
                   작업자 마스터에서 해제 →
-                </a>
+                </Link>
               </td>
             </tr>
           ))}
