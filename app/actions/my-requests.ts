@@ -12,7 +12,13 @@ import { log, logError, logWarn } from '@/lib/logger';
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { revalidatePath } from "next/cache";
-import { getWorkersTablePath, getProductsTablePath } from "@/lib/airtable";
+import {
+  getWorkersTablePath,
+  getProductsTablePath,
+  fetchAirtable,
+  getAirtableRecord,
+  patchAirtableRecord,
+} from "@/lib/airtable";
 import { WORKER_FIELDS, PRODUCT_FIELDS } from "@/lib/airtable-schema";
 import { AuthError, requireWorker } from "@/lib/server-auth";
 import {
@@ -93,15 +99,9 @@ async function fetchAirtableRecords(
   }
 
   try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableSegmentForUrl(tableName)}?${params.toString()}`,
-      {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-        cache: "no-store", // 항상 최신 데이터를 가져오도록 캐시 사용 안 함
-      },
+    const data = await fetchAirtable(
+      `${tableSegmentForUrl(tableName)}?${params.toString()}`
     );
-    if (!res.ok) return [];
-    const data = await res.json();
     const rows = (data.records ?? []) as {
       id?: string;
       fields?: Record<string, unknown>;
@@ -202,12 +202,9 @@ async function batchResolveNames(
       "fields[]": nameField, // 이름 필드만 요청 (불필요한 데이터 제외)
     });
     try {
-      const res = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableSegmentForUrl(tableName)}?${params.toString()}`,
-        { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, cache: "no-store" },
+      const data = await fetchAirtable(
+        `${tableSegmentForUrl(tableName)}?${params.toString()}`
       );
-      if (!res.ok) continue;
-      const data = await res.json();
       for (const r of data.records ?? []) {
         const name = fieldToDisplayString(r.fields?.[nameField]);
         if (name) map[r.id] = name;
@@ -229,13 +226,8 @@ async function fetchWorkerNameByRecordId(
 ): Promise<string> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !/^rec[a-zA-Z0-9]+$/.test(recordId)) return "";
   try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableSegmentForUrl(workerTablePath)}/${recordId}`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, cache: "no-store" },
-    );
-    if (!res.ok) return "";
-    const data = (await res.json()) as { fields?: Record<string, unknown> };
-    return fieldToDisplayString(data.fields?.[WORKER_FIELDS.name]);
+    const { fields } = await getAirtableRecord(tableSegmentForUrl(workerTablePath), recordId);
+    return fieldToDisplayString(fields[WORKER_FIELDS.name]);
   } catch {
     return "";
   }
@@ -268,13 +260,8 @@ async function fetchProductNameByRecordId(
 ): Promise<string> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !/^rec[a-zA-Z0-9]+$/.test(recordId)) return "";
   try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableSegmentForUrl(productTablePath)}/${recordId}`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, cache: "no-store" },
-    );
-    if (!res.ok) return "";
-    const data = (await res.json()) as { fields?: Record<string, unknown> };
-    return fieldToDisplayString(data.fields?.[PRODUCT_FIELDS.name]);
+    const { fields } = await getAirtableRecord(tableSegmentForUrl(productTablePath), recordId);
+    return fieldToDisplayString(fields[PRODUCT_FIELDS.name]);
   } catch {
     return "";
   }
@@ -739,49 +726,29 @@ export async function cancelMyRequest(
   const linkField = type === "EXPENSE" ? "신청자" : "작업자";
   const isAdmin = verifiedWorker.role === "ADMIN" || verifiedWorker.role === "MASTER";
   if (!isAdmin) {
+    let ownerFields: Record<string, unknown>;
     try {
-      const checkRes = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}/${recordId}`,
-        { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
-      );
-      if (!checkRes.ok) {
-        return { success: false, message: "신청 건을 확인할 수 없습니다." };
-      }
-      const data = await checkRes.json() as { fields?: Record<string, unknown> };
-      const linked = data.fields?.[linkField];
-      const ownerId = Array.isArray(linked) && typeof linked[0] === "string" ? linked[0] : null;
-      if (ownerId !== verifiedWorker.id) {
-        logWarn("[cancelMyRequest] 본인 신청이 아님:", { workerId: verifiedWorker.id, ownerId });
-        return { success: false, message: "본인이 신청한 건만 취소할 수 있습니다." };
-      }
+      const rec = await getAirtableRecord(encodeURIComponent(tableName), recordId);
+      ownerFields = rec.fields;
     } catch (e) {
       logError("[cancelMyRequest] 신청 건 확인 중 오류:", e);
-      return { success: false, message: "신청 건 확인 실패" };
+      return { success: false, message: "신청 건을 확인할 수 없습니다." };
+    }
+    const linked = ownerFields[linkField];
+    const ownerId = Array.isArray(linked) && typeof linked[0] === "string" ? linked[0] : null;
+    if (ownerId !== verifiedWorker.id) {
+      logWarn("[cancelMyRequest] 본인 신청이 아님:", { workerId: verifiedWorker.id, ownerId });
+      return { success: false, message: "본인이 신청한 건만 취소할 수 있습니다." };
     }
   }
 
   try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}/${recordId}`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ fields: { "승인상태": "취소" } }), // 승인상태를 "취소"로 변경
-      },
-    );
-
-    if (!res.ok) {
-      return { success: false, message: "취소 요청에 실패했습니다." };
-    }
-
+    await patchAirtableRecord(encodeURIComponent(tableName), recordId, { "승인상태": "취소" });
     // 내 신청 내역과 관리자 대시보드 캐시 초기화
     revalidatePath("/my-requests");
     revalidatePath("/admin/dashboard");
     return { success: true, message: "취소되었습니다." };
   } catch {
-    return { success: false, message: "서버 오류가 발생했습니다." };
+    return { success: false, message: "취소 요청에 실패했습니다." };
   }
 }
