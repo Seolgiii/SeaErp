@@ -18,9 +18,9 @@ import { readSession, isSessionExpired } from '@/lib/session';
 
 const NAV_ITEMS = [
   { href: '/admin/master/products', label: '제품 마스터', enabled: true },
-  { href: '/admin/master/suppliers', label: '공급업체 마스터', enabled: false },
-  { href: '/admin/master/storage', label: '보관처 마스터', enabled: false },
-  { href: '/admin/master/lots', label: 'LOT 마스터', enabled: false },
+  { href: '/admin/master/suppliers', label: '매입처 마스터', enabled: true },
+  { href: '/admin/master/storage', label: '보관처 마스터', enabled: true },
+  { href: '/admin/master/lots', label: 'LOT 마스터', enabled: true },
 ] as const;
 
 export default function MasterAdminLayout({ children }: { children: React.ReactNode }) {
