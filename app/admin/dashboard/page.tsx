@@ -389,6 +389,14 @@ export default function AdminDashboardPage() {
       <PageHeader
         title="결재 수신함"
         onBack={() => router.push("/")}
+        rightSlot={
+          <Link
+            href="/admin/master/products"
+            className="text-[13px] font-bold text-[#3182F6]"
+          >
+            마스터
+          </Link>
+        }
       />
 
       {/* Pull-to-refresh 인디케이터 */}
