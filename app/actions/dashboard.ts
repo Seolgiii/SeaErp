@@ -1,5 +1,6 @@
 "use server";
 import { log, logError, logWarn } from '@/lib/logger';
+import { fetchAirtable } from "@/lib/airtable";
 
 import { unstable_cache } from "next/cache";
 
@@ -45,17 +46,10 @@ async function fetchAllRecords(
     if (offset) params.set("offset", offset);
     params.set("pageSize", "100");
 
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableSegmentForUrl(tableName)}?${params.toString()}`;
     try {
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        logError(`[dashboard] ${tableName} fetch 실패: ${res.status}`);
-        break;
-      }
-      const data = (await res.json()) as AirtableListResponse;
+      const data = (await fetchAirtable(
+        `${tableSegmentForUrl(tableName)}?${params.toString()}`
+      )) as AirtableListResponse;
       for (const rec of data.records ?? []) {
         records.push({
           id: String(rec.id ?? ""),
@@ -65,7 +59,7 @@ async function fetchAllRecords(
       }
       offset = data.offset;
     } catch (e) {
-      logError(`[dashboard] ${tableName} fetch 예외:`, e);
+      logError(`[dashboard] ${tableName} fetch 실패:`, e);
       break;
     }
   } while (offset);

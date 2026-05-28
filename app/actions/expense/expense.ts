@@ -5,9 +5,7 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { AuthError, requireWorker } from "@/lib/server-auth";
 import { InputValidationError, sanitizeText } from "@/lib/input-sanitize";
-
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+import { fetchAirtable, createAirtableRecord } from "@/lib/airtable";
 
 export type ExpenseCreatePayload = {
   /** 신청자 record ID — 서버에서 권한 검증 */
@@ -28,12 +26,10 @@ export type ExpenseCreatePayload = {
 // 인원 정보 가져오기
 export async function getApplicantInfo(name: string) {
   try {
-    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/작업자?filterByFormula={작업자명}='${name}'`, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
-    });
-    const data = await response.json();
+    const data = await fetchAirtable(
+      `작업자?filterByFormula={작업자명}='${name}'`
+    );
     log("getApplicantInfo response", {
-      status: response.status,
       recordsCount: data.records?.length ?? 0,
       firstRecordId: data.records?.[0]?.id ?? null,
     });
@@ -83,53 +79,19 @@ export async function createExpenseRecord(formData: ExpenseCreatePayload) {
       throw e;
     }
 
-    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/지출결의`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fields: {
-          "지출일": expenseDate,
-          "작성일": createdDate,
-          "건명": title,
-          "적요": description,
-          "금액": Number(formData.amount),
-          "법인카드 사용 유무": formData.isCorpCard ? "유" : "무",
-          "비고": remarks,
-          "승인상태": "승인 대기",
-          "신청자": [applicantRecordId],
-          "영수증사진": formData.receiptUrl ? [{ url: formData.receiptUrl }] : [],
-          // ... 기타 필드
-        }
-      }),
+    await createAirtableRecord("지출결의", {
+      "지출일": expenseDate,
+      "작성일": createdDate,
+      "건명": title,
+      "적요": description,
+      "금액": Number(formData.amount),
+      "법인카드 사용 유무": formData.isCorpCard ? "유" : "무",
+      "비고": remarks,
+      "승인상태": "승인 대기",
+      "신청자": [applicantRecordId],
+      "영수증사진": formData.receiptUrl ? [{ url: formData.receiptUrl }] : [],
+      // ... 기타 필드
     });
-
-    if (!response.ok) {
-      let errorMessage = `Airtable 저장 실패 (${response.status})`;
-      let responseBody: string | null = null;
-      const errorJson = await response.clone().json().catch(() => null);
-      const apiError =
-        errorJson?.error?.message ||
-        errorJson?.error ||
-        errorJson?.message;
-
-      if (apiError) {
-        responseBody = String(apiError);
-        errorMessage = `${errorMessage}: ${String(apiError)}`;
-      } else {
-        const errorText = await response.text().catch(() => "");
-        if (errorText) {
-          responseBody = errorText;
-          errorMessage = `${errorMessage}: ${errorText}`;
-        }
-      }
-
-      logError("createExpenseRecord Airtable response error", {
-        status: response.status,
-        body: responseBody,
-      });
-
-      return { success: false, error: errorMessage };
-    }
 
     revalidatePath("/expense/list");
     revalidatePath("/admin/dashboard");

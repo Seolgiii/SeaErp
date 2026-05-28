@@ -1,7 +1,6 @@
 "use server";
 
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+import { fetchAirtable } from "@/lib/airtable";
 
 /**
  * [입고용] 품목 가이드 정보 가져오기
@@ -11,14 +10,9 @@ export async function getMasterGuide(itemName: string): Promise<
   | { success: true; records: { fields: Record<string, unknown> }[]; origin: string; placeholder: string }
 > {
   try {
-    const response = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/품목마스터?filterByFormula={품목명}='${itemName}'`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } }
+    const data = await fetchAirtable(
+      `품목마스터?filterByFormula={품목명}='${itemName}'`
     );
-
-    if (!response.ok) return { success: false, records: [] };
-
-    const data = await response.json();
     const records: { fields: Record<string, unknown> }[] = data.records || [];
     const first = records[0];
     if (!first) return { success: false, records: [] };
