@@ -13,6 +13,11 @@ import {
 } from "@/lib/generate-pdf.server";
 import { isOwnStorage } from "@/lib/storage";
 import { TransferFieldsSchema, reportSchemaIssue } from "@/lib/schemas";
+import {
+  fetchAirtable,
+  getAirtableRecord,
+  patchAirtableRecord,
+} from "@/lib/airtable";
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -35,31 +40,25 @@ async function fetchRecord(
   tableName: string,
   recordId: string,
 ): Promise<Record<string, unknown> | null> {
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}/${recordId}`,
-    { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
-  );
-  if (!res.ok) {
-    logError(`[transfer fetchRecord] ${tableName}/${recordId} 실패:`, res.status);
+  try {
+    const { fields } = await getAirtableRecord(encodeURIComponent(tableName), recordId);
+    return fields;
+  } catch (e) {
+    logError(`[transfer fetchRecord] ${tableName}/${recordId} 실패:`, e instanceof Error ? e.message : e);
     return null;
   }
-  const data = await res.json();
-  return (data.fields as Record<string, unknown>) ?? null;
 }
 
 async function listRecords(
   tableName: string,
 ): Promise<{ id: string; fields: Record<string, unknown> }[]> {
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}?pageSize=100`,
-    { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
-  );
-  if (!res.ok) {
-    logError(`[transfer listRecords] ${tableName} 실패:`, res.status);
+  try {
+    const data = await fetchAirtable(`${encodeURIComponent(tableName)}?pageSize=100`);
+    return (data.records as { id: string; fields: Record<string, unknown> }[]) ?? [];
+  } catch (e) {
+    logError(`[transfer listRecords] ${tableName} 실패:`, e instanceof Error ? e.message : e);
     return [];
   }
-  const data = await res.json();
-  return (data.records as { id: string; fields: Record<string, unknown> }[]) ?? [];
 }
 
 async function patchRecord(
@@ -67,64 +66,45 @@ async function patchRecord(
   recordId: string,
   fields: Record<string, unknown>,
 ): Promise<boolean> {
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}/${recordId}`,
-    {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ fields }),
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    logError(`[transfer patchRecord] ${tableName}/${recordId} 실패:`, res.status, body);
+  try {
+    await patchAirtableRecord(encodeURIComponent(tableName), recordId, fields);
+    return true;
+  } catch (e) {
+    logError(`[transfer patchRecord] ${tableName}/${recordId} 실패:`, e instanceof Error ? e.message : e);
+    return false;
   }
-  return res.ok;
 }
 
 async function createRecord(
   tableName: string,
   fields: Record<string, unknown>,
 ): Promise<{ id: string; fields: Record<string, unknown> } | null> {
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}`,
-    {
+  try {
+    return (await fetchAirtable(encodeURIComponent(tableName), {
       method: "POST",
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({ fields }),
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    logError(`[transfer createRecord] ${tableName} 실패:`, res.status, body);
+    })) as { id: string; fields: Record<string, unknown> };
+  } catch (e) {
+    logError(`[transfer createRecord] ${tableName} 실패:`, e instanceof Error ? e.message : e);
     return null;
   }
-  return await res.json();
 }
 
 async function createRecordOrThrow(
   tableName: string,
   fields: Record<string, unknown>,
 ): Promise<{ id: string; fields: Record<string, unknown> }> {
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}`,
-    {
+  try {
+    return (await fetchAirtable(encodeURIComponent(tableName), {
       method: "POST",
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({ fields }),
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    logError(`[transfer createRecord] ${tableName} 실패:`, res.status, body);
-    let detail = `HTTP ${res.status}`;
-    try {
-      const parsed = JSON.parse(body);
-      detail = parsed.error?.message || parsed.message || parsed.error || detail;
-    } catch {}
+    })) as { id: string; fields: Record<string, unknown> };
+  } catch (e) {
+    // 헬퍼 에러 메시지가 status + 응답 body 포함. 테이블명을 prefix로 붙여 throw.
+    const detail = e instanceof Error ? e.message : String(e);
+    logError(`[transfer createRecord] ${tableName} 실패:`, detail);
     throw new Error(`[${tableName}] ${detail}`);
   }
-  return res.json();
 }
 
 function buildLotNumber(opts: {
@@ -145,12 +125,15 @@ function buildLotNumber(opts: {
 
 async function resolveStorageName(storageId: string): Promise<string> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !isRecordId(storageId)) return "";
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("보관처 마스터")}/${storageId}`,
-    { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 300 } },
-  );
-  if (!res.ok) return "";
-  return String((await res.json()).fields?.["보관처명"] ?? "");
+  try {
+    const data = await fetchAirtable(
+      `${encodeURIComponent("보관처 마스터")}/${storageId}`,
+      { next: { revalidate: 300 } },
+    );
+    return String(data.fields?.["보관처명"] ?? "");
+  } catch {
+    return "";
+  }
 }
 
 export type TransferLotResult = {
@@ -174,25 +157,27 @@ export async function searchTransferLot(
   try {
     const escaped = keyword.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
     const formula = `AND({재고수량} > 0, OR(FIND('${escaped}', REGEX_EXTRACT({LOT번호}, '[0-9]+$')), FIND('${escaped}', {품목명})))`;
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("LOT별 재고")}?filterByFormula=${encodeURIComponent(formula)}&pageSize=20`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
-    );
-    if (!res.ok) return { success: false, records: [], error: `Airtable 오류 ${res.status}` };
-
-    const data = await res.json();
+    let data: { records?: { id: string; fields?: Record<string, unknown> }[] };
+    try {
+      data = await fetchAirtable(
+        `${encodeURIComponent("LOT별 재고")}?filterByFormula=${encodeURIComponent(formula)}&pageSize=20`
+      );
+    } catch (e) {
+      return { success: false, records: [], error: e instanceof Error ? e.message : "Airtable 오류" };
+    }
 
     // 보관처 마스터 이름 맵 (1회 fetch, 5분 캐시)
-    const masterRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("보관처 마스터")}?fields[]=${encodeURIComponent("보관처명")}&pageSize=100`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 300 } },
-    );
     const storageNameMap: Record<string, string> = {};
-    if (masterRes.ok) {
-      const masterData = await masterRes.json();
+    try {
+      const masterData = await fetchAirtable(
+        `${encodeURIComponent("보관처 마스터")}?fields[]=${encodeURIComponent("보관처명")}&pageSize=100`,
+        { next: { revalidate: 300 } },
+      );
       for (const r of masterData.records ?? []) {
         storageNameMap[r.id] = String(r.fields?.["보관처명"] ?? "");
       }
+    } catch {
+      // 비치명적: 이름 변환 없이 진행 (기존 if(masterRes.ok) silent-skip 보존)
     }
 
     const records: TransferLotResult[] = (data.records ?? []).map(
