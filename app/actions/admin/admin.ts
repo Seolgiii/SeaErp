@@ -36,6 +36,11 @@ import {
   OutboundFieldsSchema,
   reportSchemaIssue,
 } from "@/lib/schemas";
+import {
+  fetchAirtable,
+  getAirtableRecord,
+  patchAirtableRecord,
+} from "@/lib/airtable";
 
 // Airtable 접속에 필요한 인증 키와 데이터베이스 ID (환경변수에서 읽어옴)
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -71,17 +76,13 @@ async function fetchRecord(
   tableName: string,
   recordId: string,
 ): Promise<Record<string, unknown> | null> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}/${recordId}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) {
-    logError(`[fetchRecord] ${tableName}/${recordId} 조회 실패:`, res.status);
+  try {
+    const { fields } = await getAirtableRecord(encodeURIComponent(tableName), recordId);
+    return fields;
+  } catch (e) {
+    logError(`[fetchRecord] ${tableName}/${recordId} 조회 실패:`, e instanceof Error ? e.message : e);
     return null;
   }
-  const data = await res.json();
-  return (data.fields as Record<string, unknown>) ?? null;
 }
 
 /**
@@ -93,20 +94,13 @@ async function patchRecord(
   recordId: string,
   fields: Record<string, unknown>,
 ): Promise<boolean> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}/${recordId}`;
-  const res = await fetch(url, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ fields }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    logError(`[patchRecord] ${tableName}/${recordId} PATCH 실패:`, res.status, body);
+  try {
+    await patchAirtableRecord(encodeURIComponent(tableName), recordId, fields);
+    return true;
+  } catch (e) {
+    logError(`[patchRecord] ${tableName}/${recordId} PATCH 실패:`, e instanceof Error ? e.message : e);
+    return false;
   }
-  return res.ok;
 }
 
 // ── PDF 생성 헬퍼 ─────────────────────────────────────────────────────────
@@ -127,13 +121,12 @@ function firstLinkId(val: unknown): string | null {
  */
 async function fetchWorkerName(workerId: string): Promise<string> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return "";
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("작업자")}/${workerId}`,
-    { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
-  );
-  if (!res.ok) return "";
-  const data = await res.json();
-  return String(data.fields?.["작업자명"] ?? "");
+  try {
+    const { fields } = await getAirtableRecord(encodeURIComponent("작업자"), workerId);
+    return String(fields["작업자명"] ?? "");
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -142,41 +135,36 @@ async function fetchWorkerName(workerId: string): Promise<string> {
  */
 async function fetchProductName(productId: string): Promise<string> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return "";
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("품목마스터")}/${productId}`,
-    { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
-  );
-  if (!res.ok) return "";
-  const data = await res.json();
-  return String(data.fields?.["품목명"] ?? "");
+  try {
+    const { fields } = await getAirtableRecord(encodeURIComponent("품목마스터"), productId);
+    return String(fields["품목명"] ?? "");
+  } catch {
+    return "";
+  }
 }
 
 /** 보관처 link 필드 값(record id 배열) → 보관처명 문자열 변환 */
 async function resolveStorageName(rawField: unknown): Promise<string> {
   const id = Array.isArray(rawField) && rawField.length > 0 ? rawField[0] : null;
   if (!id || typeof id !== "string" || !/^rec/.test(id)) return "";
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("보관처 마스터")}/${id}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) return "";
-  const data = await res.json();
-  return String(data.fields?.["보관처명"] ?? "");
+  try {
+    const { fields } = await getAirtableRecord(encodeURIComponent("보관처 마스터"), id);
+    return String(fields["보관처명"] ?? "");
+  } catch {
+    return "";
+  }
 }
 
 /** 매입처 link 필드 값(record id 배열) → 매입처명 문자열 변환 */
 async function resolveSupplierName(rawField: unknown): Promise<string> {
   const id = firstLinkId(rawField);
   if (!id) return "";
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("매입처 마스터")}/${id}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) return "";
-  const data = await res.json();
-  return String(data.fields?.["매입처명"] ?? "");
+  try {
+    const { fields } = await getAirtableRecord(encodeURIComponent("매입처 마스터"), id);
+    return String(fields["매입처명"] ?? "");
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -412,19 +400,15 @@ async function createLotOnInboundApproval(
 
   // 2. LOT번호로 LOT별 재고 레코드 조회 (신청 시 생성된 재고=0 레코드를 찾음)
   const formula = encodeURIComponent(`{LOT번호}="${lotNumber}"`);
-  const lotQueryRes = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/LOT별%20재고?filterByFormula=${formula}&maxRecords=1`,
-    {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-      next: { revalidate: 0 },
-    },
-  );
-  if (!lotQueryRes.ok) {
-    const body = await lotQueryRes.text().catch(() => "");
-    logError("[createLotOnInboundApproval] LOT별 재고 조회 실패:", lotQueryRes.status, body);
+  let lotQueryData: { records?: { id: string; fields?: Record<string, unknown> }[] };
+  try {
+    lotQueryData = await fetchAirtable(
+      `LOT별%20재고?filterByFormula=${formula}&maxRecords=1`
+    );
+  } catch (e) {
+    logError("[createLotOnInboundApproval] LOT별 재고 조회 실패:", e instanceof Error ? e.message : e);
     return { success: false, message: "LOT별 재고 조회에 실패했습니다." };
   }
-  const lotQueryData = await lotQueryRes.json();
   const lotRecord = lotQueryData.records?.[0];
   if (!lotRecord?.id) {
     return { success: false, message: `LOT별 재고 레코드를 찾을 수 없습니다. (LOT번호: ${lotNumber})` };
@@ -512,22 +496,18 @@ async function revertLotOnInboundReject(
   }
 
   const formula = encodeURIComponent(`{LOT번호}="${lotNumber}"`);
-  const lotQueryRes = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/LOT별%20재고?filterByFormula=${formula}&maxRecords=1`,
-    {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-      next: { revalidate: 0 },
-    },
-  );
-  if (!lotQueryRes.ok) {
-    const body = await lotQueryRes.text().catch(() => "");
+  let lotQueryData: { records?: { id: string; fields?: Record<string, unknown> }[] };
+  try {
+    lotQueryData = await fetchAirtable(
+      `LOT별%20재고?filterByFormula=${formula}&maxRecords=1`
+    );
+  } catch (e) {
     logError(
       "[INTEGRITY-ALERT][revertLotOnInboundReject] LOT별 재고 조회 실패 — 수동 정합 확인 필요:",
-      { inboundRecordId, lotNumber, status: lotQueryRes.status, body },
+      { inboundRecordId, lotNumber, error: e instanceof Error ? e.message : e },
     );
     return { success: false, message: "LOT별 재고 조회에 실패했습니다." };
   }
-  const lotQueryData = await lotQueryRes.json();
   const lotRecord = lotQueryData.records?.[0];
   if (!lotRecord?.id) {
     // LOT 레코드 없음 — 이미 정리됐거나 처음부터 없었음 → 무처리
@@ -1156,22 +1136,14 @@ export async function updateApprovalStatus(
 
     log("[updateApprovalStatus] patching", { tableName, recordId, fields });
 
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}/${recordId}`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ fields }),
-      },
-    );
-
-    if (!res.ok) {
-      const body = await res.text();
-      logError("[updateApprovalStatus] Airtable error", res.status, body);
-      return { success: false, message: `Airtable 오류 (${res.status})` };
+    try {
+      await patchAirtableRecord(encodeURIComponent(tableName), recordId, fields);
+    } catch (e) {
+      logError("[updateApprovalStatus] Airtable error", e);
+      return {
+        success: false,
+        message: e instanceof Error ? e.message : "Airtable 오류",
+      };
     }
 
     log("[updateApprovalStatus] patch success");
