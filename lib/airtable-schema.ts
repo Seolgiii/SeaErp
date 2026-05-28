@@ -9,6 +9,11 @@ export const AIRTABLE_TABLE = {
   txn: "입출고 내역",
   storageCostHistory: "보관처 비용 이력",
   suppliers: "매입처 마스터",
+  inbound: "입고 관리",
+  outbound: "출고 관리",
+  expense: "지출결의",
+  transfer: "재고 이동",
+  storageMaster: "보관처 마스터",
 } as const;
 
 /** 작업자 테이블 필드 */
@@ -88,3 +93,124 @@ export const STORAGE_COST_FIELDS = {
 
 /** 승인상태 필드값 — 이 문구일 때 화면에 승인 대기 표시 */
 export const LOT_PENDING_APPROVAL_EXACT = "승인 대기 중";
+
+/** 입고 관리 테이블 필드 */
+export const INBOUND_FIELDS = {
+  /** 입고일자 (현재 표준) */
+  date: "입고일",
+  /** 일부 베이스 변형 (구) */
+  dateLegacy: "입고일자",
+  /** LOT별 재고에서 룩업된 LOT번호 */
+  lotNumber: "LOT번호",
+  /** 품목마스터 link */
+  productLink: "품목마스터",
+  /** 일부 베이스 변형 (구) */
+  productLinkLegacy: "품목",
+  /** 작업자 (입고 신청자) link */
+  worker: "작업자",
+  /** 매입자 (작업자 link — 원물을 매입한 사람) */
+  purchaser: "매입자",
+  /** 매입처 마스터 link */
+  supplier: "매입처",
+  /** 보관처 마스터 link */
+  storage: "보관처",
+  spec: "규격",
+  detailSpec: "미수",
+  origin: "원산지",
+  shipName: "선박명",
+  memo: "비고",
+  quantity: "입고수량",
+  quantityBox: "입고수량(BOX)",
+  remainingQty: "잔여수량",
+  purchasePrice: "수매가",
+  approvalStatus: "승인상태",
+  rejectReason: "반려사유",
+  /** 입고증 PDF 저장 URL */
+  pdfUrl: "입고증URL",
+} as const;
+
+/** 출고 관리 테이블 필드 */
+export const OUTBOUND_FIELDS = {
+  date: "출고일",
+  /** 입고 관리 link (LOT 차감 대상) */
+  inboundLink: "입고관리",
+  /** 입고관리.LOT번호 룩업 */
+  lotNumber: "LOT번호",
+  /** LOT별 재고 record ID (텍스트 저장, 차감 시 사용) */
+  lotRecordId: "LOT재고레코드ID",
+  /** 출고 신청 수량 (반려해도 유지) */
+  requestedQty: "출고요청수량",
+  worker: "작업자",
+  storage: "보관처",
+  seller: "판매처",
+  salePrice: "판매가",
+  /** formula: 판매가 × 출고요청수량 */
+  saleAmount: "판매금액",
+  spec: "규격",
+  detailSpec: "미수",
+  origin: "원산지",
+  approvalStatus: "승인상태",
+  rejectReason: "반려사유",
+  pdfUrl: "출고증URL",
+  /** 출고 승인 시 스냅샷되는 비용 7필드 (LOT 평균단가 기반) */
+  snapshotUnitPrice: "출고시점 단가",
+  snapshotRefrigerationFee: "출고시점 냉장료",
+  snapshotInOutFee: "출고시점 입출고비",
+  snapshotUnionFee: "출고시점 노조비",
+  snapshotFreezeFee: "출고시점 동결비",
+  snapshotSalePrice: "출고시점 판매원가",
+  snapshotProfit: "출고시점 손익",
+  receipt: "영수증사진",
+} as const;
+
+/** 지출결의 테이블 필드 */
+export const EXPENSE_FIELDS = {
+  expenseDate: "지출일",
+  createdDate: "작성일",
+  /** 건명 (현재 표준) */
+  title: "건명",
+  /** 일부 베이스 변형 (구) */
+  titleLegacy: "항목명",
+  description: "적요",
+  amount: "금액",
+  approvalStatus: "승인상태",
+  /** 일부 베이스 변형 (구) */
+  approvalStatusLegacy: "결재상태",
+  rejectReason: "반려사유",
+  /** 작업자 link (신청자) */
+  applicant: "신청자",
+  department: "소속",
+  position: "직급",
+  receipt: "영수증사진",
+  /** 지출결의서 PDF 저장 URL */
+  pdfUrl: "지출결의서URL",
+} as const;
+
+/** 재고 이동 테이블 필드 */
+export const TRANSFER_FIELDS = {
+  date: "이동일",
+  quantity: "이동수량",
+  /** 원본 LOT별 재고 link */
+  originalLotLink: "원본 LOT번호",
+  /** 이동 전 보관처 마스터 link */
+  fromStorage: "이동 전 보관처",
+  /** 이동 후 보관처 마스터 link */
+  toStorage: "이동 후 보관처",
+  worker: "작업자",
+  approvalStatus: "승인상태",
+  rejectReason: "반려사유",
+  /** 이동 출고증 PDF URL (2026-05-19 신설) */
+  pdfUrl: "출고증 URL",
+} as const;
+
+/** 보관처 마스터 테이블 필드 */
+export const STORAGE_FIELDS = {
+  name: "보관처명",
+  /** 자사창고/외부창고/가공공장/기타 — 입출고증 발행 주체 분기(isOwnStorage) 기준. (2026-05-19) */
+  kind: "구분",
+} as const;
+
+/** 매입처 마스터 테이블 필드 */
+export const SUPPLIER_FIELDS = {
+  name: "매입처명",
+} as const;
