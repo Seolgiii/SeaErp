@@ -24,6 +24,7 @@ import { useSyncQueryParams } from "@/lib/use-sync-query-params";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession, isSessionExpired } from "@/lib/session";
 import { toast } from "@/lib/toast";
+import { formatSpecKgMisu } from "@/lib/spec-display";
 import { usePullToRefresh } from "@/lib/pull-to-refresh";
 import { logError } from "@/lib/logger";
 
@@ -477,14 +478,9 @@ export default function AdminDashboardPage() {
         ) : (
           <>
             {!isTransfer && (
-              <div className="flex gap-3">
-                <p className="text-[14px] text-gray-700">
-                  <span className="font-bold">규격 :</span> {item.spec || "-"}
-                </p>
-                <p className="text-[14px] text-gray-700">
-                  <span className="font-bold">미수 :</span> {item.misu || "-"}
-                </p>
-              </div>
+              <p className="text-[14px] text-gray-500">
+                {formatSpecKgMisu(item.spec || "", item.misu || "")}
+              </p>
             )}
             {isTransfer && (
               <p className="text-[13px] text-gray-500">
@@ -498,9 +494,7 @@ export default function AdminDashboardPage() {
                   {isTransfer ? `원본: ${item.lotNumber}` : item.lotNumber}
                 </p>
               ) : (
-                <p className="text-[15px] font-mono text-gray-300 tracking-tight min-w-0 flex-1 leading-snug">
-                  LOT 미부여
-                </p>
+                <div className="min-w-0 flex-1" />
               )}
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                 <span className="text-[17.6px] font-bold text-gray-800">

@@ -10,6 +10,9 @@ import {
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
 import { toast } from '@/lib/toast';
+import LotProductSpec from '@/components/LotProductSpec';
+import { formatIntKo } from '@/lib/number-format';
+import { formatSpecKgMisu } from '@/lib/spec-display';
 import {
   PENDING_TRANSFER_LOTS_KEY,
   PENDING_OUTBOUND_LOTS_KEY,
@@ -411,24 +414,22 @@ export default function StockStatusPage() {
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 leading-tight">
-                    <p className="text-[16px] font-black text-gray-900 truncate">
-                      {lot.productName || '—'}
-                    </p>
-                    <p className="text-[13px] text-gray-500 mt-0.5">
-                      {lot.spec ? `${lot.spec}kg` : '—'} · {lot.misu ? `${lot.misu}미` : '—'}
-                    </p>
-                  </div>
+                  <LotProductSpec
+                    productName={lot.productName}
+                    spec={lot.spec}
+                    misu={lot.misu}
+                    className="flex-1"
+                  />
                   {lot.salePrice > 0 && (
                     <p className="text-[17px] font-black text-gray-900 shrink-0 leading-tight">
-                      {Math.round(lot.salePrice).toLocaleString('ko-KR')}원/kg
+                      {formatIntKo(Math.round(lot.salePrice))}원/kg
                     </p>
                   )}
                 </div>
 
                 <div className="border-t border-gray-100 pt-3 flex items-center justify-end gap-2">
                   <span className="text-[16px] font-black text-blue-600 shrink-0 whitespace-nowrap">
-                    {lot.stockQty.toLocaleString('ko-KR')}박스 중
+                    {formatIntKo(lot.stockQty)}박스 중
                   </span>
                   <input
                     type="number"
@@ -455,11 +456,11 @@ export default function StockStatusPage() {
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-bold text-gray-400">선택</p>
               <p className="text-[20px] font-black text-blue-600 leading-tight">
-                {totalBoxes.toLocaleString('ko-KR')}박스
+                {formatIntKo(totalBoxes)}박스
               </p>
               {totalAmount > 0 && (
                 <p className="text-[12px] text-gray-500">
-                  {totalAmount.toLocaleString('ko-KR')}원 (예상)
+                  {formatIntKo(totalAmount)}원 (예상)
                 </p>
               )}
             </div>
@@ -517,6 +518,7 @@ export default function StockStatusPage() {
           {selectedLots.map((lot, i) => {
             const boxes  = selectedQty[lot.id] ?? 0;
             const amount = calcAmount(lot, boxes);
+            const spec   = formatSpecKgMisu(lot.spec, lot.misu);
             return (
               <div
                 key={lot.id}
@@ -527,11 +529,11 @@ export default function StockStatusPage() {
                 </p>
                 <div className="flex justify-between items-baseline gap-2">
                   <p className="text-[15px] font-black text-gray-900">
-                    {boxes.toLocaleString('ko-KR')}박스
+                    {formatIntKo(boxes)}박스
                   </p>
                   {amount > 0 ? (
                     <p className="text-[14px] font-bold text-gray-700 shrink-0">
-                      {amount.toLocaleString('ko-KR')}원
+                      {formatIntKo(amount)}원
                     </p>
                   ) : (
                     <p className="text-[13px] text-gray-400 shrink-0">단가 미산출</p>
@@ -539,8 +541,7 @@ export default function StockStatusPage() {
                 </div>
                 <p className="text-[12px] text-gray-400 mt-0.5">
                   {lot.productName}
-                  {lot.spec ? ` · ${lot.spec}kg` : ''}
-                  {lot.misu ? ` · ${lot.misu}미` : ''}
+                  {spec && spec !== '-' ? ` · ${spec}` : ''}
                 </p>
               </div>
             );
@@ -556,11 +557,11 @@ export default function StockStatusPage() {
             <p className="text-[15px] font-bold text-gray-500">합계</p>
             <div className="text-right">
               <p className="text-[26px] font-black text-blue-600 leading-tight">
-                {totalBoxes.toLocaleString('ko-KR')}박스
+                {formatIntKo(totalBoxes)}박스
               </p>
               {totalAmount > 0 && (
                 <p className="text-[14px] font-bold text-gray-500 mt-0.5">
-                  {totalAmount.toLocaleString('ko-KR')}원 (예상)
+                  {formatIntKo(totalAmount)}원 (예상)
                 </p>
               )}
             </div>
