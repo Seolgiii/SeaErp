@@ -12,6 +12,7 @@ import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
 import { AuthError, requireWorker } from "@/lib/server-auth";
 import { InputValidationError, sanitizeText } from "@/lib/input-sanitize";
 import { generateUniqueLotNumber } from "@/lib/lot-sequence";
+import { fetchAirtable, patchAirtableRecord } from "@/lib/airtable";
 
 export type InventoryCreatePayload = {
   /** YYYY-MM-DD 또는 YYYY/MM/DD 입고일자 */
@@ -110,21 +111,11 @@ async function resolveProductMasterForInbound(formData: InventoryCreatePayload):
   const masterTable = encodeURIComponent("품목마스터");
   // 동일 품목명이 이미 있는지 조회
   const formula = encodeURIComponent(`{품목명}='${escaped}'`);
-  const getUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${masterTable}?filterByFormula=${formula}&maxRecords=1`;
-  const getRes = await fetch(getUrl, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  const getBody = await getRes.text().catch(() => "");
-  if (!getRes.ok) {
-    logError("[createInventoryRecord] 품목마스터 조회 실패:", { status: getRes.status, body: getBody || "(empty)" });
-    return null;
-  }
   let data: { records?: { id: string; fields?: Record<string, unknown> }[] };
   try {
-    data = getBody ? JSON.parse(getBody) : { records: [] };
-  } catch {
-    logError("[createInventoryRecord] 품목마스터 조회 응답 파싱 실패:", getBody);
+    data = await fetchAirtable(`${masterTable}?filterByFormula=${formula}&maxRecords=1`);
+  } catch (e) {
+    logError("[createInventoryRecord] 품목마스터 조회 실패:", e instanceof Error ? e.message : e);
     return null;
   }
   // 기존 품목마스터 레코드가 있으면 해당 ID와 연결된 LOT 목록 반환
@@ -140,11 +131,10 @@ async function resolveProductMasterForInbound(formData: InventoryCreatePayload):
   }
 
   // 기존 품목마스터가 없으면 신규 생성 (처음 입고되는 품목)
-  const postRes = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${masterTable}`,
-    {
+  let created: { id?: string; fields?: Record<string, unknown> };
+  try {
+    created = await fetchAirtable(masterTable, {
       method: "POST",
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         fields: {
           품목명: name,
@@ -153,22 +143,13 @@ async function resolveProductMasterForInbound(formData: InventoryCreatePayload):
           원산지: formData?.["원산지"],
         },
       }),
-    }
-  );
-  const postBody = await postRes.text().catch(() => "");
-  if (!postRes.ok) {
-    logError("[createInventoryRecord] 품목마스터(신규) POST 실패:", { status: postRes.status, body: postBody || "(empty)" });
-    return null;
-  }
-  let created: { id?: string; fields?: Record<string, unknown> };
-  try {
-    created = postBody ? JSON.parse(postBody) : {};
-  } catch {
-    logError("[createInventoryRecord] 품목마스터(신규) 응답 파싱 실패:", postBody);
+    });
+  } catch (e) {
+    logError("[createInventoryRecord] 품목마스터(신규) POST 실패:", e instanceof Error ? e.message : e);
     return null;
   }
   if (!created.id || !isRecordId(created.id)) {
-    logError("[createInventoryRecord] 품목마스터(신규) record id 없음:", postBody);
+    logError("[createInventoryRecord] 품목마스터(신규) record id 없음:", created);
     return null;
   }
   const productCode = String(created.fields?.["품목코드"] ?? "").trim();
@@ -280,29 +261,19 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
       ...(shipName && { 선박명: shipName }),
       ...(isRecordId(String(formData?.["storageRecordId"] ?? "")) && { 보관처: [String(formData?.["storageRecordId"])] }),
     };
-    const inboundRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${inboundTablePath()}`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ fields: inboundFields }),
-      }
-    );
-    const inboundBodyRaw = await inboundRes.text().catch(() => "");
-    if (!inboundRes.ok) {
-      logError("[createInventoryRecord] 입고 관리 POST 실패:", { status: inboundRes.status, body: inboundBodyRaw || "(empty)" });
-      return { success: false, message: "입고 관리 등록 실패" };
-    }
     let inboundRecordId: string;
     try {
-      const createdInbound = inboundBodyRaw ? JSON.parse(inboundBodyRaw) : null;
+      const createdInbound = await fetchAirtable(inboundTablePath(), {
+        method: "POST",
+        body: JSON.stringify({ fields: inboundFields }),
+      });
       inboundRecordId = createdInbound?.id;
-    } catch {
-      logError("[createInventoryRecord] 입고 관리 응답 파싱 실패:", inboundBodyRaw);
-      return { success: false, message: "입고 관리 응답 오류" };
+    } catch (e) {
+      logError("[createInventoryRecord] 입고 관리 POST 실패:", e instanceof Error ? e.message : e);
+      return { success: false, message: "입고 관리 등록 실패" };
     }
     if (!isRecordId(inboundRecordId)) {
-      logError("[createInventoryRecord] 입고 관리 record id 없음:", inboundBodyRaw);
+      logError("[createInventoryRecord] 입고 관리 record id 없음");
       return { success: false, message: "입고 관리 등록 실패" };
     }
 
@@ -347,47 +318,33 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
       lotFields["비고"] = memo;
     }
 
-    const lotRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/LOT별%20재고`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ fields: lotFields }),
-      }
-    );
-    const lotBodyRaw = await lotRes.text().catch(() => "");
-    if (!lotRes.ok) {
-      logError("[createInventoryRecord] LOT별 재고 POST 실패:", { status: lotRes.status, body: lotBodyRaw || "(empty)" });
-      return { success: false, message: "재고 등록 실패" };
-    }
     let createdLot: { id?: string };
     try {
-      createdLot = lotBodyRaw ? JSON.parse(lotBodyRaw) : {};
-    } catch {
-      logError("[createInventoryRecord] LOT별 재고 응답 파싱 실패:", lotBodyRaw);
-      return { success: false, message: "재고 등록 응답 오류" };
+      createdLot = await fetchAirtable("LOT별%20재고", {
+        method: "POST",
+        body: JSON.stringify({ fields: lotFields }),
+      });
+    } catch (e) {
+      logError("[createInventoryRecord] LOT별 재고 POST 실패:", e instanceof Error ? e.message : e);
+      return { success: false, message: "재고 등록 실패" };
     }
     const newLotId = createdLot.id;
     if (!newLotId || !isRecordId(newLotId)) {
-      logError("[createInventoryRecord] LOT record id 없음:", lotBodyRaw);
+      logError("[createInventoryRecord] LOT record id 없음");
       return { success: false, message: "재고 등록 실패" };
     }
 
     // ── 5. 품목마스터 LOT 연결 ──
     // 품목마스터 레코드에 방금 생성한 LOT 재고 레코드를 연결합니다
     const masterTable = encodeURIComponent("품목마스터");
-    const patchRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${masterTable}/${productMaster.masterId}`,
-      {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
+    try {
+      await patchAirtableRecord(masterTable, productMaster.masterId, {
         // 기존 LOT 목록에 새 LOT ID를 추가 (덮어쓰지 않도록 기존 목록 유지)
-        body: JSON.stringify({ fields: { "LOT별 재고": [...productMaster.lotIds, newLotId] } }),
-      }
-    );
-    const patchBody = await patchRes.text().catch(() => "");
-    if (!patchRes.ok) {
-      logError("[createInventoryRecord] 품목마스터 LOT 연결 PATCH 실패:", { status: patchRes.status, body: patchBody || "(empty)" });
+        "LOT별 재고": [...productMaster.lotIds, newLotId],
+      });
+    } catch (e) {
+      // 비치명적: LOT 자체는 생성됐고 연결만 실패 → 로그만 남기고 진행 (기존 동작 보존)
+      logError("[createInventoryRecord] 품목마스터 LOT 연결 PATCH 실패:", e instanceof Error ? e.message : e);
     }
 
     // 재고 현황 페이지와 관리자 대시보드 캐시 초기화 (최신 데이터 반영)
@@ -409,18 +366,10 @@ export async function getStorageOptions(): Promise<{ id: string; name: string }[
   if (!apiKey || !baseId) return [];
 
   try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${baseId}/${encodeURIComponent("보관처 마스터")}?fields[]=${encodeURIComponent("보관처명")}&pageSize=100`,
-      {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        next: { revalidate: 300 },
-      }
+    const data = await fetchAirtable(
+      `${encodeURIComponent("보관처 마스터")}?fields[]=${encodeURIComponent("보관처명")}&pageSize=100`,
+      { next: { revalidate: 300 } },
     );
-    if (!res.ok) {
-      logError("[getStorageOptions] 보관처 마스터 fetch 실패:", res.status);
-      return [];
-    }
-    const data = await res.json();
     return (data.records ?? [])
       .map((r: { id: string; fields?: Record<string, unknown> }) => ({ id: r.id, name: String(r.fields?.["보관처명"] ?? "") }))
       .filter((o: { id: string; name: string }) => o.name);
@@ -457,16 +406,16 @@ export async function getProductOptions(): Promise<{ id: string; name: string; c
     do {
       const params = new URLSearchParams({ pageSize: "100" });
       if (offset) params.set("offset", offset);
-      const url = `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`;
-      log(`[getProductOptions] 페이지 ${++pageNum} 요청: ${url}`);
+      const path = `${table}?${fieldParams}&${params}`;
+      log(`[getProductOptions] 페이지 ${++pageNum} 요청: ${path}`);
 
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } });
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        logError("[getProductOptions] 조회 실패:", { status: res.status, body: body.slice(0, 500) });
+      let data: { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
+      try {
+        data = await fetchAirtable(path);
+      } catch (e) {
+        logError("[getProductOptions] 조회 실패:", e instanceof Error ? e.message : e);
         break;
       }
-      const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
       const pageRecords = data.records ?? [];
       log(`[getProductOptions] 페이지 ${pageNum} 결과: ${pageRecords.length}건, 샘플:`, pageRecords.slice(0, 2).map((r) => ({ id: r.id, fields: r.fields })));
 
@@ -517,17 +466,17 @@ export async function getSupplierOptions(): Promise<{ id: string; name: string }
     do {
       const params = new URLSearchParams({ pageSize: "100" });
       if (offset) params.set("offset", offset);
-      const url = `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`;
-      log(`[getSupplierOptions] 매입처 마스터 페이지 ${++pageNum} 요청: ${url}`);
+      const path = `${table}?${fieldParams}&${params}`;
+      log(`[getSupplierOptions] 매입처 마스터 페이지 ${++pageNum} 요청: ${path}`);
 
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } });
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        logWarn("[getSupplierOptions] 매입처 마스터 조회 실패:", { status: res.status, body: body.slice(0, 500) });
+      let data: { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
+      try {
+        data = await fetchAirtable(path);
+      } catch (e) {
+        logWarn("[getSupplierOptions] 매입처 마스터 조회 실패:", e instanceof Error ? e.message : e);
         masterOk = false;
         break;
       }
-      const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
       const pageRecords = data.records ?? [];
       log(`[getSupplierOptions] 매입처 마스터 페이지 ${pageNum} 결과: ${pageRecords.length}건, 샘플:`, pageRecords.slice(0, 2).map((r) => ({ id: r.id, fields: r.fields })));
 
@@ -559,14 +508,14 @@ export async function getSupplierOptions(): Promise<{ id: string; name: string }
     do {
       const params = new URLSearchParams({ pageSize: "100" });
       if (offset) params.set("offset", offset);
-      const url = `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } });
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        logError("[getSupplierOptions] 폴백 조회 실패:", { status: res.status, body: body.slice(0, 500) });
+      const path = `${table}?${fieldParams}&${params}`;
+      let data: { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
+      try {
+        data = await fetchAirtable(path);
+      } catch (e) {
+        logError("[getSupplierOptions] 폴백 조회 실패:", e instanceof Error ? e.message : e);
         break;
       }
-      const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
       for (const rec of data.records ?? []) {
         const name = String(rec.fields?.["매입처"] ?? "").trim();
         if (name) nameSet.add(name);
