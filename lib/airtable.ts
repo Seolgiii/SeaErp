@@ -159,7 +159,8 @@ export async function fetchAirtable(path: string, init?: RequestInit) {
       "Content-Type": "application/json",
       ...init?.headers,
     },
-    next: { revalidate: 0 }, // 항상 최신 데이터 사용 (캐시 비활성화)
+    // 기본은 캐시 비활성화. caller가 init.next로 지정하면 그 값을 존중(예: 보관처 마스터 5분 캐시).
+    next: init?.next ?? { revalidate: 0 },
   });
 
   if (!res.ok) {

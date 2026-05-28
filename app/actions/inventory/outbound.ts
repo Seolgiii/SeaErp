@@ -11,6 +11,7 @@ import { log, logError, logWarn } from '@/lib/logger';
 import { revalidatePath } from "next/cache";
 import { AuthError, requireWorker } from "@/lib/server-auth";
 import { InputValidationError, sanitizeText } from "@/lib/input-sanitize";
+import { fetchAirtable, getAirtableRecord, createAirtableRecord } from "@/lib/airtable";
 
 export type OutboundCreatePayload = {
   /** LOT별 재고 레코드 ID (필수) */
@@ -84,18 +85,18 @@ function firstLinkedRecordId(raw: unknown): string | null {
  */
 async function getStorageIdFromLot(lotRecordId: string): Promise<string | null> {
   const lotTable = encodeURIComponent("LOT별 재고");
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${lotTable}/${lotRecordId}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) {
-    logWarn("[getStorageIdFromLot] LOT 조회 실패 (fallback 포기):", res.status, lotRecordId);
+  let fields: Record<string, unknown>;
+  try {
+    const rec = await getAirtableRecord(lotTable, lotRecordId);
+    fields = rec.fields;
+  } catch (e) {
+    logWarn(
+      "[getStorageIdFromLot] LOT 조회 실패 (fallback 포기):",
+      e instanceof Error ? e.message : e,
+      lotRecordId,
+    );
     return null;
   }
-  const data = await res.json();
-  const fields = data.fields as Record<string, unknown> | undefined;
-  if (!fields) return null;
   return firstLinkedRecordId(fields["보관처"]);
 }
 
@@ -105,18 +106,19 @@ async function getStorageIdFromLot(lotRecordId: string): Promise<string | null> 
  */
 async function getInboundRecordIdFromLot(lotRecordId: string): Promise<string | null> {
   const lotTable = encodeURIComponent("LOT별 재고");
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${lotTable}/${lotRecordId}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) {
-    logError("[getInboundRecordIdFromLot] LOT 조회 실패:", res.status, lotRecordId);
+  let fields: Record<string, unknown>;
+  try {
+    const rec = await getAirtableRecord(lotTable, lotRecordId);
+    fields = rec.fields;
+  } catch (e) {
+    logError(
+      "[getInboundRecordIdFromLot] LOT 조회 실패:",
+      e instanceof Error ? e.message : e,
+      lotRecordId,
+    );
     return null;
   }
-  const data = await res.json();
-  const fields = data.fields as Record<string, unknown> | undefined;
-  const fieldKeys = fields ? Object.keys(fields) : [];
+  const fieldKeys = Object.keys(fields);
   log("[getInboundRecordIdFromLot] table:", "LOT별 재고");
   log("[getInboundRecordIdFromLot] recordId:", lotRecordId);
   log("[getInboundRecordIdFromLot] fieldKeys:", fieldKeys);
@@ -126,7 +128,6 @@ async function getInboundRecordIdFromLot(lotRecordId: string): Promise<string | 
     "(LOT_TO_INBOUND_FIELD:",
     LOT_TO_INBOUND_FIELD + ")"
   );
-  if (!fields) return null;
   const linked = firstLinkedRecordId(fields[LOT_TO_INBOUND_FIELD]);
   if (linked) return linked;
   logError("[getInboundRecordIdFromLot] 링크 없음:", {
@@ -145,24 +146,18 @@ async function getInboundRecordIdFromLot(lotRecordId: string): Promise<string | 
 async function getInboundRemainingQty(
   inboundRecordId: string
 ): Promise<{ currentQty: number; fieldKeys: string[]; storageId: string } | null> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${inboundTablePath()}/${inboundRecordId}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => "");
+  let fields: Record<string, unknown>;
+  try {
+    const rec = await getAirtableRecord(inboundTablePath(), inboundRecordId);
+    fields = rec.fields;
+  } catch (e) {
     logError("[getInboundRemainingQty] 입고 관리 조회 실패:", {
       inboundRecordId,
-      status: res.status,
-      responseBody: errBody || "(empty)",
+      error: e instanceof Error ? e.message : String(e),
     });
     return null;
   }
-
-  const data = await res.json();
-  const fields = data.fields as Record<string, unknown> | undefined;
-  const fieldKeys = fields ? Object.keys(fields) : [];
+  const fieldKeys = Object.keys(fields);
   const rawQty = fields?.[INBOUND_REMAINING_QTY_FIELD];
   const currentQty = Number(rawQty);
 
@@ -203,28 +198,10 @@ export async function searchLotByKeyword(keyword: string) {
     // Airtable formula 문자열 안전화: 백슬래시·작은따옴표 이스케이프
     const escaped = keyword.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
     const formula = `OR(FIND('${escaped}',REGEX_EXTRACT({LOT번호},'[0-9]+$')),FIND('${escaped}',{품목명}))`;
-    const response = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}?filterByFormula=${encodeURIComponent(formula)}`,
-      {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-        next: { revalidate: 0 }
-      }
-    );
-
-    if (!response.ok) {
-      let msg = `HTTP ${response.status}`;
-      try {
-        const errBody = await response.json();
-        msg = errBody?.error?.message ?? msg;
-      } catch {
-        /* ignore */
-      }
-      logError("[searchLotByKeyword] Airtable 응답 실패:", msg);
-      return { success: false, records: [], error: msg };
-    }
-
     type AirtableRecord = { id: string; fields: Record<string, unknown> };
-    const data = (await response.json()) as { records?: AirtableRecord[] };
+    const data = (await fetchAirtable(
+      `${tableName}?filterByFormula=${encodeURIComponent(formula)}`
+    )) as { records?: AirtableRecord[] };
     // 재고수량이 1 이상인 항목만 필터링 (소진된 재고 제외)
     const records: AirtableRecord[] = (data.records ?? []).filter((r) => {
       const raw = r.fields?.["재고수량"];
@@ -233,12 +210,11 @@ export async function searchLotByKeyword(keyword: string) {
     });
 
     // 보관처 link → 이름 변환 (보관처 마스터 전체 fetch 1회, 5분 캐시)
-    const masterRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("보관처 마스터")}?fields[]=${encodeURIComponent("보관처명")}&pageSize=100`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 300 } }
-    );
-    if (masterRes.ok) {
-      const masterData = (await masterRes.json()) as { records?: AirtableRecord[] };
+    try {
+      const masterData = (await fetchAirtable(
+        `${encodeURIComponent("보관처 마스터")}?fields[]=${encodeURIComponent("보관처명")}&pageSize=100`,
+        { next: { revalidate: 300 } },
+      )) as { records?: AirtableRecord[] };
       const storageNameMap = new Map<string, string>();
       for (const r of masterData.records ?? []) {
         storageNameMap.set(r.id, String(r.fields?.["보관처명"] ?? ""));
@@ -249,12 +225,19 @@ export async function searchLotByKeyword(keyword: string) {
           record.fields["보관처"] = storageNameMap.get(raw[0]) ?? "";
         }
       }
+    } catch (e) {
+      // 비치명적: 이름 변환 실패해도 검색 결과는 반환 (기존 if(ok) silent-skip 패턴 보존)
+      logWarn("[searchLotByKeyword] 보관처 마스터 조회 실패:", e instanceof Error ? e.message : e);
     }
 
     return { success: true, records };
   } catch (error) {
     logError("🔴 출고 검색 에러:", error);
-    return { success: false, records: [], error: "검색 중 서버 오류" };
+    return {
+      success: false,
+      records: [],
+      error: error instanceof Error ? error.message : "검색 중 서버 오류",
+    };
   }
 }
 
@@ -376,61 +359,20 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
     if (seller) fields["판매처"] = seller;
     if (payload?.salePrice != null && payload.salePrice !== "") fields["판매가"] = Number(payload.salePrice);
 
-    const postUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${outboundTablePath()}`;
-    const requestBody = JSON.stringify({ fields });
-
     log("[createOutboundRecord] POST table:", process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리");
     log("[createOutboundRecord] POST fields:", JSON.stringify(fields));
 
-    const response = await fetch(postUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: requestBody,
-    });
-
-    const responseBodyRaw = await response.text().catch(() => "");
-    log("[createOutboundRecord] POST response.status:", response.status);
-    log("[createOutboundRecord] POST response.ok:", response.ok);
-    log("[createOutboundRecord] POST response.body (raw):", responseBodyRaw || "(empty)");
-
-    if (!response.ok) {
-      let message = "저장 실패";
-      let errorType: string | undefined;
-      try {
-        const errorData = responseBodyRaw ? JSON.parse(responseBodyRaw) : null;
-        message = errorData?.error?.message ?? message;
-        errorType = errorData?.error?.type;
-      } catch {
-        message = responseBodyRaw?.trim()
-          ? responseBodyRaw.slice(0, 500)
-          : `HTTP ${response.status}`;
-      }
-      logError("[createOutboundRecord] POST 실패 — 명시 처리:", {
-        table: process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리",
-        status: response.status,
-        ok: response.ok,
-        errorType,
-        message,
-        requestFields: fields,
-        responseBodyRaw: responseBodyRaw || "(empty)",
-      });
-      return { success: false, error: message };
-    }
-
     try {
-      const created = responseBodyRaw ? JSON.parse(responseBodyRaw) : null;
-      log("[createOutboundRecord] POST 성공:", {
-        createdRecordId: created?.id ?? null,
-        createdFieldKeys:
-          created?.fields && typeof created.fields === "object"
-            ? Object.keys(created.fields as object)
-            : [],
+      const { id } = await createAirtableRecord(outboundTablePath(), fields);
+      log("[createOutboundRecord] POST 성공:", { createdRecordId: id });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "저장 실패";
+      logError("[createOutboundRecord] POST 실패:", {
+        table: process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리",
+        error: msg,
+        requestFields: fields,
       });
-    } catch {
-      log("[createOutboundRecord] POST 성공(본문 JSON 파싱 생략)");
+      return { success: false, error: msg };
     }
 
     // 관리자 대시보드 캐시 초기화 (새 출고 신청이 바로 보이도록)
