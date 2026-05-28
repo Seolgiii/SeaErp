@@ -24,33 +24,12 @@ import { useSyncQueryParams } from "@/lib/use-sync-query-params";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession, isSessionExpired } from "@/lib/session";
 import { toast } from "@/lib/toast";
-import { formatSpecKgMisu } from "@/lib/spec-display";
+import ApprovalCard from "@/app/components/ApprovalCard";
+import ApprovalLogisticsBody from "@/app/components/ApprovalLogisticsBody";
+import ApprovalExpenseBody from "@/app/components/ApprovalExpenseBody";
+import { PENDING_STATUSES } from "@/app/components/approval-card-shared";
 import { usePullToRefresh } from "@/lib/pull-to-refresh";
 import { logError } from "@/lib/logger";
-
-const PENDING_STATUSES = ["승인 대기", "최종 승인 대기"];
-
-const STATUS_STYLE: Record<string, string> = {
-  "승인 대기": "bg-[#3182F6]/10 text-[#3182F6]",
-  "최종 승인 대기": "bg-orange-50 text-orange-600",
-  "승인 완료": "bg-green-100 text-green-700",
-  "반려": "bg-gray-100 text-gray-500",
-  "취소": "bg-red-50 text-red-400",
-};
-
-const TYPE_BADGE: Record<string, { bg: string; label: string }> = {
-  INBOUND: { bg: "bg-[#3182F6]/10 text-[#3182F6]", label: "물품 입고" },
-  OUTBOUND: { bg: "bg-[#5061FF]/10 text-[#5061FF]", label: "물품 출고" },
-  EXPENSE: { bg: "bg-[#00D082]/10 text-[#00D082]", label: "지출 신청" },
-  TRANSFER: { bg: "bg-orange-100 text-orange-600", label: "재고 이동" },
-};
-
-function formatSubmittedAt(iso?: string): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return null;
-  return d.toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" });
-}
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -353,192 +332,25 @@ export default function AdminDashboardPage() {
     setTimeout(() => setActionSheetItem(null), 200);
   };
 
-  const badge = (type: string) => TYPE_BADGE[type] ?? { bg: "bg-gray-100 text-gray-700", label: "기타" };
-
   const renderCard = (item: RequestItem) => {
-    const uiState = uiOverrides[item.id];
-    const b = badge(item.type);
     const isExpense = item.type === "EXPENSE";
-    const isTransfer = item.type === "TRANSFER";
-    const description = isExpense ? String(item.raw["적요"] ?? "") : "";
-    const displayStatus =
-      uiState === "COMPLETED" ? "승인 완료" :
-      uiState === "REJECTED"  ? "반려" :
-      item.status;
-
-    // 완료 탭 + (승인 완료 || 반려) + ADMIN/MASTER + 처리 중이 아닐 때만 카드 클릭 가능
-    // — 승인 완료 → 반려, 반려 → 승인 양방향 변경 진입점
-    const canChangeStatus =
-      isDoneTab &&
-      (item.status === "승인 완료" || item.status === "반려") &&
-      !uiState &&
-      (role === "ADMIN" || role === "MASTER");
-
-    const baseClass = isExpense
-      ? "bg-white p-5 rounded-[24px] shadow-[0_8px_24px_rgba(149,157,165,0.08)] flex flex-col gap-3 animate-fade-in"
-      : "bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-1";
-    const interactiveClass = canChangeStatus
-      ? " cursor-pointer hover:shadow-md active:scale-[0.99] transition-all"
-      : "";
-
-    const bulkEligible = isBulkEligible(item) && !uiState;
-    const checked = selectedIds.has(item.id);
-    const cardRingClass = bulkEligible && checked ? " ring-2 ring-[#3182F6]" : "";
-
     return (
-      <div
-        key={item.id}
-        className={baseClass + interactiveClass + cardRingClass}
-        onClick={canChangeStatus ? () => handleOpenActionSheet(item) : undefined}
-        role={canChangeStatus ? "button" : undefined}
-        tabIndex={canChangeStatus ? 0 : undefined}
-        onKeyDown={
-          canChangeStatus
-            ? (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleOpenActionSheet(item);
-                }
-              }
-            : undefined
-        }
+      <ApprovalCard
+        item={item}
+        uiState={uiOverrides[item.id]}
+        isDoneTab={isDoneTab}
+        role={role}
+        bulkEligible={isBulkEligible(item) && !uiOverrides[item.id]}
+        checked={selectedIds.has(item.id)}
+        onToggleSelect={() => toggleSelect(item.id)}
+        onOpenActionSheet={() => handleOpenActionSheet(item)}
+        onOpenReject={() => handleOpenReject(item)}
+        onApprove={() => handleApprove(item)}
       >
-        {bulkEligible && (
-          <div className="flex items-center gap-2 -mb-1">
-            <label className="inline-flex items-center gap-2 select-none cursor-pointer active:scale-95 transition-transform">
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
-                onClick={(e) => e.stopPropagation()}
-                className="w-5 h-5 rounded border-gray-300 text-[#3182F6] focus:ring-[#3182F6]"
-                aria-label="일괄 승인 대상으로 선택"
-              />
-              <span className="text-[12px] font-bold text-gray-400">
-                일괄 승인 대상
-              </span>
-            </label>
-          </div>
-        )}
-        {isExpense ? (
-          <div className="flex justify-between items-center gap-2">
-            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-              <span className={`shrink-0 text-[12px] font-bold px-2.5 py-1 rounded-md ${b.bg}`}>{b.label}</span>
-              <p className="text-[14px] text-gray-500 font-medium shrink-0 min-w-0">
-                <span className="font-bold">신청자 :</span> {item.requester}
-              </p>
-              {formatSubmittedAt(item.createdTime) && (
-                <p className="text-[14px] text-gray-500 font-medium min-w-0">
-                  <span className="font-bold">접수 시간 :</span> {formatSubmittedAt(item.createdTime)}
-                </p>
-              )}
-            </div>
-            <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[displayStatus] ?? "bg-[#3182F6]/10 text-[#3182F6]"}`}>
-              {displayStatus}
-            </span>
-          </div>
-        ) : (
-          <div className="flex justify-between items-center gap-2">
-            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-              <span className={`shrink-0 text-[12px] font-bold px-2.5 py-1 rounded-md ${b.bg}`}>{b.label}</span>
-              <p className="text-[14px] text-gray-500 font-medium shrink-0 min-w-0">
-                <span className="font-bold">신청자 :</span> {item.requester}
-              </p>
-              {formatSubmittedAt(item.createdTime) && (
-                <p className="text-[14px] text-gray-500 font-medium min-w-0">
-                  <span className="font-bold">접수 시간 :</span> {formatSubmittedAt(item.createdTime)}
-                </p>
-              )}
-            </div>
-            <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[displayStatus] ?? "bg-[#3182F6]/10 text-[#3182F6]"}`}>
-              {displayStatus}
-            </span>
-          </div>
-        )}
-
-        {isExpense ? (
-          <>
-            <h2 className="text-[17px] font-bold text-gray-900 tracking-tight min-w-0">
-              건명 : {item.title || "-"}
-            </h2>
-            <div className="flex justify-between items-center gap-3 min-w-0">
-              {description ? (
-                <p className="text-gray-400 font-medium text-[14px] min-w-0 flex-1 leading-snug">
-                  적요 : {description}
-                </p>
-              ) : (
-                <div className="min-w-0 flex-1" />
-              )}
-              <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                <span className="text-[17.6px] font-bold text-gray-800">금액 :</span>
-                <span className="text-[17.6px] font-bold text-[#191F28]">{item.amountOrQuantity}</span>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            {!isTransfer && (
-              <p className="text-[14px] text-gray-500">
-                {formatSpecKgMisu(item.spec || "", item.misu || "")}
-              </p>
-            )}
-            {isTransfer && (
-              <p className="text-[13px] text-gray-500">
-                <span className="font-bold">이동일 :</span> {item.date || "-"}
-              </p>
-            )}
-            <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">{item.title || "-"}</h2>
-            <div className="flex justify-between items-center gap-3 min-w-0">
-              {item.lotNumber ? (
-                <p className="text-[15px] font-bold font-mono text-blue-700 tracking-tight break-all leading-snug min-w-0 flex-1">
-                  {isTransfer ? `원본: ${item.lotNumber}` : item.lotNumber}
-                </p>
-              ) : (
-                <div className="min-w-0 flex-1" />
-              )}
-              <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                <span className="text-[17.6px] font-bold text-gray-800">
-                  {item.type === "INBOUND" ? "입고 수량" : item.type === "TRANSFER" ? "이동 수량" : "출고 수량"} :
-                </span>
-                <span className="text-[17.6px] font-bold text-blue-600">{item.amountOrQuantity}박스</span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {!uiState && PENDING_STATUSES.includes(item.status) && (role === "ADMIN" || role === "MASTER") && (
-          <div className={`flex gap-3 ${isExpense ? "mt-1.5" : "mt-0.5"}`}>
-            <button
-              onClick={() => handleOpenReject(item)}
-              className="flex-1 bg-gray-100 text-gray-600 font-bold text-[15px] py-4 rounded-[16px] active:scale-95 transition-transform"
-            >
-              반려
-            </button>
-            <button
-              onClick={() => handleApprove(item)}
-              className="flex-[2] bg-[#191F28] text-white font-bold text-[15px] py-4 rounded-[16px] active:scale-95 transition-transform"
-            >
-              승인
-            </button>
-          </div>
-        )}
-
-        {uiState === "PROCESSING" && (
-          <div className="w-full bg-blue-50/50 text-[#3182F6] font-bold py-4 rounded-[16px] text-center flex items-center justify-center gap-2 animate-pulse">
-            처리 중...
-          </div>
-        )}
-        {uiState === "COMPLETED" && (
-          <div className="w-full bg-[#00D082]/10 text-[#00D082] font-bold py-4 rounded-[16px] text-center flex items-center justify-center gap-2">
-            승인 완료
-          </div>
-        )}
-        {uiState === "REJECTED" && (
-          <div className="w-full bg-gray-50 text-gray-400 font-bold py-4 rounded-[16px] text-center">
-            반려됨
-          </div>
-        )}
-      </div>
+        {isExpense
+          ? <ApprovalExpenseBody item={item} />
+          : <ApprovalLogisticsBody item={item} />}
+      </ApprovalCard>
     );
   };
 
