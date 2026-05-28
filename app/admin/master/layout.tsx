@@ -5,23 +5,18 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldExclamationIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
+import { NAV_GROUPS } from './_nav';
 
 /**
  * /admin/master/* 공통 레이아웃 (PC PWA 관리 화면).
  *
- * - 좌측 사이드바 nav (제품/공급업체/보관처/LOT) — 이번 phase에서는 제품만 활성, 나머지는 placeholder
+ * - 좌측 사이드바 nav: IA 6 카테고리(결재/재고/거래 이력/원가·손익/마스터/시스템·운영).
+ *   미구현 항목은 ComingSoonPage placeholder로 안내 ([...slug]/page.tsx)
  * - 상단 권한 게이트 (ADMIN/MASTER) — dashboard 패턴 재사용
  * - 본문 영역은 children 슬롯
  *
  * 모바일 BottomTabBar/PageHeader 패턴과 분리. PC 전용 시작 (반응형은 추후).
  */
-
-const NAV_ITEMS = [
-  { href: '/admin/master/products', label: '제품 마스터', enabled: true },
-  { href: '/admin/master/suppliers', label: '매입처 마스터', enabled: true },
-  { href: '/admin/master/storage', label: '보관처 마스터', enabled: true },
-  { href: '/admin/master/lots', label: 'LOT 마스터', enabled: true },
-] as const;
 
 export default function MasterAdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -72,46 +67,61 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
           <Link href="/" className="text-[18px] font-black text-gray-900 hover:text-[#3182F6] transition-colors">
             SEAERP
           </Link>
-          <p className="text-[12px] font-bold text-gray-400 mt-1">마스터 관리</p>
+          <p className="text-[12px] font-bold text-gray-400 mt-1">관리자 시스템</p>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV_ITEMS.map((item) => {
-            const base = 'block px-3 py-2.5 rounded-xl text-[14px] font-bold transition-colors';
-            if (!item.enabled) {
-              return (
-                <div
-                  key={item.href}
-                  className={`${base} text-gray-300 cursor-not-allowed flex items-center justify-between`}
-                  title="준비 중"
-                >
-                  <span>{item.label}</span>
-                  <span className="text-[11px] font-bold text-gray-300">준비중</span>
-                </div>
-              );
-            }
-            const active = pathname?.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${base} ${
-                  active
-                    ? 'bg-[#3182F6]/10 text-[#3182F6]'
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.title}>
+              <p className="px-3 mb-1.5 text-[11px] font-black text-gray-400 tracking-wider uppercase">
+                {group.title}
+              </p>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const base = 'block px-3 py-2 rounded-xl text-[13px] font-bold transition-colors';
+                  const active = pathname === item.href;
+                  if (!item.enabled) {
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        title="준비 중 — 클릭하면 안내 화면이 표시됩니다"
+                        className={`${base} flex items-center justify-between ${
+                          active
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'text-gray-400 hover:bg-gray-50 hover:text-gray-500'
+                        }`}
+                      >
+                        <span>{item.label}</span>
+                        <span
+                          className={`text-[10px] font-black px-1.5 py-0.5 rounded ${active ? 'bg-amber-200 text-amber-800' : 'bg-gray-100 text-gray-400'}`}
+                        >
+                          준비중
+                        </span>
+                      </Link>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`${base} ${
+                        active
+                          ? 'bg-[#3182F6]/10 text-[#3182F6]'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
-        <div className="px-3 py-4 border-t border-gray-100">
-          <Link
-            href="/admin/dashboard"
-            className="block px-3 py-2.5 rounded-xl text-[14px] font-bold text-gray-500 hover:bg-gray-50 transition-colors"
-          >
-            ← 결재 수신함
-          </Link>
+        <div className="px-5 py-3 border-t border-gray-100">
+          <p className="text-[10px] font-bold text-gray-300">
+            Phase 3 IA 미정착 — URL은 phase 후반 정리
+          </p>
         </div>
       </aside>
 

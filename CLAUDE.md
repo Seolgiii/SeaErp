@@ -4,6 +4,11 @@
 개발 방식: 1인 기획/개발 + Claude Code
 
 ■ 최근 변경 (2026-05-28)
+- Phase 3 마스터 + 재고 카테고리 마무리 — 작업자 마스터(`/admin/master/workers`, PIN 재설정·잠금해제·본인 보호·마지막 MASTER 보호) + 선박 마스터(`/admin/master/ships`, 9필드, 어업종류 옵션 미정) + 재고 현황 집계(3뷰 토글) + LOT 생애주기(시간순 타임라인 + PDF 링크) + 음수·이상 LOT 모니터(daily-report HealthMetrics 화면화 + 위반 상세). master-{workers,ships,health,lot-timeline}.ts 4종 server action 신설.
+- IA 6 카테고리 사이드바 shell — `_nav.ts`로 NAV_GROUPS 분리(27 슬롯 / 14 활성 / 13 준비중) + `[...slug]` catch-all로 ComingSoonPage placeholder. 준비중 항목도 클릭 가능(노란 배지), IA 전체 구도 시각화. URL은 `/admin/master/*` 통일 유지, phase 3 후반 카테고리 디렉터리 분리 예정.
+- 추가 결정 — IA 진행은 카테고리별 단계적(전체 만들고 dogfooding 대신 1개씩 → 1주 사용 → 다음). 순서: 마스터 → 재고 → 거래 → 결재 확장 → 원가·손익 → 시스템.
+
+■ 최근 변경 (2026-05-28 오전)
 - Phase 1 마무리 + Phase 2 전체 완료 + Phase 3 시작 (13 커밋). 표기 통일·컴포넌트 추출 → inline fetch 42→0 + schema 11테이블 → 마스터 4화면(products/suppliers/storage 풀 CRUD + lots read-only) + PC PWA "SEAERP 관리자" 별도 설치.
 - 관리자 PC IA 6 카테고리 확정 — 결재/재고/거래이력/원가·손익/마스터/시스템·운영. 재무회계 영역(분개·전표·부가세·세금계산서·결산)은 명시적 보류, 외부 ERP export로 연결(1인 한계·세법 리스크). docs/ROADMAP.md "명시적 보류 항목" 섹션 + 본 파일 "■ 의도된 비범위" 섹션.
 - 보관처 마스터 'use server' const export 버그 fix — `STORAGE_KINDS`를 `lib/storage-kinds.ts`로 분리. 다른 'use server' 파일 전수 스캔 동일 패턴 0건.
@@ -150,7 +155,7 @@
 
 ■ Airtable 테이블 구조
 운영 7개: 작업자 / 품목마스터 / LOT별 재고 / 입고 관리 / 출고 관리 / 지출결의 / 재고 이동
-마스터 4개: 보관처 마스터 / 매입처 마스터 / 보관처 비용 이력 / 선박 정보 마스터(예정)
+마스터 4개: 보관처 마스터 / 매입처 마스터 / 보관처 비용 이력 / 선박 정보 마스터
 
 작업자 테이블 PIN 보안 필드 (5월 추가):
 - pin_hash (Long text — "scrypt:saltHex:hashHex" 형식)

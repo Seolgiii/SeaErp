@@ -14,6 +14,7 @@ export const AIRTABLE_TABLE = {
   expense: "지출결의",
   transfer: "재고 이동",
   storageMaster: "보관처 마스터",
+  ships: "선박 정보 마스터",
 } as const;
 
 /** 작업자 테이블 필드 */
