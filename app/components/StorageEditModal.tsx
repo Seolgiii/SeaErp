@@ -8,11 +8,10 @@ import {
   createStorage,
   deleteStorage,
   updateStorage,
-  STORAGE_KINDS,
   type Storage,
   type StorageInput,
-  type StorageKind,
 } from '@/app/actions/admin/master-storage';
+import { STORAGE_KINDS, type StorageKind } from '@/lib/storage-kinds';
 
 interface Props {
   mode: 'create' | 'edit';
@@ -36,7 +35,7 @@ export default function StorageEditModal({
 }: Props) {
   const confirm = useConfirm();
   const [name, setName] = useState(storage?.name ?? '');
-  const [kind, setKind] = useState<StorageKind>(storage?.kind ?? '');
+  const [kind, setKind] = useState<StorageKind | ''>(storage?.kind ?? '');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -126,7 +125,7 @@ export default function StorageEditModal({
             </label>
             <select
               value={kind}
-              onChange={(e) => setKind(e.target.value as StorageKind)}
+              onChange={(e) => setKind(e.target.value as StorageKind | '')}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent transition-all"
             >
               <option value="">(선택 안 함)</option>

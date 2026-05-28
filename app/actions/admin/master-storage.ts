@@ -8,29 +8,30 @@ import {
   patchAirtableRecord,
 } from "@/lib/airtable";
 import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
+import { STORAGE_KINDS, type StorageKind } from "@/lib/storage-kinds";
 import { ensureAdmin, type Result } from "./_master-helpers";
 
 /**
  * 보관처 마스터 (Phase 3 PC 관리 화면용) 서버 액션.
  * 2필드: 보관처명 + 구분(자사창고/외부창고/가공공장/기타).
  * 구분은 입출고증 발행 주체 분기(isOwnStorage) 기준 — 2026-05-19 신설.
+ *
+ * 주의: 'use server' 파일은 async function만 export 가능. STORAGE_KINDS·StorageKind는
+ * 'use server' 아닌 lib/storage-kinds.ts에서 import해 client에서도 직접 쓸 수 있게.
  */
 
 const TABLE_PATH = encodeURIComponent(AIRTABLE_TABLE.storageMaster);
 const TAG = "master-storage";
 
-export const STORAGE_KINDS = ["자사창고", "외부창고", "가공공장", "기타"] as const;
-export type StorageKind = (typeof STORAGE_KINDS)[number] | "";
-
 export type Storage = {
   id: string;
   name: string;
-  kind: StorageKind;
+  kind: StorageKind | "";
 };
 
 export type StorageInput = {
   name: string;
-  kind?: StorageKind;
+  kind?: StorageKind | "";
 };
 
 function parseStorage(rec: { id: string; fields?: Record<string, unknown> }): Storage {

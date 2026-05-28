@@ -10,12 +10,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import {
-  listStorages,
-  STORAGE_KINDS,
-  type Storage,
-  type StorageKind,
-} from '@/app/actions/admin/master-storage';
+import { listStorages, type Storage } from '@/app/actions/admin/master-storage';
+import { STORAGE_KINDS, type StorageKind } from '@/lib/storage-kinds';
 import StorageEditModal from '@/app/components/StorageEditModal';
 
 type SortField = 'name' | 'kind';
