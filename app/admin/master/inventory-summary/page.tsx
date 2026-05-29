@@ -293,9 +293,9 @@ export default function InventorySummaryPage() {
                       </>
                     )
                   ) : view === 'storage-only' ? (
-                    <Th label="보관처" field="group" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                    <Th label="보관처" field="group" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} paddingX="px-3" />
                   ) : (
-                    <th className="px-4 py-3">품목</th>
+                    <th className="px-3 py-3">품목</th>
                   )}
                   {view !== 'storage-only' && (
                     <>
@@ -314,19 +314,19 @@ export default function InventorySummaryPage() {
                     {view === 'storage-product' ? (
                       primary === 'storage' ? (
                         <>
-                          <td className="px-4 py-3 font-bold text-gray-900 truncate" title={r.storage || undefined}>{r.storage || '-'}</td>
-                          <td className="px-4 py-3 text-gray-700 truncate" title={r.product || undefined}>{r.product || '-'}</td>
+                          <td className="px-3 py-3 font-bold text-gray-900 truncate" title={r.storage || undefined}>{r.storage || '-'}</td>
+                          <td className="px-3 py-3 text-gray-700 truncate" title={r.product || undefined}>{r.product || '-'}</td>
                         </>
                       ) : (
                         <>
-                          <td className="px-4 py-3 font-bold text-gray-900 truncate" title={r.product || undefined}>{r.product || '-'}</td>
-                          <td className="px-4 py-3 text-gray-700 truncate" title={r.storage || undefined}>{r.storage || '-'}</td>
+                          <td className="px-3 py-3 font-bold text-gray-900 truncate" title={r.product || undefined}>{r.product || '-'}</td>
+                          <td className="px-3 py-3 text-gray-700 truncate" title={r.storage || undefined}>{r.storage || '-'}</td>
                         </>
                       )
                     ) : view === 'storage-only' ? (
-                      <td className="px-4 py-3 font-bold text-gray-900 truncate" title={r.storage || undefined}>{r.storage || '-'}</td>
+                      <td className="px-3 py-3 font-bold text-gray-900 truncate" title={r.storage || undefined}>{r.storage || '-'}</td>
                     ) : (
-                      <td className="px-4 py-3 font-bold text-gray-900 truncate" title={r.product || undefined}>{r.product || '-'}</td>
+                      <td className="px-3 py-3 font-bold text-gray-900 truncate" title={r.product || undefined}>{r.product || '-'}</td>
                     )}
                     {view !== 'storage-only' && (
                       <>
@@ -379,7 +379,7 @@ function SwapTh({
     <th
       onClick={onSwap}
       title={active ? '클릭해 순서 바꾸기' : '클릭해 이 컬럼을 앞으로'}
-      className="px-4 py-3 cursor-pointer select-none transition-colors group"
+      className="px-3 py-3 cursor-pointer select-none transition-colors group"
     >
       <span
         className={`inline-flex items-center gap-1 ${
@@ -401,12 +401,14 @@ function Th({
   sortField,
   sortDir,
   onToggle,
+  paddingX = 'px-4',
 }: {
   label: string;
   field: SortField;
   sortField: SortField;
   sortDir: SortDir;
   onToggle: (f: SortField) => void;
+  paddingX?: string;
 }) {
   const Icon =
     sortField === field
@@ -417,7 +419,7 @@ function Th({
   return (
     <th
       onClick={() => onToggle(field)}
-      className="px-4 py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors"
+      className={`${paddingX} py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors`}
     >
       <span className="inline-flex items-center gap-1">
         {label}
