@@ -6,16 +6,18 @@ import {
   ArrowsUpDownIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { formatIntKo } from '@/lib/number-format';
-import { formatSpecKgMisu } from '@/lib/spec-display';
+import { formatSpec, formatMisu, formatSize } from '@/lib/spec-display';
 import { listLots, type Lot } from '@/app/actions/admin/master-lots';
 
 type ViewMode = 'storage-product' | 'storage-only' | 'product-only';
 type SortField = 'group' | 'lots' | 'qty';
 type SortDir = 'asc' | 'desc';
+type Primary = 'storage' | 'product';
 
 type Row = {
   key: string;
@@ -44,6 +46,9 @@ export default function InventorySummaryPage() {
   const [storageFilter, setStorageFilter] = useState<string>('ALL');
   const [sortField, setSortField] = useState<SortField>('qty');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  // 보관처 × 품목 뷰에서 어떤 컬럼이 먼저 오는지 (= 1차 그룹화 기준).
+  // 헤더 클릭으로 swap. 같은 데이터를 두 관점으로 본다.
+  const [primary, setPrimary] = useState<Primary>('storage');
 
   useEffect(() => {
     const session = readSession();
@@ -126,11 +131,16 @@ export default function InventorySummaryPage() {
     return [...filtered].sort((a, b) => {
       if (sortField === 'qty') return (a.qty - b.qty) * dir;
       if (sortField === 'lots') return (a.lots - b.lots) * dir;
-      const ga = `${a.storage} ${a.product}`.trim();
-      const gb = `${b.storage} ${b.product}`.trim();
+      // 'group' 정렬: storage-product 뷰에서는 primary 우선, 외 뷰는 보관처+품목 합성.
+      const ga = view === 'storage-product' && primary === 'product'
+        ? `${a.product} ${a.storage}`.trim()
+        : `${a.storage} ${a.product}`.trim();
+      const gb = view === 'storage-product' && primary === 'product'
+        ? `${b.product} ${b.storage}`.trim()
+        : `${b.storage} ${b.product}`.trim();
       return ga.localeCompare(gb, 'ko') * dir;
     });
-  }, [baseLots, view, storageFilter, search, sortField, sortDir]);
+  }, [baseLots, view, storageFilter, search, sortField, sortDir, primary]);
 
   const totals = useMemo(
     () => ({
@@ -235,16 +245,63 @@ export default function InventorySummaryPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[13px] table-fixed">
+              {/* 컬럼 너비 고정 — primary swap 시 보관처/품목 컬럼이 흔들리지 않도록.
+                  table-fixed + colgroup 조합으로 너비가 내용 길이에 따라 변하지 않음. */}
+              {view === 'storage-product' && (
+                <colgroup>
+                  <col style={{ width: '220px' }} />
+                  <col style={{ width: '220px' }} />
+                  <col style={{ width: '80px' }} />
+                  <col style={{ width: '80px' }} />
+                  <col style={{ width: '140px' }} />
+                  <col style={{ width: '90px' }} />
+                  <col style={{ width: '130px' }} />
+                </colgroup>
+              )}
+              {view === 'storage-only' && (
+                <colgroup>
+                  <col />
+                  <col style={{ width: '90px' }} />
+                  <col style={{ width: '130px' }} />
+                </colgroup>
+              )}
+              {view === 'product-only' && (
+                <colgroup>
+                  <col />
+                  <col style={{ width: '80px' }} />
+                  <col style={{ width: '80px' }} />
+                  <col style={{ width: '140px' }} />
+                  <col style={{ width: '90px' }} />
+                  <col style={{ width: '130px' }} />
+                </colgroup>
+              )}
               <thead className="bg-gray-50 sticky top-0">
                 <tr className="text-left font-bold text-gray-500 text-[12px]">
-                  {view !== 'product-only' && (
+                  {/* storage-product 뷰: 보관처/품목을 swap 버튼으로. primary가 먼저 옴.
+                      다른 뷰는 기존 단일 열 그대로 (정렬 의미 있음). */}
+                  {view === 'storage-product' ? (
+                    primary === 'storage' ? (
+                      <>
+                        <SwapTh label="보관처" active onSwap={() => setPrimary('product')} />
+                        <SwapTh label="품목" onSwap={() => setPrimary('product')} />
+                      </>
+                    ) : (
+                      <>
+                        <SwapTh label="품목" active onSwap={() => setPrimary('storage')} />
+                        <SwapTh label="보관처" onSwap={() => setPrimary('storage')} />
+                      </>
+                    )
+                  ) : view === 'storage-only' ? (
                     <Th label="보관처" field="group" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  ) : (
+                    <th className="px-4 py-3">품목</th>
                   )}
                   {view !== 'storage-only' && (
                     <>
-                      <th className="px-4 py-3">품목</th>
-                      <th className="px-4 py-3">규격·미수</th>
+                      <th className="px-4 py-3">규격</th>
+                      <th className="px-4 py-3">미수</th>
+                      <th className="px-4 py-3">사이즈</th>
                     </>
                   )}
                   <Th label="LOT 수" field="lots" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
@@ -254,15 +311,28 @@ export default function InventorySummaryPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.key} className="border-t border-gray-100 hover:bg-blue-50/40 transition-colors">
-                    {view !== 'product-only' && (
-                      <td className="px-4 py-3 font-bold text-gray-900">{r.storage || '-'}</td>
+                    {view === 'storage-product' ? (
+                      primary === 'storage' ? (
+                        <>
+                          <td className="px-4 py-3 font-bold text-gray-900 truncate" title={r.storage || undefined}>{r.storage || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700 truncate" title={r.product || undefined}>{r.product || '-'}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-4 py-3 font-bold text-gray-900 truncate" title={r.product || undefined}>{r.product || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700 truncate" title={r.storage || undefined}>{r.storage || '-'}</td>
+                        </>
+                      )
+                    ) : view === 'storage-only' ? (
+                      <td className="px-4 py-3 font-bold text-gray-900 truncate" title={r.storage || undefined}>{r.storage || '-'}</td>
+                    ) : (
+                      <td className="px-4 py-3 font-bold text-gray-900 truncate" title={r.product || undefined}>{r.product || '-'}</td>
                     )}
                     {view !== 'storage-only' && (
                       <>
-                        <td className="px-4 py-3 text-gray-700">{r.product || '-'}</td>
-                        <td className="px-4 py-3 text-gray-500">
-                          {formatSpecKgMisu(r.spec, r.misu) || '-'}
-                        </td>
+                        <td className="px-4 py-3 text-gray-500">{formatSpec(r.spec)}</td>
+                        <td className="px-4 py-3 text-gray-500">{formatMisu(r.misu)}</td>
+                        <td className="px-4 py-3 text-gray-500">{formatSize(r.spec, r.misu)}</td>
                       </>
                     )}
                     <td className="px-4 py-3 text-gray-600">{r.lots}</td>
@@ -276,7 +346,7 @@ export default function InventorySummaryPage() {
                 <tr className="text-[13px] font-black text-gray-800">
                   <td
                     className="px-4 py-3"
-                    colSpan={view === 'storage-only' ? 1 : view === 'product-only' ? 2 : 3}
+                    colSpan={view === 'storage-only' ? 1 : view === 'product-only' ? 4 : 5}
                   >
                     합계
                   </td>
@@ -289,6 +359,39 @@ export default function InventorySummaryPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Swap-on-click 헤더. asc/desc 정렬 대신 컬럼 순서 swap.
+ * active=true (현재 primary)는 파란색 강조, 비활성은 회색 + swap 아이콘.
+ */
+function SwapTh({
+  label,
+  active = false,
+  onSwap,
+}: {
+  label: string;
+  active?: boolean;
+  onSwap: () => void;
+}) {
+  return (
+    <th
+      onClick={onSwap}
+      title={active ? '클릭해 순서 바꾸기' : '클릭해 이 컬럼을 앞으로'}
+      className="px-4 py-3 cursor-pointer select-none transition-colors group"
+    >
+      <span
+        className={`inline-flex items-center gap-1 ${
+          active ? 'text-[#3182F6]' : 'text-gray-500 group-hover:text-[#3182F6]'
+        }`}
+      >
+        {label}
+        <ArrowsRightLeftIcon
+          className={`w-3.5 h-3.5 ${active ? 'text-[#3182F6]' : 'text-gray-300 group-hover:text-[#3182F6]'}`}
+        />
+      </span>
+    </th>
   );
 }
 

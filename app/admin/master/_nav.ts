@@ -31,7 +31,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: '재고',
     items: [
-      { href: '/admin/master/lots', label: 'LOT 조회', enabled: true },
+      { href: '/admin/master/lots', label: '재고 조회', enabled: true },
       { href: '/admin/master/inventory-summary', label: '재고 현황 집계', enabled: true },
       { href: '/admin/master/lot-timeline', label: 'LOT 생애주기', enabled: true },
       { href: '/admin/master/health', label: '음수·이상 LOT 모니터', enabled: true },

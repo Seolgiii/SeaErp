@@ -10,6 +10,7 @@ import {
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { formatIntKo } from '@/lib/number-format';
+import { formatSpec, formatMisu } from '@/lib/spec-display';
 import { listLots, type Lot } from '@/app/actions/admin/master-lots';
 
 type SortField = 'lotNumber' | 'productName' | 'stockQty' | 'firstInboundDate' | 'storageName';
@@ -17,7 +18,7 @@ type SortDir = 'asc' | 'desc';
 type StatusFilter = 'ALL' | '활성' | '소진';
 
 /**
- * LOT 마스터 — read-only.
+ * 재고 조회 — LOT 단위 read-only 표.
  * LOT은 입고 승인 시 자동 생성되므로 admin 직접 생성 거의 없음.
  * 1차 dogfooding은 조회만 — 편집 필요성 확인되면 후속 추가.
  */
@@ -106,7 +107,7 @@ export default function LotsMasterPage() {
     <div className="p-8 min-w-0">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">LOT 마스터</h1>
+          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고 조회</h1>
           <p className="text-[13px] text-gray-500 mt-1">
             {visible.length}건{(search || statusFilter !== 'ALL') && ` / 전체 ${items.length}건`}
             <span className="ml-2 text-gray-400">(조회 전용 — 편집은 입고 승인으로)</span>
@@ -183,18 +184,6 @@ export default function LotsMasterPage() {
       </div>
     </div>
   );
-}
-
-function formatSpec(spec: string): string {
-  const t = (spec ?? '').trim();
-  if (!t || t === '-') return '-';
-  return /kg\s*$/i.test(t) ? t : `${t}kg`;
-}
-
-function formatMisu(misu: string): string {
-  const t = (misu ?? '').trim();
-  if (!t || t === '-') return '-';
-  return t.endsWith('미') ? t : `${t}미`;
 }
 
 // 색은 라이프사이클 상태에 매핑: 승인 완료(녹색)/소진(회색)/반려(빨강)/취소(연빨강)
