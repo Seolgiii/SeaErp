@@ -68,11 +68,12 @@ export default function InventorySummaryPage() {
   }, [workerId, loadData]);
 
   // 승인 완료 + 재고수량 > 0 인 LOT만 집계 대상 (옵션으로 0 박스 포함 가능)
+  // 라이프사이클 상태: '승인 완료'(활성) 또는 '소진'(재고 0이지만 정상 처리 완료) 둘 다 포함
   const baseLots = useMemo(
     () =>
       lots.filter(
         (l) =>
-          l.approvalStatus === '승인 완료' &&
+          (l.status === '승인 완료' || l.status === '소진') &&
           (includeDepleted || l.stockQty > 0),
       ),
     [lots, includeDepleted],

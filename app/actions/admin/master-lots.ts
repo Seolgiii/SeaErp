@@ -26,7 +26,8 @@ export type Lot = {
   misu: string;
   stockQty: number;
   storageName: string;
-  approvalStatus: string;
+  status: string;
+  statusReason: string;
   firstInboundDate: string;
 };
 
@@ -54,7 +55,8 @@ function parseLot(
     misu: str(f["상세규격_표기"]) || str(f["미수"]),
     stockQty: Number(Array.isArray(f["재고수량"]) ? f["재고수량"][0] : f["재고수량"]) || 0,
     storageName: storageId ? (storageMap[storageId] ?? "") : "",
-    approvalStatus: str(f["승인상태"]),
+    status: str(f["상태"]),
+    statusReason: str(f["상태사유"]),
     firstInboundDate: str(f["최초입고일"]),
   };
 }

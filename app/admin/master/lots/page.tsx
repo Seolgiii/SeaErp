@@ -10,7 +10,6 @@ import {
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { formatIntKo } from '@/lib/number-format';
-import { formatSpecKgMisu } from '@/lib/spec-display';
 import { listLots, type Lot } from '@/app/actions/admin/master-lots';
 
 type SortField = 'lotNumber' | 'productName' | 'stockQty' | 'firstInboundDate' | 'storageName';
@@ -146,7 +145,8 @@ export default function LotsMasterPage() {
                 <tr className="text-left font-bold text-gray-500 text-[12px]">
                   <Th label="LOT번호" field="lotNumber" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="품목명" field="productName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <th className="px-4 py-3">규격·미수</th>
+                  <th className="px-4 py-3">규격</th>
+                  <th className="px-4 py-3">미수</th>
                   <Th label="재고수량" field="stockQty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="보관처" field="storageName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <th className="px-4 py-3">상태</th>
@@ -156,17 +156,22 @@ export default function LotsMasterPage() {
               <tbody>
                 {visible.map((l) => (
                   <tr key={l.id} className="border-t border-gray-100 hover:bg-blue-50/40 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-blue-700">{l.lotNumber || '-'}</td>
+                    <td className="px-4 py-3 font-bold text-gray-900">{l.lotNumber || '-'}</td>
                     <td className="px-4 py-3 font-bold text-gray-900">{l.productName || '-'}</td>
-                    <td className="px-4 py-3 text-gray-500">{formatSpecKgMisu(l.spec, l.misu)}</td>
+                    <td className="px-4 py-3 text-gray-500">{formatSpec(l.spec)}</td>
+                    <td className="px-4 py-3 text-gray-500">{formatMisu(l.misu)}</td>
                     <td className={`px-4 py-3 font-bold ${l.stockQty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`}>
                       {formatIntKo(l.stockQty)}박스
                     </td>
                     <td className="px-4 py-3 text-gray-600">{l.storageName || '-'}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold ${statusColor(l.approvalStatus)}`}>
-                        {l.approvalStatus || '-'}
-                      </span>
+                      {l.statusReason ? (
+                        <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold ${statusColor(l.status)}`}>
+                          {l.statusReason}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500">{l.firstInboundDate || '-'}</td>
                   </tr>
@@ -180,14 +185,29 @@ export default function LotsMasterPage() {
   );
 }
 
+function formatSpec(spec: string): string {
+  const t = (spec ?? '').trim();
+  if (!t || t === '-') return '-';
+  return /kg\s*$/i.test(t) ? t : `${t}kg`;
+}
+
+function formatMisu(misu: string): string {
+  const t = (misu ?? '').trim();
+  if (!t || t === '-') return '-';
+  return t.endsWith('미') ? t : `${t}미`;
+}
+
+// 색은 라이프사이클 상태에 매핑: 승인 완료(녹색)/소진(회색)/반려(빨강)/취소(연빨강)
 function statusColor(status: string): string {
   switch (status) {
     case '승인 완료':
       return 'bg-green-100 text-green-700';
+    case '소진':
+      return 'bg-gray-100 text-gray-500';
     case '승인 대기':
       return 'bg-[#3182F6]/10 text-[#3182F6]';
     case '반려':
-      return 'bg-gray-100 text-gray-500';
+      return 'bg-red-50 text-red-500';
     case '취소':
       return 'bg-red-50 text-red-400';
     default:
