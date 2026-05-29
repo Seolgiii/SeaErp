@@ -803,6 +803,8 @@ UX (3건):
 - **PC 진입 UX 통합** (`353a87a`, 5 files +947) — (1) PC 전용 로그인 split-screen: 좌 브랜드 파노라마(#3182F6→#0F4FB0 그라디언트 + SEAERP 72pt + 기능 캘러우트 + 상하 웨이브) / 우 작업자 4열 그리드 → 클릭 시 PIN 입력으로 swap. 키보드 입력 네이티브(0-9/Backspace/Esc). (2) `LoginShell.tsx` matchMedia(1024px) 분기 단일 mount. (3) `/admin/master` 관리자 홈: KPI 4장(결재 대기/오늘 입출고/위험 알림 drill-down) + 6 카테고리 카드(준비중 회색 칩). (4) `defaultLanding(role)`: ADMIN/MASTER → /admin/master, WORKER → /. (5) 사이드바 SEAERP → /admin/master + 하단 사용자 메뉴(아바타+이름+역할+로그아웃).
 - **사이드바 IA 정리** (`290616d`) — 카테고리 접기/펼치기 도입(chevron + 헤더 클릭 토글, 기본 접힘: 마스터/시스템·운영). localStorage 'seafood-erp:nav-collapsed' 보존. 현재 페이지 속한 카테고리는 자동 펼침. 카테고리 vs 항목 시각 위계 강화(13px font-black + 우측 chevron, 항목 ml-2 + border-l 들여쓰기). enabled/disabled 항목 좌측 정렬 통일(단일 flex 구조 + 조건부 칩).
 - **재고 현황 집계 dogfooding fix** (`7cc692a`, 5 files +268) — 규격·미수 한 컬럼 → 두 컬럼 분리 + 사이즈 컬럼 신규(`formatSize` 마리당 g 환산: 미수 1~2자리 → spec/N 계산, 3자리 이상 → g 그대로). 보관처/품목 swap-on-click(asc/desc 정렬 무의미 → primary swap, ↔ 아이콘 강조). table-fixed + colgroup으로 컬럼 너비 고정(swap 시 흔들림 0). 라벨 'LOT 조회' → '재고 조회'(사이드바 + 페이지 h1). spec-display.ts에 formatSpec/formatMisu/formatSize 공유 추출 + 단위 테스트 +11 케이스(단위 140 통과).
+- **재고 집계 컬럼 너비 자동·대칭화** — 보관처·품목 컬럼을 table-fixed 220px 고정 → table-auto + 내용 자연너비 측정 후 더 긴 쪽으로 둘 통일(useEffect equalize). 남는 폭 안 채우는 콤팩트 + swap해도 폭 동일. swap 흔들림은 px-2로 줄였던 셀 패딩을 px-3(`a41d16f` 상태)로 복원해 해결.
+- **관리자 IA 비중복 재정리 (b+a, 4파일)** — 재고 라벨 통일(재고 조회→재고(LOT별) / 재고 현황 집계→재고 집계). LOT 생애주기 메뉴 제외 → 재고(LOT별) 행클릭 drill-down(lot-timeline `?lot=` 자동조회 + lots 행 onClick). 음수·이상 LOT 모니터 재고→시스템·운영. placeholder 정리: 결재 '일괄 처리 표'·'결재 이력·검색' 제거, 원가 'LOT 누적 비용' 제거·'보관비 이력'→마스터(보관처 비용 이력), 시스템 '운영 건강도 실시간' 제거. 최종 6카테고리 22항목/활성 9. catch-all·ComingSoonPage null-safe·제거 href 외부 참조 0 확인.
 
 **결정 사항**
 - **상태 컬럼 = 상태사유(라이프사이클)** — 재고 조회 맥락에선 `승인상태`(워크플로우 대기/완료/반려)보다 `상태사유`(신규입고/이동입고/출고완료/이동출고/입고반려/이동반려/취소)가 본질적. 색은 `상태`에 매핑.
@@ -820,18 +822,23 @@ UX (3건):
 - **table-fixed + colgroup = swap 흔들림 0** — 보관처/품목 220px 동일, 나머지 명시 너비. truncate + title로 220px 초과 hover 풀텍스트.
 - **PC 누수 엣지 = 1번(현 상태 유지)** — PC ADMIN/MASTER 자연 흐름은 모바일 UI 0. PC WORKER 로그인(/)·URL 직접 타이핑은 엣지. 권한 분리 시 자연 해소.
 - **'LOT' 라벨은 내부 식별자만** — 사용자 노출 라벨은 '재고'로 일관. URL `/admin/master/lots`는 phase 3 후반 IA 정리 때 함께 이전.
+- **IA 비중복 원칙 = "형제 메뉴는 서로 다른 질문"** — 한쪽이 다른 쪽의 상세·필터·합계면 메뉴(형제)가 아니라 drill-down/탭/필터로 들어간다. LOT 생애주기·LOT 누적비용을 형제에서 빼 LOT 상세로, 결재 일괄/이력을 수신함·거래이력으로 흡수.
+- **재고 컬럼 너비 = 내용 최소 + 둘 같게** — MAX(남는 폭 채움)·작은 고정 옵션 중 swap 시 여백 통일감 때문에 "내용 자연너비 측정 후 더 긴 쪽으로 통일" 채택. 순수 CSS 불가라 측정 equalize.
+- **세부 가격·원가·출처 = LOT 상세 귀속** — 수매가·경비·판매원가·매입자·선박명 등은 per-LOT라 집계 불가 + 표 컬럼도 부적합(18컬럼). 재고(LOT별)→LOT 상세 drill-down. 기간 손익 집계만 원가·손익 카테고리.
 
 **미해결 이슈**
+- **🔴 가격·원가가 PC 관리 화면에 안 보임** — 손익·가격은 현재 일일 정산 이메일(+`/api/preview/daily-report`)에서만. 재고/집계/생애주기 화면 가격 표시 0. 데이터·cost-calc·스키마는 존재, 표시만 미구현.
 - **🔴 1주 PC dogfooding 본격 시작** — 로그인 split + 관리자 홈 + 결재 수신함 + 사이드바 카테고리 접기 + 재고 조회/집계 + LOT 생애주기 등 진입 가능 14화면 실사용 메모. 카테고리 IA 동선·결재함 검색·KPI 정확성 확인.
 - **재무회계 PC IA 잔여 13 슬롯** — 거래 이력 5 / 원가·손익 5 / 시스템·운영 5 (catch-all + ComingSoonPage placeholder). 결재 확장 2.
 - **품목/규격에 따른 사이즈 표시 검증** — 실 데이터(130 품목 × 다양한 spec/misu) dogfooding 중 g 환산 정확도·"약" 접두 합리성 체크.
 - 장기 유지 항목은 5/28 그대로 — 갈치 LOT 16건 / 기존 재고 200건 비용 / 판매처 마스터→다국어 / Airtable view 4·Automation 7 / `.` 보관처·`해원냉동(구좌)` 정리 / GitHub Actions CI / `PRODUCT_FIELDS.category` stale 정정.
 
 **다음 작업 후보**
+- **🔴 (1순위) LOT 상세에 '비용 내역' 섹션 추가** — lot-detail.ts/master-lot-timeline.ts에 수매가·누적냉장료·동결비·입출고비·노조비·이월경비·판매원가 매핑 + 생애주기 화면 비용 카드 + 출고 이벤트에 출고시점 판매원가/손익. 재고(LOT별) 클릭 → LOT 가격 즉시 노출.
+- **(2순위) 원가·손익 카테고리 화면화** — 손익 추이(일일정산 이메일 손익을 화면으로) / 매입 통계.
 - **1주 dogfooding** 후 결재함·홈·재고 화면 fix
 - 모바일 로그아웃 진입점 (PC는 사이드바에 추가됨, 모바일은 `/`나 `/admin/dashboard` 우상단 후보)
-- Phase 3 다음 카테고리 — IA 3번 거래 이력 5화면 (입고/출고/이동/지출 admin 표 + PDF 재발행)
-- 또는 IA 1번 결재 확장 2화면 (이력·검색 + 일괄 처리 표)
+- Phase 3 다음 카테고리 — IA 3번 거래 이력 5화면 (입고/출고/이동/지출 admin 표 + PDF 재발행, 결재상태 필터로 결재 이력 검색 흡수)
 - 외부 ERP export 1차 (CSV 출력) — IA 4번 핵심 약속
 - 어업종류 옵션 결정 → 선박 폼 활성화
 - Master 페이지 패턴 안착 후 Table/Modal primitive 추출
