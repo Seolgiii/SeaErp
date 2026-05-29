@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowDownTrayIcon,
@@ -58,21 +58,36 @@ export default function LotTimelinePage() {
     setWorkerId(session.workerId);
   }, [router]);
 
-  const handleSearch = async () => {
+  const runSearch = useCallback(
+    async (raw: string) => {
+      if (!workerId) return;
+      const q = raw.trim();
+      if (!q) {
+        toast('LOT번호를 입력하세요.', 'error');
+        return;
+      }
+      setIsLoading(true);
+      setData(null);
+      const result = await fetchLotLifecycle(workerId, q);
+      setIsLoading(false);
+      setSearched(true);
+      if (result.success) setData(result.data);
+      else toast(`조회 실패: ${result.error}`, 'error');
+    },
+    [workerId],
+  );
+
+  const handleSearch = () => void runSearch(query);
+
+  // 재고(LOT별) 행 클릭으로 ?lot= 가 넘어오면 자동 조회 — drill-down 진입점.
+  useEffect(() => {
     if (!workerId) return;
-    const q = query.trim();
-    if (!q) {
-      toast('LOT번호를 입력하세요.', 'error');
-      return;
+    const lot = new URLSearchParams(window.location.search).get('lot');
+    if (lot && lot.trim()) {
+      setQuery(lot);
+      void runSearch(lot);
     }
-    setIsLoading(true);
-    setData(null);
-    const result = await fetchLotLifecycle(workerId, q);
-    setIsLoading(false);
-    setSearched(true);
-    if (result.success) setData(result.data);
-    else toast(`조회 실패: ${result.error}`, 'error');
-  };
+  }, [workerId, runSearch]);
 
   if (!workerId) {
     return (

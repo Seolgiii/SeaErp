@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowsUpDownIcon,
@@ -49,6 +49,9 @@ export default function InventorySummaryPage() {
   // 보관처 × 품목 뷰에서 어떤 컬럼이 먼저 오는지 (= 1차 그룹화 기준).
   // 헤더 클릭으로 swap. 같은 데이터를 두 관점으로 본다.
   const [primary, setPrimary] = useState<Primary>('storage');
+  // 보관처·품목 두 컬럼을 내용 길이에 맞춘 최소 너비로 줄이되, 더 긴 쪽 기준으로 통일.
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [pairW, setPairW] = useState<number>();
 
   useEffect(() => {
     const session = readSession();
@@ -150,6 +153,34 @@ export default function InventorySummaryPage() {
     [rows],
   );
 
+  // storage-product 뷰: 보관처·품목 두 컬럼을 내용에 맞춘 최소 너비로 줄이되,
+  // 둘 중 더 긴 쪽 기준으로 같은 너비로 통일 → swap해도 폭이 흔들리지 않음.
+  // table-auto + 비-w-full이라 컬럼이 내용만큼만 차지(콤팩트)하고, 남는 폭은 채우지 않음.
+  useEffect(() => {
+    if (view !== 'storage-product') {
+      setPairW(undefined);
+      return;
+    }
+    const table = tableRef.current;
+    if (!table) return;
+    const cols = table.querySelectorAll<HTMLTableColElement>('colgroup col');
+    const ths = table.querySelectorAll<HTMLElement>('thead th');
+    const ca = cols[0];
+    const cb = cols[1];
+    const ta = ths[0];
+    const tb = ths[1];
+    if (!ca || !cb || !ta || !tb) return;
+    // 적용된 너비를 비워 내용 자연 너비를 측정한 뒤, 더 넓은 쪽으로 둘을 통일.
+    ca.style.width = '';
+    cb.style.width = '';
+    const next = Math.ceil(
+      Math.max(ta.getBoundingClientRect().width, tb.getBoundingClientRect().width),
+    );
+    ca.style.width = `${next}px`;
+    cb.style.width = `${next}px`;
+    setPairW(next);
+  }, [view, rows]);
+
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else {
@@ -170,7 +201,7 @@ export default function InventorySummaryPage() {
     <div className="p-8 min-w-0">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고 현황 집계</h1>
+          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고 집계</h1>
           <p className="text-[13px] text-gray-500 mt-1">
             {isLoading ? '집계 중...' : `${rows.length}행 · 총 ${formatIntKo(totals.qty)}박스 · ${totals.lots}LOT`}
             <span className="ml-2 text-gray-400">(승인 완료 LOT 기준)</span>
@@ -245,13 +276,17 @@ export default function InventorySummaryPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px] table-fixed">
-              {/* 컬럼 너비 고정 — primary swap 시 보관처/품목 컬럼이 흔들리지 않도록.
-                  table-fixed + colgroup 조합으로 너비가 내용 길이에 따라 변하지 않음. */}
+            <table
+              ref={tableRef}
+              className={`text-[13px] ${view === 'storage-product' ? '' : 'w-full table-fixed'}`}
+            >
+              {/* 보관처/품목 너비는 pairW(측정값)로 동기화 — 둘 중 더 긴 내용에 맞춘
+                  최소 너비로 통일. table-auto + 비-w-full이라 내용만큼만 차지(콤팩트),
+                  남는 폭은 채우지 않음. swap해도 둘이 같은 폭이라 흔들리지 않음. */}
               {view === 'storage-product' && (
                 <colgroup>
-                  <col style={{ width: '220px' }} />
-                  <col style={{ width: '220px' }} />
+                  <col style={pairW ? { width: pairW } : undefined} />
+                  <col style={pairW ? { width: pairW } : undefined} />
                   <col style={{ width: '80px' }} />
                   <col style={{ width: '80px' }} />
                   <col style={{ width: '140px' }} />

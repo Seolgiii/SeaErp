@@ -107,10 +107,10 @@ export default function LotsMasterPage() {
     <div className="p-8 min-w-0">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고 조회</h1>
+          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고(LOT별)</h1>
           <p className="text-[13px] text-gray-500 mt-1">
             {visible.length}건{(search || statusFilter !== 'ALL') && ` / 전체 ${items.length}건`}
-            <span className="ml-2 text-gray-400">(조회 전용 — 편집은 입고 승인으로)</span>
+            <span className="ml-2 text-gray-400">(행 클릭 → 생애주기 · 조회 전용)</span>
           </p>
         </div>
       </div>
@@ -156,7 +156,19 @@ export default function LotsMasterPage() {
               </thead>
               <tbody>
                 {visible.map((l) => (
-                  <tr key={l.id} className="border-t border-gray-100 hover:bg-blue-50/40 transition-colors">
+                  <tr
+                    key={l.id}
+                    onClick={
+                      l.lotNumber
+                        ? () =>
+                            router.push(
+                              `/admin/master/lot-timeline?lot=${encodeURIComponent(l.lotNumber)}`,
+                            )
+                        : undefined
+                    }
+                    title={l.lotNumber ? '클릭해 LOT 생애주기 보기' : undefined}
+                    className={`border-t border-gray-100 hover:bg-blue-50/40 transition-colors ${l.lotNumber ? 'cursor-pointer' : ''}`}
+                  >
                     <td className="px-4 py-3 font-bold text-gray-900">{l.lotNumber || '-'}</td>
                     <td className="px-4 py-3 font-bold text-gray-900">{l.productName || '-'}</td>
                     <td className="px-4 py-3 text-gray-500">{formatSpec(l.spec)}</td>
