@@ -23,7 +23,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: '결재',
     items: [
-      { href: '/admin/dashboard', label: '결재 수신함', enabled: true },
+      { href: '/admin/master/approval/inbox', label: '결재 수신함', enabled: true },
       { href: '/admin/master/approval/history', label: '결재 이력·검색', enabled: false },
       { href: '/admin/master/approval/bulk', label: '일괄 처리 표', enabled: false },
     ],
