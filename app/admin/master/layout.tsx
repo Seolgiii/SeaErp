@@ -3,9 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldExclamationIcon } from '@heroicons/react/24/outline';
-import { readSession, isSessionExpired } from '@/lib/session';
+import { ShieldExclamationIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { readSession, isSessionExpired, clearSession } from '@/lib/session';
 import { NAV_GROUPS } from './_nav';
+
+const ROLE_LABEL: Record<string, string> = {
+  MASTER: '마스터',
+  ADMIN: '관리자',
+  WORKER: '작업자',
+};
 
 /**
  * /admin/master/* 공통 레이아웃 (PC PWA 관리 화면).
@@ -22,6 +28,8 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
   const router = useRouter();
   const pathname = usePathname();
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [workerName, setWorkerName] = useState<string>('');
+  const [role, setRole] = useState<string>('');
 
   useEffect(() => {
     const session = readSession();
@@ -30,7 +38,14 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
       return;
     }
     setAuthorized(session.role === 'ADMIN' || session.role === 'MASTER');
+    setWorkerName(session.workerName ?? '');
+    setRole(session.role ?? '');
   }, [router]);
+
+  const handleLogout = () => {
+    clearSession();
+    router.replace('/login');
+  };
 
   if (authorized === null) {
     return (
@@ -64,7 +79,7 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
       {/* 사이드바 */}
       <aside className="w-60 bg-white border-r border-gray-100 shrink-0 flex flex-col">
         <div className="px-6 py-5 border-b border-gray-100">
-          <Link href="/" className="text-[18px] font-black text-gray-900 hover:text-[#3182F6] transition-colors">
+          <Link href="/admin/master" className="text-[18px] font-black text-gray-900 hover:text-[#3182F6] transition-colors">
             SEAERP
           </Link>
           <p className="text-[12px] font-bold text-gray-400 mt-1">관리자 시스템</p>
@@ -118,8 +133,27 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
             </div>
           ))}
         </nav>
-        <div className="px-5 py-3 border-t border-gray-100">
-          <p className="text-[10px] font-bold text-gray-300">
+        {/* 사용자 메뉴 — 작업자명 + 로그아웃 */}
+        <div className="px-3 py-3 border-t border-gray-100">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50">
+            <div className="w-8 h-8 rounded-full bg-[#3182F6] flex items-center justify-center text-white text-[13px] font-black shrink-0">
+              {workerName ? workerName[0] : '?'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-bold text-gray-800 truncate">{workerName || '—'}</p>
+              <p className="text-[10px] font-bold text-gray-400">{ROLE_LABEL[role] ?? role}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="로그아웃"
+              aria-label="로그아웃"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-[#FF3B30] hover:bg-white active:scale-95 transition-all shrink-0"
+            >
+              <ArrowRightOnRectangleIcon className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="px-3 mt-2 text-[10px] font-bold text-gray-300">
             Phase 3 IA 미정착 — URL은 phase 후반 정리
           </p>
         </div>
