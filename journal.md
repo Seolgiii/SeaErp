@@ -795,6 +795,50 @@ UX (3건):
 
 ---
 
+### 2026-05-29
+
+**완료한 작업**
+- **재고 조회 표 정리** (`2afa2bb`) — LOT번호 mono+blue → 품목명과 동일한 bold gray로 통일 / 규격·미수 한 컬럼 → 두 컬럼 분리 (xxkg / xx미) / 상태 컬럼: 승인상태(워크플로우) → 상태사유(라이프사이클). 색은 status에 매핑 (승인 완료=초록 / 소진=회색 / 반려=빨강 / 취소=연빨강). inventory-summary 연쇄 수정: status in ('승인 완료', '소진').
+- **PC 결재 수신함 신설** (`e143e2c`, 2 files +770) — `/admin/master/approval/inbox` 표 일람 + 다중선택 일괄 처리. 백엔드(updateApprovalStatus[Bulk], getMyRequests) 모바일과 100% 공유. 모바일 `/admin/dashboard` 무손상. 탭(대기/완료) + 타입 필터(전체/입고/출고/이동/지출) URL 동기화. 일괄 승인 + 일괄 반려(같은 사유 순차 호출). 완료 탭 행 인라인 '반려로/승인으로' 토글. EXPENSE 100만원 분기 동일. 사이드바 _nav 링크 신규 경로로 교체.
+- **PC 진입 UX 통합** (`353a87a`, 5 files +947) — (1) PC 전용 로그인 split-screen: 좌 브랜드 파노라마(#3182F6→#0F4FB0 그라디언트 + SEAERP 72pt + 기능 캘러우트 + 상하 웨이브) / 우 작업자 4열 그리드 → 클릭 시 PIN 입력으로 swap. 키보드 입력 네이티브(0-9/Backspace/Esc). (2) `LoginShell.tsx` matchMedia(1024px) 분기 단일 mount. (3) `/admin/master` 관리자 홈: KPI 4장(결재 대기/오늘 입출고/위험 알림 drill-down) + 6 카테고리 카드(준비중 회색 칩). (4) `defaultLanding(role)`: ADMIN/MASTER → /admin/master, WORKER → /. (5) 사이드바 SEAERP → /admin/master + 하단 사용자 메뉴(아바타+이름+역할+로그아웃).
+- **사이드바 IA 정리** (`290616d`) — 카테고리 접기/펼치기 도입(chevron + 헤더 클릭 토글, 기본 접힘: 마스터/시스템·운영). localStorage 'seafood-erp:nav-collapsed' 보존. 현재 페이지 속한 카테고리는 자동 펼침. 카테고리 vs 항목 시각 위계 강화(13px font-black + 우측 chevron, 항목 ml-2 + border-l 들여쓰기). enabled/disabled 항목 좌측 정렬 통일(단일 flex 구조 + 조건부 칩).
+- **재고 현황 집계 dogfooding fix** (`7cc692a`, 5 files +268) — 규격·미수 한 컬럼 → 두 컬럼 분리 + 사이즈 컬럼 신규(`formatSize` 마리당 g 환산: 미수 1~2자리 → spec/N 계산, 3자리 이상 → g 그대로). 보관처/품목 swap-on-click(asc/desc 정렬 무의미 → primary swap, ↔ 아이콘 강조). table-fixed + colgroup으로 컬럼 너비 고정(swap 시 흔들림 0). 라벨 'LOT 조회' → '재고 조회'(사이드바 + 페이지 h1). spec-display.ts에 formatSpec/formatMisu/formatSize 공유 추출 + 단위 테스트 +11 케이스(단위 140 통과).
+
+**결정 사항**
+- **상태 컬럼 = 상태사유(라이프사이클)** — 재고 조회 맥락에선 `승인상태`(워크플로우 대기/완료/반려)보다 `상태사유`(신규입고/이동입고/출고완료/이동출고/입고반려/이동반려/취소)가 본질적. 색은 `상태`에 매핑.
+- **PC 결재 수신함 = 표 일람** — 모바일 카드 그대로 포팅 대신 PC가 잘하는 표·체크박스·sticky 액션바·되돌리기 인라인. 메일앱 split, 카드 그리드 옵션 검토 후 표 채택.
+- **PC ↔ 모바일 결재 동시 사용 = 서버 멱등 가드 + 보상 트랜잭션으로 충돌 0** — 신규 화면 출시해도 모바일 결재함 무손상. 같은 건 동시 클릭 시 한쪽은 no-op.
+- **PC 로그인 = Split-screen (A안)** — 메인 카드(B), 팀 보드 그리드(C) 옵션 중 Stripe/Linear 스타일 split이 일과 사용에 적합 + 키보드 입력으로 PC 이점 활용.
+- **viewport 분기 = 단일 mount** — 두 컴포넌트 동시 mount 시 /api/workers 중복 호출 + bottom sheet portal 부작용. matchMedia 결정 전엔 빈 배경으로 한 frame 흡수.
+- **관리자 홈 구성 = KPI + 카테고리 카드 둘 다** — KPI만(메트릭 중심)과 카테고리만(공간 단순) 옵션 중 추천안 채택. "오늘 뭐부터" + "어디로 갈지" 동시 제공.
+- **역할별 진입 분기 = defaultLanding(role)** — ADMIN/MASTER → /admin/master, WORKER → /. callbackUrl이 있으면 그게 우선(보안 검증 유지).
+- **카테고리 접기 = 마스터/시스템·운영 기본 접힘** — 첫 진입 시 사이드바 짧게 + 사용자 선택 localStorage 보존. 현재 페이지 속한 카테고리는 자동 펼침(활성 항목 숨김 모순 방지).
+- **카테고리 활성 시그널 = 작은 점 제거 + 글자색 강조** — 위치 변동 없이 신호만 유지(text-[#191F28] vs gray-700). 점은 1×1px이라 정보 전달 약함.
+- **항목 좌측 정렬 통일 = 단일 flex 구조** — enabled/disabled가 별도 className으로 분기돼 시각 차이 발생하던 것을 단일 `<a flex>`로 통합. 칩은 조건부 + shrink-0.
+- **사이즈 컬럼 규칙** — 미수 1~2자리는 박스당 마리수로 해석해 spec(kg)/N 계산. 3자리 이상은 이미 g 단위로 간주(계산 생략). "약 xxxg" / "약 xxx~xxxg" 형식 + 작은~큰 자연 정렬.
+- **swap on click = 보관처 알파벳 정렬보다 자연** — 같은 데이터를 두 관점(보관처 우선 / 품목 우선)으로 보는 게 진짜 목적. asc/desc 무의미.
+- **table-fixed + colgroup = swap 흔들림 0** — 보관처/품목 220px 동일, 나머지 명시 너비. truncate + title로 220px 초과 hover 풀텍스트.
+- **PC 누수 엣지 = 1번(현 상태 유지)** — PC ADMIN/MASTER 자연 흐름은 모바일 UI 0. PC WORKER 로그인(/)·URL 직접 타이핑은 엣지. 권한 분리 시 자연 해소.
+- **'LOT' 라벨은 내부 식별자만** — 사용자 노출 라벨은 '재고'로 일관. URL `/admin/master/lots`는 phase 3 후반 IA 정리 때 함께 이전.
+
+**미해결 이슈**
+- **🔴 1주 PC dogfooding 본격 시작** — 로그인 split + 관리자 홈 + 결재 수신함 + 사이드바 카테고리 접기 + 재고 조회/집계 + LOT 생애주기 등 진입 가능 14화면 실사용 메모. 카테고리 IA 동선·결재함 검색·KPI 정확성 확인.
+- **재무회계 PC IA 잔여 13 슬롯** — 거래 이력 5 / 원가·손익 5 / 시스템·운영 5 (catch-all + ComingSoonPage placeholder). 결재 확장 2.
+- **품목/규격에 따른 사이즈 표시 검증** — 실 데이터(130 품목 × 다양한 spec/misu) dogfooding 중 g 환산 정확도·"약" 접두 합리성 체크.
+- 장기 유지 항목은 5/28 그대로 — 갈치 LOT 16건 / 기존 재고 200건 비용 / 판매처 마스터→다국어 / Airtable view 4·Automation 7 / `.` 보관처·`해원냉동(구좌)` 정리 / GitHub Actions CI / `PRODUCT_FIELDS.category` stale 정정.
+
+**다음 작업 후보**
+- **1주 dogfooding** 후 결재함·홈·재고 화면 fix
+- 모바일 로그아웃 진입점 (PC는 사이드바에 추가됨, 모바일은 `/`나 `/admin/dashboard` 우상단 후보)
+- Phase 3 다음 카테고리 — IA 3번 거래 이력 5화면 (입고/출고/이동/지출 admin 표 + PDF 재발행)
+- 또는 IA 1번 결재 확장 2화면 (이력·검색 + 일괄 처리 표)
+- 외부 ERP export 1차 (CSV 출력) — IA 4번 핵심 약속
+- 어업종류 옵션 결정 → 선박 폼 활성화
+- Master 페이지 패턴 안착 후 Table/Modal primitive 추출
+- 다국어 라벨 트랙 시작 (판매처 마스터 → 재고표 PDF → 다국어)
+
+---
+
 ## 누적 통계 (2026-05-18 기준)
 
 - 단위 테스트: 5 files / **110 pass** (변동 없음)
