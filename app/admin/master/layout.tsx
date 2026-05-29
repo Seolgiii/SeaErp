@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldExclamationIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { ShieldExclamationIcon, ArrowRightOnRectangleIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired, clearSession } from '@/lib/session';
 import { NAV_GROUPS } from './_nav';
 
@@ -12,6 +12,10 @@ const ROLE_LABEL: Record<string, string> = {
   ADMIN: '관리자',
   WORKER: '작업자',
 };
+
+const NAV_COLLAPSE_KEY = 'seafood-erp:nav-collapsed';
+// 자주 안 보는 카테고리는 기본 접힘 — 첫 진입 시 사이드바 짧게.
+const DEFAULT_COLLAPSED = ['마스터', '시스템·운영'];
 
 /**
  * /admin/master/* 공통 레이아웃 (PC PWA 관리 화면).
@@ -30,6 +34,7 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [workerName, setWorkerName] = useState<string>('');
   const [role, setRole] = useState<string>('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(DEFAULT_COLLAPSED));
 
   useEffect(() => {
     const session = readSession();
@@ -41,6 +46,41 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
     setWorkerName(session.workerName ?? '');
     setRole(session.role ?? '');
   }, [router]);
+
+  // 접힘 상태 복원 — localStorage 저장 키가 있으면 우선
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(NAV_COLLAPSE_KEY);
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) setCollapsed(new Set(arr.filter((x): x is string => typeof x === 'string')));
+    } catch {
+      /* 기본값 유지 */
+    }
+  }, []);
+
+  // 현재 페이지가 속한 카테고리는 강제 펼침 (사이드바에서 활성 항목이 안 보이는 모순 방지)
+  useEffect(() => {
+    const owner = NAV_GROUPS.find((g) => g.items.some((it) => it.href === pathname));
+    if (!owner) return;
+    setCollapsed((prev) => {
+      if (!prev.has(owner.title)) return prev;
+      const next = new Set(prev);
+      next.delete(owner.title);
+      try { window.localStorage.setItem(NAV_COLLAPSE_KEY, JSON.stringify(Array.from(next))); } catch {}
+      return next;
+    });
+  }, [pathname]);
+
+  const toggleCollapse = (title: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      try { window.localStorage.setItem(NAV_COLLAPSE_KEY, JSON.stringify(Array.from(next))); } catch {}
+      return next;
+    });
+  };
 
   const handleLogout = () => {
     clearSession();
@@ -84,54 +124,63 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
           </Link>
           <p className="text-[12px] font-bold text-gray-400 mt-1">관리자 시스템</p>
         </div>
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.title}>
-              <p className="px-3 mb-1.5 text-[11px] font-black text-gray-400 tracking-wider uppercase">
-                {group.title}
-              </p>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const base = 'block px-3 py-2 rounded-xl text-[13px] font-bold transition-colors';
-                  const active = pathname === item.href;
-                  if (!item.enabled) {
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        title="준비 중 — 클릭하면 안내 화면이 표시됩니다"
-                        className={`${base} flex items-center justify-between ${
-                          active
-                            ? 'bg-amber-50 text-amber-700'
-                            : 'text-gray-400 hover:bg-gray-50 hover:text-gray-500'
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        <span
-                          className={`text-[10px] font-black px-1.5 py-0.5 rounded ${active ? 'bg-amber-200 text-amber-800' : 'bg-gray-100 text-gray-400'}`}
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+          {NAV_GROUPS.map((group) => {
+            const isCollapsed = collapsed.has(group.title);
+            const activeChild = group.items.some((it) => it.href === pathname);
+            return (
+              <div key={group.title}>
+                <button
+                  type="button"
+                  onClick={() => toggleCollapse(group.title)}
+                  aria-expanded={!isCollapsed}
+                  className={`w-full px-3 py-2 flex items-center justify-between rounded-lg text-[13px] font-black tracking-tight transition-colors ${
+                    activeChild
+                      ? 'text-[#191F28]'
+                      : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>{group.title}</span>
+                  <ChevronDownIcon
+                    className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                  />
+                </button>
+                {!isCollapsed && (
+                  <div className="mt-0.5 mb-2 ml-2 pl-2 border-l border-gray-100 space-y-0.5">
+                    {group.items.map((item) => {
+                      const active = pathname === item.href;
+                      // 모든 항목을 동일 구조로 렌더: flex 컨테이너 + 좌측 라벨 + (선택) 우측 칩.
+                      // 이전엔 enabled/disabled가 별도 className으로 분기돼 좌측 정렬이 미세하게 달라보였음.
+                      const cls = !item.enabled
+                        ? active
+                          ? 'bg-amber-50 text-amber-700 font-medium'
+                          : 'text-gray-400 hover:bg-gray-50 hover:text-gray-500 font-medium'
+                        : active
+                          ? 'bg-[#3182F6]/10 text-[#3182F6] font-bold'
+                          : 'text-gray-600 hover:bg-gray-50 font-medium';
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          title={!item.enabled ? '준비 중 — 클릭하면 안내 화면이 표시됩니다' : undefined}
+                          className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-[13px] transition-colors ${cls}`}
                         >
-                          준비중
-                        </span>
-                      </Link>
-                    );
-                  }
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`${base} ${
-                        active
-                          ? 'bg-[#3182F6]/10 text-[#3182F6]'
-                          : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
+                          <span className="truncate">{item.label}</span>
+                          {!item.enabled && (
+                            <span
+                              className={`text-[10px] font-black px-1.5 py-0.5 rounded shrink-0 ml-2 ${active ? 'bg-amber-200 text-amber-800' : 'bg-gray-100 text-gray-400'}`}
+                            >
+                              준비중
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
         {/* 사용자 메뉴 — 작업자명 + 로그아웃 */}
         <div className="px-3 py-3 border-t border-gray-100">
