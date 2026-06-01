@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowDownTrayIcon,
@@ -194,13 +194,16 @@ export default function LotTimelinePage() {
               </div>
             ) : (
               <ol className="p-5 space-y-3">
-                {data.events.map((ev, i) => (
-                  <EventItem
-                    key={`${ev.recordId}-${i}`}
-                    event={ev}
-                    currentLot={data.lotNumber}
-                  />
-                ))}
+                {data.events.map((ev, i) => {
+                  // 입고·이동 입고 = 새 재고(LOT)가 생성되는 순간 → 직전에 구분선으로 세대 경계 표시.
+                  const isBirth = ev.type === 'inbound' || ev.type === 'transfer-in';
+                  return (
+                    <Fragment key={`${ev.recordId}-${i}`}>
+                      {isBirth && <GenerationDivider event={ev} first={i === 0} />}
+                      <EventItem event={ev} currentLot={data.lotNumber} />
+                    </Fragment>
+                  );
+                })}
               </ol>
             )}
           </div>
@@ -282,6 +285,32 @@ function CostCard({ cost, stockQty }: { cost: LotCostInfo; stockQty: number }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 세대 구분선 — 입고/이동 입고로 "새 재고(LOT)"가 생성되는 지점에 표시.
+ * 조상 LOT 체인이 한 타임라인에 섞여 보이므로, LOT번호가 바뀌는 경계를 한눈에 읽게 한다.
+ */
+function GenerationDivider({ event, first }: { event: LifecycleEvent; first: boolean }) {
+  const isTransfer = event.type === 'transfer-in';
+  // 이동 입고면 신규 LOT번호, 일반 입고(루트)면 이 LOT번호.
+  const lotLabel = (isTransfer ? event.toLot : '') || event.lotNumber;
+  const sub = isTransfer ? '이동 입고로 신규 LOT 생성' : '신규 입고로 LOT 생성';
+  return (
+    <li className={`flex items-center gap-2.5 ${first ? '' : 'pt-1'}`} aria-hidden="true">
+      <span className="h-px flex-1 bg-gradient-to-r from-transparent to-gray-200" />
+      <span
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap ${
+          isTransfer ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
+        }`}
+      >
+        <span>{isTransfer ? '🔁' : '📦'}</span>
+        {lotLabel && <span className="font-mono">{lotLabel}</span>}
+        <span className="opacity-70">· {sub}</span>
+      </span>
+      <span className="h-px flex-1 bg-gradient-to-l from-transparent to-gray-200" />
+    </li>
   );
 }
 

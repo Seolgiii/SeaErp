@@ -27,6 +27,10 @@ type Row = {
   misu: string;
   lots: number;
   qty: number;
+  /** 현재고 평가액 합(원) = Σ(박스당 판매원가 × 재고수량) */
+  valuation: number;
+  /** 현재고에 묶인 누적 보관비 합(원) = Σ((박스당 판매원가 − 수매가) × 재고수량). 오늘 기준 */
+  storageCost: number;
 };
 
 const VIEW_OPTIONS: { value: ViewMode; label: string; desc: string }[] = [
@@ -100,7 +104,7 @@ export default function InventorySummaryPage() {
       const storage = l.storageName || '(미지정)';
       const product = l.productName || '(미지정)';
       let key: string;
-      let row: Omit<Row, 'lots' | 'qty'>;
+      let row: Omit<Row, 'lots' | 'qty' | 'valuation' | 'storageCost'>;
       if (view === 'storage-product') {
         key = `${storage}${product}${l.spec}${l.misu}`;
         row = { key, storage, product, spec: l.spec, misu: l.misu };
@@ -111,12 +115,23 @@ export default function InventorySummaryPage() {
         key = `${product}${l.spec}${l.misu}`;
         row = { key, storage: '', product, spec: l.spec, misu: l.misu };
       }
+      // 보관비 = 박스당(판매원가 − 수매가) × 재고수량 — 현재고에 묶인 보관 비용분(오늘 기준).
+      const lotStorageCost =
+        Math.max(0, l.costPerBox - l.purchasePrice) * Math.max(0, l.stockQty);
       const prev = map.get(key);
       if (prev) {
         prev.lots += 1;
         prev.qty += l.stockQty;
+        prev.valuation += l.valuation;
+        prev.storageCost += lotStorageCost;
       } else {
-        map.set(key, { ...row, lots: 1, qty: l.stockQty });
+        map.set(key, {
+          ...row,
+          lots: 1,
+          qty: l.stockQty,
+          valuation: l.valuation,
+          storageCost: lotStorageCost,
+        });
       }
     }
     const list = Array.from(map.values());
@@ -149,6 +164,8 @@ export default function InventorySummaryPage() {
     () => ({
       qty: rows.reduce((s, r) => s + r.qty, 0),
       lots: rows.reduce((s, r) => s + r.lots, 0),
+      valuation: rows.reduce((s, r) => s + r.valuation, 0),
+      storageCost: rows.reduce((s, r) => s + r.storageCost, 0),
     }),
     [rows],
   );
@@ -299,6 +316,8 @@ export default function InventorySummaryPage() {
                   <col />
                   <col style={{ width: '90px' }} />
                   <col style={{ width: '130px' }} />
+                  <col style={{ width: '140px' }} />
+                  <col style={{ width: '140px' }} />
                 </colgroup>
               )}
               {view === 'product-only' && (
@@ -341,6 +360,19 @@ export default function InventorySummaryPage() {
                   )}
                   <Th label="LOT 수" field="lots" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="재고 합계" field="qty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  {view === 'storage-only' && (
+                    <>
+                      <th
+                        className="px-4 py-3"
+                        title="현재고에 묶인 누적 보관비 (오늘 기준 · 냉장료+입출고비+노조비+동결비+이월). 기간별 발생액은 추후 추가 예정."
+                      >
+                        보관비
+                      </th>
+                      <th className="px-4 py-3" title="현재고 평가액 = 박스당 판매원가 × 재고수량">
+                        평가액
+                      </th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -374,6 +406,16 @@ export default function InventorySummaryPage() {
                     <td className={`px-4 py-3 font-bold ${r.qty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`}>
                       {formatIntKo(r.qty)}박스
                     </td>
+                    {view === 'storage-only' && (
+                      <>
+                        <td className="px-4 py-3 tabular-nums text-gray-700">
+                          {r.storageCost > 0 ? `${formatIntKo(Math.round(r.storageCost))}원` : '-'}
+                        </td>
+                        <td className="px-4 py-3 tabular-nums font-bold text-gray-900">
+                          {r.valuation > 0 ? `${formatIntKo(Math.round(r.valuation))}원` : '-'}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -387,6 +429,16 @@ export default function InventorySummaryPage() {
                   </td>
                   <td className="px-4 py-3">{totals.lots}</td>
                   <td className="px-4 py-3 text-[#3182F6]">{formatIntKo(totals.qty)}박스</td>
+                  {view === 'storage-only' && (
+                    <>
+                      <td className="px-4 py-3 tabular-nums text-gray-700">
+                        {totals.storageCost > 0 ? `${formatIntKo(Math.round(totals.storageCost))}원` : '-'}
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-gray-900">
+                        {totals.valuation > 0 ? `${formatIntKo(Math.round(totals.valuation))}원` : '-'}
+                      </td>
+                    </>
+                  )}
                 </tr>
               </tfoot>
             </table>

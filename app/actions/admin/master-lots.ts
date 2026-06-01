@@ -42,6 +42,8 @@ export type Lot = {
   costPerBox: number;
   /** 현재 재고 평가액(원) = 박스당 판매원가 × 재고수량 */
   valuation: number;
+  /** 비고(메모) — 운영 표기(라벨 색상·재포장·구물·상환 메모 등). admin 화면 노출용 */
+  memo: string;
 };
 
 function firstLinkId(val: unknown): string | null {
@@ -105,6 +107,7 @@ function parseLot(
     purchasePrice: basis.purchasePerBox,
     costPerBox,
     valuation: Math.round(costPerBox * Math.max(0, stockQty)),
+    memo: str(f["비고"]),
   };
 }
 

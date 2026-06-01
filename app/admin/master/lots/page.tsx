@@ -440,6 +440,7 @@ export default function LotsMasterPage() {
                   <Th label="보관처" field="storageName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="보관일수" field="daysHeld" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <th className="px-4 py-3">상태</th>
+                  <th className="px-4 py-3">비고</th>
                 </tr>
               </thead>
               <tbody>
@@ -491,9 +492,23 @@ export default function LotsMasterPage() {
                       {l.firstInboundDate ? `${formatIntKo(l.daysHeld)}일` : '-'}
                     </td>
                     <td className="px-4 py-3">
-                      {l.statusReason ? (
+                      {!l.status ? (
+                        <span className="text-gray-300">-</span>
+                      ) : l.status === '승인 완료' ? (
+                        // 활성 LOT(대다수)은 조용한 점 — 상세 사유는 tooltip. 예외 상태만 배지로 강조.
+                        <span className="inline-flex items-center" title={l.statusReason || l.status}>
+                          <span className="w-2 h-2 rounded-full bg-green-400" />
+                        </span>
+                      ) : (
                         <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold ${statusColor(l.status)}`}>
-                          {l.statusReason}
+                          {l.statusReason || l.status}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {l.memo ? (
+                        <span className="block max-w-[220px] truncate" title={l.memo}>
+                          {l.memo}
                         </span>
                       ) : (
                         <span className="text-gray-300">-</span>
@@ -519,6 +534,7 @@ export default function LotsMasterPage() {
                   <td className="px-4 py-3 tabular-nums text-gray-900">
                     {sumVal > 0 ? `${formatIntKo(sumVal)}원` : '-'}
                   </td>
+                  <td className="px-4 py-3" />
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3" />
