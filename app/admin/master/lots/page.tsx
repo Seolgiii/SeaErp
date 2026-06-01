@@ -4,8 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowsUpDownIcon,
+  ArrowDownTrayIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  FunnelIcon,
+  PrinterIcon,
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -13,9 +16,42 @@ import { formatIntKo } from '@/lib/number-format';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
 import { listLots, type Lot } from '@/app/actions/admin/master-lots';
 
-type SortField = 'lotNumber' | 'productName' | 'stockQty' | 'firstInboundDate' | 'storageName';
+// 재고장 인쇄 핸드오프 키 — /admin/ledger 인쇄 화면과 공유(새 탭 공유 위해 localStorage).
+const LEDGER_KEY = 'seaerp:ledger-print';
+const seoulToday = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+
+type SortField =
+  | 'lotNumber'
+  | 'productName'
+  | 'stockQty'
+  | 'firstInboundDate'
+  | 'storageName'
+  | 'daysHeld'
+  | 'stockWeight'
+  | 'purchasePrice'
+  | 'costPerBox'
+  | 'valuation';
 type SortDir = 'asc' | 'desc';
 type StatusFilter = 'ALL' | '활성' | '소진';
+type Filters = {
+  from: string;
+  to: string;
+  spec: string;
+  misu: string;
+  origin: string;
+  storage: string;
+  minDays: string;
+};
+const EMPTY_FILTERS: Filters = {
+  from: '',
+  to: '',
+  spec: '',
+  misu: '',
+  origin: '',
+  storage: '',
+  minDays: '',
+};
 
 /**
  * 재고 조회 — LOT 단위 read-only 표.
@@ -31,6 +67,9 @@ export default function LotsMasterPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('활성');
   const [sortField, setSortField] = useState<SortField>('firstInboundDate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showFilter, setShowFilter] = useState(false);
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
 
   useEffect(() => {
     const session = readSession();
@@ -64,6 +103,23 @@ export default function LotsMasterPage() {
           l.productName.toLowerCase().includes(q),
       );
     }
+
+    // 구조화 필터 (입고기간/품목명/규격/미수/원산지) — 입력된 항목만 적용
+    const f = filters;
+    const has = (s: string) => s.trim() !== '';
+    const inc = (val: string, needle: string) =>
+      val.toLowerCase().includes(needle.trim().toLowerCase());
+    if (has(f.from)) list = list.filter((l) => l.firstInboundDate && l.firstInboundDate >= f.from);
+    if (has(f.to)) list = list.filter((l) => l.firstInboundDate && l.firstInboundDate <= f.to);
+    if (has(f.spec)) list = list.filter((l) => inc(l.spec, f.spec));
+    if (has(f.misu)) list = list.filter((l) => inc(l.misu, f.misu));
+    if (has(f.origin)) list = list.filter((l) => inc(l.origin, f.origin));
+    if (has(f.storage)) list = list.filter((l) => inc(l.storageName, f.storage));
+    if (has(f.minDays)) {
+      const n = Number(f.minDays);
+      if (Number.isFinite(n)) list = list.filter((l) => l.daysHeld >= n);
+    }
+
     // 활성: 재고수량 > 0, 소진: 재고수량 == 0
     if (statusFilter === '활성') list = list.filter((l) => l.stockQty > 0);
     else if (statusFilter === '소진') list = list.filter((l) => l.stockQty === 0);
@@ -80,11 +136,98 @@ export default function LotsMasterPage() {
     return list;
   })();
 
+  // 현재 보이는 LOT들의 재고 평가액 합계 (재고 자산 가치 한눈 보기)
+  const totalValuation = visible.reduce((sum, l) => sum + l.valuation, 0);
+
+  const activeFilterCount = Object.values(filters).filter((v) => v.trim() !== '').length;
+  const setFilter = (k: keyof Filters, v: string) =>
+    setFilters((p) => ({ ...p, [k]: v }));
+  // 드롭다운 검색(datalist) 옵션 — 현재 적재된 LOT들의 고유값
+  const storageOptions = Array.from(
+    new Set(items.map((l) => l.storageName).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b, 'ko'));
+
+  // 다중선택 — "보이는 것 중 선택된 것"만 대상으로(필터로 가려진 선택은 출력 제외 → 직관적)
+  const selectedVisible = visible.filter((l) => selected.has(l.id));
+  const selectedValuation = selectedVisible.reduce((s, l) => s + l.valuation, 0);
+  const allVisibleSelected = visible.length > 0 && visible.every((l) => selected.has(l.id));
+
+  // 합계 행 — 선택이 있으면 선택분 합계, 없으면 현재 보이는 전체 합계
+  const summaryRows = selectedVisible.length > 0 ? selectedVisible : visible;
+  const summaryIsSelection = selectedVisible.length > 0;
+  const sumQty = summaryRows.reduce((s, l) => s + l.stockQty, 0);
+  const sumWeight = summaryRows.reduce((s, l) => s + l.stockWeight, 0);
+  const sumVal = summaryRows.reduce((s, l) => s + l.valuation, 0);
+
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleAllVisible = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) visible.forEach((l) => next.delete(l.id));
+      else visible.forEach((l) => next.add(l.id));
+      return next;
+    });
+
+  // 재고장 인쇄 — 선택 LOT을 localStorage로 넘기고 새 탭에서 인쇄 화면 열기.
+  const handlePrint = () => {
+    if (selectedVisible.length === 0) return;
+    try {
+      window.localStorage.setItem(
+        LEDGER_KEY,
+        JSON.stringify({ asOf: seoulToday(), lots: selectedVisible }),
+      );
+    } catch {
+      toast('인쇄 데이터를 준비하지 못했습니다.', 'error');
+      return;
+    }
+    window.open('/admin/ledger', '_blank');
+  };
+
+  // CSV 내보내기 — 엑셀 한글 위해 BOM 선두, 쉼표/따옴표 이스케이프.
+  const handleCsv = () => {
+    if (selectedVisible.length === 0) return;
+    const asOf = seoulToday();
+    const header = ['LOT번호', '품목명', '규격', '미수', '보관처', '재고수량(박스)', '박스당 판매원가(원)', '평가액(원)'];
+    const body = selectedVisible.map((l) => [
+      l.lotNumber,
+      l.productName,
+      formatSpec(l.spec),
+      formatMisu(l.misu),
+      l.storageName,
+      String(l.stockQty),
+      l.costPerBox > 0 ? String(Math.round(l.costPerBox)) : '',
+      l.costPerBox > 0 ? String(l.valuation) : '',
+    ]);
+    const totalQty = selectedVisible.reduce((s, l) => s + l.stockQty, 0);
+    const totalVal = selectedVisible.reduce((s, l) => s + l.valuation, 0);
+    const footer = ['합계', '', '', '', '', String(totalQty), '', String(totalVal)];
+    const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const csv =
+      '﻿' + [header, ...body, footer].map((r) => r.map(cell).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `재고장_${asOf}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else {
       setSortField(field);
-      setSortDir(field === 'firstInboundDate' || field === 'stockQty' ? 'desc' : 'asc');
+      // 날짜·수량·금액은 큰 값부터(desc)가 보통 더 유용
+      const descFirst: SortField[] = ['firstInboundDate', 'daysHeld', 'stockQty', 'stockWeight', 'purchasePrice', 'costPerBox', 'valuation'];
+      setSortDir(descFirst.includes(field) ? 'desc' : 'asc');
     }
   };
 
@@ -107,10 +250,15 @@ export default function LotsMasterPage() {
     <div className="p-8 min-w-0">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고(LOT별)</h1>
+          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고 조회</h1>
           <p className="text-[13px] text-gray-500 mt-1">
             {visible.length}건{(search || statusFilter !== 'ALL') && ` / 전체 ${items.length}건`}
-            <span className="ml-2 text-gray-400">(행 클릭 → 생애주기 · 조회 전용)</span>
+            {totalValuation > 0 && (
+              <span className="ml-2 font-bold text-gray-700">
+                · 평가액 합계 {formatIntKo(totalValuation)}원
+              </span>
+            )}
+            <span className="ml-2 text-gray-400">(행 클릭 → 생애주기·원가 · 조회 전용)</span>
           </p>
         </div>
       </div>
@@ -123,12 +271,138 @@ export default function LotsMasterPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-80 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
         />
-        <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => setShowFilter((v) => !v)}
+          className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[14px] font-bold transition-colors ${
+            showFilter || activeFilterCount > 0
+              ? 'bg-[#3182F6]/10 text-[#3182F6] border border-[#3182F6]/30'
+              : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <FunnelIcon className="w-4 h-4" />
+          필터
+          {activeFilterCount > 0 && (
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-[#3182F6] text-white text-[11px] font-black leading-none">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+        <div className="flex items-center gap-1.5 ml-auto">
           <StatusChip label="활성" active={statusFilter === '활성'} count={counts.활성} onClick={() => setStatusFilter('활성')} />
           <StatusChip label="소진" active={statusFilter === '소진'} count={counts.소진} onClick={() => setStatusFilter('소진')} />
           <StatusChip label="전체" active={statusFilter === 'ALL'} count={counts.ALL} onClick={() => setStatusFilter('ALL')} />
         </div>
       </div>
+
+      {/* 필터 패널 — 입고기간/품목명/규격/미수/원산지 (입력된 항목만 AND 적용) */}
+      {showFilter && (
+        <div className="mb-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="flex flex-wrap gap-4">
+            {/* 입고기간 */}
+            <div className="flex-[2] min-w-[240px]">
+              <label className="block text-[12px] font-bold text-gray-500 mb-1">입고기간</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={filters.from}
+                  max={filters.to || undefined}
+                  onChange={(e) => setFilter('from', e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-lg px-2 py-2 text-[13px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+                />
+                <span className="text-gray-400">~</span>
+                <input
+                  type="date"
+                  value={filters.to}
+                  min={filters.from || undefined}
+                  onChange={(e) => setFilter('to', e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-lg px-2 py-2 text-[13px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+                />
+              </div>
+            </div>
+            {/* 보관처 — 드롭다운 검색 */}
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-[12px] font-bold text-gray-500 mb-1">보관처</label>
+              <input
+                list="lot-storage-options"
+                value={filters.storage}
+                onChange={(e) => setFilter('storage', e.target.value)}
+                placeholder="전체"
+                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-[14px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+              />
+              <datalist id="lot-storage-options">
+                {storageOptions.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </div>
+            <FilterField className="flex-1 min-w-[110px]" label="규격" value={filters.spec} onChange={(v) => setFilter('spec', v)} placeholder="예: 11" />
+            <FilterField className="flex-1 min-w-[110px]" label="미수" value={filters.misu} onChange={(v) => setFilter('misu', v)} placeholder="예: 42/44" />
+            <FilterField className="flex-1 min-w-[110px]" label="원산지" value={filters.origin} onChange={(v) => setFilter('origin', v)} placeholder="예: 국산" />
+            {/* 보관일수 (최소) */}
+            <div className="flex-1 min-w-[130px]">
+              <label className="block text-[12px] font-bold text-gray-500 mb-1">보관일수</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  value={filters.minDays}
+                  onChange={(e) => setFilter('minDays', e.target.value)}
+                  placeholder="예: 90"
+                  className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-[14px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+                />
+                <span className="text-gray-400 text-[13px] whitespace-nowrap">일↑</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 mt-4">
+            <button
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              disabled={activeFilterCount === 0}
+              className="px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-gray-700 disabled:text-gray-300 transition-colors"
+            >
+              초기화
+            </button>
+            <button
+              onClick={() => setShowFilter(false)}
+              className="px-4 py-2 bg-[#191F28] text-white text-[13px] font-bold rounded-lg active:scale-95 transition-transform"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 다중선택 툴바 — 선택 시에만 노출 */}
+      {selectedVisible.length > 0 && (
+        <div className="mb-3 flex items-center gap-3 flex-wrap rounded-xl bg-[#3182F6]/5 border border-[#3182F6]/20 px-4 py-3">
+          <span className="text-[13px] font-bold text-gray-800">
+            {selectedVisible.length}건 선택
+            {selectedValuation > 0 && (
+              <span className="ml-2 text-gray-500">· 평가액 {formatIntKo(selectedValuation)}원</span>
+            )}
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#3182F6] text-white font-bold text-[13px] rounded-lg hover:bg-[#1c6ce0] active:scale-95 transition-all"
+            >
+              <PrinterIcon className="w-4 h-4" /> 재고장 인쇄
+            </button>
+            <button
+              onClick={handleCsv}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold text-[13px] rounded-lg hover:bg-gray-50 active:scale-95 transition-all"
+            >
+              <ArrowDownTrayIcon className="w-4 h-4" /> CSV
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="px-3 py-2 text-gray-400 font-bold text-[13px] hover:text-gray-600 transition-colors"
+            >
+              해제
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {isLoading ? (
@@ -144,14 +418,28 @@ export default function LotsMasterPage() {
             <table className="w-full text-[13px]">
               <thead className="bg-gray-50 sticky top-0">
                 <tr className="text-left font-bold text-gray-500 text-[12px]">
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleAllVisible}
+                      aria-label="보이는 항목 전체 선택"
+                      className="w-4 h-4 accent-[#3182F6] cursor-pointer align-middle"
+                    />
+                  </th>
                   <Th label="LOT번호" field="lotNumber" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th label="최초입고일" field="firstInboundDate" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="품목명" field="productName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <th className="px-4 py-3">규격</th>
                   <th className="px-4 py-3">미수</th>
                   <Th label="재고수량" field="stockQty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th label="총중량" field="stockWeight" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th label="수매가" field="purchasePrice" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th label="판매원가" field="costPerBox" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th label="평가액" field="valuation" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="보관처" field="storageName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th label="보관일수" field="daysHeld" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <th className="px-4 py-3">상태</th>
-                  <Th label="최초입고일" field="firstInboundDate" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                 </tr>
               </thead>
               <tbody>
@@ -166,17 +454,42 @@ export default function LotsMasterPage() {
                             )
                         : undefined
                     }
-                    title={l.lotNumber ? '클릭해 LOT 생애주기 보기' : undefined}
+                    title={l.lotNumber ? '클릭해 LOT 생애주기·원가 보기' : undefined}
                     className={`border-t border-gray-100 hover:bg-blue-50/40 transition-colors ${l.lotNumber ? 'cursor-pointer' : ''}`}
                   >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(l.id)}
+                        onChange={() => toggleOne(l.id)}
+                        aria-label="선택"
+                        className="w-4 h-4 accent-[#3182F6] cursor-pointer align-middle"
+                      />
+                    </td>
                     <td className="px-4 py-3 font-bold text-gray-900">{l.lotNumber || '-'}</td>
+                    <td className="px-4 py-3 text-gray-500">{l.firstInboundDate || '-'}</td>
                     <td className="px-4 py-3 font-bold text-gray-900">{l.productName || '-'}</td>
                     <td className="px-4 py-3 text-gray-500">{formatSpec(l.spec)}</td>
                     <td className="px-4 py-3 text-gray-500">{formatMisu(l.misu)}</td>
                     <td className={`px-4 py-3 font-bold ${l.stockQty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`}>
                       {formatIntKo(l.stockQty)}박스
                     </td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">
+                      {l.stockWeight > 0 ? `${formatIntKo(l.stockWeight)} kg` : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 tabular-nums">
+                      {l.purchasePrice > 0 ? `${formatIntKo(Math.round(l.purchasePrice))}원` : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 tabular-nums">
+                      {l.costPerBox > 0 ? `${formatIntKo(Math.round(l.costPerBox))}원` : '-'}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-gray-900 tabular-nums">
+                      {l.costPerBox > 0 ? `${formatIntKo(l.valuation)}원` : '-'}
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{l.storageName || '-'}</td>
+                    <td className="px-4 py-3 text-gray-500 tabular-nums">
+                      {l.firstInboundDate ? `${formatIntKo(l.daysHeld)}일` : '-'}
+                    </td>
                     <td className="px-4 py-3">
                       {l.statusReason ? (
                         <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold ${statusColor(l.status)}`}>
@@ -186,10 +499,31 @@ export default function LotsMasterPage() {
                         <span className="text-gray-300">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{l.firstInboundDate || '-'}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-200 bg-gray-50 font-black text-gray-800 text-[13px]">
+                  <td className="px-4 py-3" colSpan={6}>
+                    합계{' '}
+                    <span className="text-gray-400 font-bold">
+                      ({summaryIsSelection ? `선택 ${selectedVisible.length}건` : `${visible.length}건`})
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-[#3182F6]">{formatIntKo(sumQty)}박스</td>
+                  <td className="px-4 py-3 tabular-nums text-gray-700">
+                    {sumWeight > 0 ? `${formatIntKo(sumWeight)} kg` : '-'}
+                  </td>
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3 tabular-nums text-gray-900">
+                    {sumVal > 0 ? `${formatIntKo(sumVal)}원` : '-'}
+                  </td>
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3" />
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
@@ -214,6 +548,33 @@ function statusColor(status: string): string {
     default:
       return 'bg-gray-50 text-gray-400';
   }
+}
+
+function FilterField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  className,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <label className="block text-[12px] font-bold text-gray-500 mb-1">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-[14px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+      />
+    </div>
+  );
 }
 
 function StatusChip({

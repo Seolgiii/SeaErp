@@ -116,15 +116,15 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
       className="min-h-screen bg-[#F2F4F6] flex"
       style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
     >
-      {/* 사이드바 */}
-      <aside className="w-60 bg-white border-r border-gray-100 shrink-0 flex flex-col">
+      {/* 사이드바 — 뷰포트 높이로 고정(엑셀 틀고정): 헤더는 위 고정, 카테고리만 내부 스크롤 */}
+      <aside className="w-60 bg-white border-r border-gray-100 shrink-0 flex flex-col sticky top-0 h-screen">
         <div className="px-6 py-5 border-b border-gray-100">
           <Link href="/admin/master" className="text-[18px] font-black text-gray-900 hover:text-[#3182F6] transition-colors">
             SEAERP
           </Link>
           <p className="text-[12px] font-bold text-gray-400 mt-1">관리자 시스템</p>
         </div>
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1">
           {NAV_GROUPS.map((group) => {
             const isCollapsed = collapsed.has(group.title);
             const activeChild = group.items.some((it) => it.href === pathname);

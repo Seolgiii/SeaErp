@@ -31,9 +31,9 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: '재고',
     items: [
-      { href: '/admin/master/lots', label: '재고(LOT별)', enabled: true },
+      { href: '/admin/master/lots', label: '재고 조회', enabled: true },
       { href: '/admin/master/inventory-summary', label: '재고 집계', enabled: true },
-      // LOT 생애주기는 메뉴에서 제외 — 재고(LOT별) 행 클릭으로 진입하는 drill-down 상세.
+      // LOT 생애주기는 메뉴에서 제외 — 재고 조회 행 클릭으로 진입하는 drill-down 상세.
       //   라우트(/admin/master/lot-timeline)는 그대로 존재하며 ?lot= 으로 자동 조회.
       // 음수·이상 LOT 모니터는 시스템·운영 카테고리로 이동.
     ],
@@ -51,7 +51,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: '원가·손익',
     items: [
-      // 집계·분석 전용. 개별 LOT 원가는 재고(LOT별) → LOT 상세 drill-down으로,
+      // 집계·분석 전용. 개별 LOT 원가는 재고 조회 → LOT 상세 drill-down으로,
       //   보관처 비용 이력은 기준정보라 마스터로 이동 → 'LOT 누적 비용'·'보관비 이력' 제거.
       { href: '/admin/master/cost/profit-trend', label: '손익 추이', enabled: false },
       { href: '/admin/master/cost/purchase-stats', label: '매입 통계', enabled: false },

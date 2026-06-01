@@ -114,6 +114,98 @@ export function calculateOutboundCost(input: OutboundCostInput): OutboundCostBre
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LOT 현재 원가 기준(cost basis) — PC 관리 화면 "LOT 상세 비용 섹션"용
+//
+// "오늘 기준으로 이 LOT을 전량 출고한다면 박스당 원가는 얼마인가"를 분해한다.
+// calculateOutboundCost(outQty=입고수량, outboundDate=오늘)의 박스당 환산과 동일하지만,
+// 화면 표시는 항목별 박스당 분해(이월은 별도 합산 1줄)가 필요해 별도 함수로 둔다.
+// 출고 스냅샷과 totalPerBox 값이 일치하도록 항목 합산식을 동일하게 유지한다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type LotCostBasisInput = {
+  /** LOT.수매가 (원/박스) */
+  purchasePrice: number;
+  /** LOT.냉장료단가 (원/박스/일) */
+  refrigerationFeePerUnit: number;
+  /** LOT.입출고비 (원/박스) */
+  inOutFee: number;
+  /** LOT.노조비 (원/박스) */
+  unionFee: number;
+  /** LOT.동결비 (원/박스) — 이동된 LOT은 0 (동결비 특례) */
+  freezeFee: number;
+  /** LOT.이월냉장료 (원, 총액) */
+  carriedRefrigeration: number;
+  /** LOT.이월입출고비 (원, 총액) */
+  carriedInOutFee: number;
+  /** LOT.이월노조비 (원, 총액) */
+  carriedUnionFee: number;
+  /** LOT.이월동결비 (원, 총액) */
+  carriedFreezeFee: number;
+  /** LOT.입고수량(BOX) — 이월(총액) → 박스당 환산 분모 */
+  inboxQty: number;
+  /** LOT.이동입고일 ?? LOT.최초입고일 (YYYY-MM-DD) — 냉장료 보관일수 기준 */
+  inboundDate: string;
+  /** 기준일 (보통 오늘, YYYY-MM-DD) */
+  asOfDate: string;
+};
+
+export type LotCostBasis = {
+  /** 보관일수 (inboundDate ~ asOfDate) */
+  daysHeld: number;
+  /** 박스당 매입가 = 수매가 */
+  purchasePerBox: number;
+  /** 박스당 냉장료 = 냉장료단가 × 보관일수 (현재 보관처분) */
+  refrigerationPerBox: number;
+  /** 박스당 입출고비 */
+  inOutPerBox: number;
+  /** 박스당 노조비 */
+  unionPerBox: number;
+  /** 박스당 동결비 */
+  freezePerBox: number;
+  /** 박스당 이월비용 = (이월 4종 합) / 입고수량 — 이동 안 된 LOT은 0 */
+  carriedPerBox: number;
+  /** 박스당 총원가 = 위 6항목 합 */
+  totalPerBox: number;
+};
+
+/**
+ * LOT의 오늘 기준 박스당 원가 분해.
+ *
+ * totalPerBox는 calculateOutboundCost(outQty=inboxQty, outboundDate=asOfDate)의
+ * totalCost / inboxQty 와 동일하다 (이월은 박스당으로 환산되어 합산).
+ */
+export function calculateLotCostBasis(input: LotCostBasisInput): LotCostBasis {
+  const daysHeld = daysBetween(input.inboundDate, input.asOfDate);
+  const refrigerationPerBox = input.refrigerationFeePerUnit * daysHeld;
+
+  const carriedTotal =
+    input.carriedRefrigeration +
+    input.carriedInOutFee +
+    input.carriedUnionFee +
+    input.carriedFreezeFee;
+  const carriedPerBox = input.inboxQty > 0 ? carriedTotal / input.inboxQty : 0;
+
+  const totalPerBox =
+    input.purchasePrice +
+    refrigerationPerBox +
+    input.inOutFee +
+    input.unionFee +
+    input.freezeFee +
+    carriedPerBox;
+
+  return {
+    daysHeld,
+    purchasePerBox: input.purchasePrice,
+    refrigerationPerBox,
+    inOutPerBox: input.inOutFee,
+    unionPerBox: input.unionFee,
+    freezePerBox: input.freezeFee,
+    carriedPerBox,
+    totalPerBox,
+  };
+}
+
 export type TransferPricingInput = {
   /** 원본 LOT.수매가 (원/박스) */
   purchasePrice: number;

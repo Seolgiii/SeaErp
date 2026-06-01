@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  calculateLotCostBasis,
   calculateOutboundCost,
   calculateTransferPricing,
   daysBetween,
@@ -331,5 +332,93 @@ describe("calculateTransferPricing (C안 + 동결비 특례)", () => {
     expect(Number.isInteger(r.newCarriedInOutFee)).toBe(true);
     // (0 + 1000/7) × 3 = 3000/7 ≈ 428.57 → 429
     expect(r.newCarriedInOutFee).toBe(429);
+  });
+});
+
+describe("calculateLotCostBasis", () => {
+  const base = {
+    purchasePrice: 10_000,
+    refrigerationFeePerUnit: 40, // 원/박스/일
+    inOutFee: 300,
+    unionFee: 140,
+    freezeFee: 100,
+    carriedRefrigeration: 0,
+    carriedInOutFee: 0,
+    carriedUnionFee: 0,
+    carriedFreezeFee: 0,
+    inboxQty: 20,
+    inboundDate: "2026-04-01",
+    asOfDate: "2026-05-16", // 45일
+  };
+
+  test("이동 안 된 LOT — 이월 0, 박스당 분해 합 = 총원가", () => {
+    const r = calculateLotCostBasis(base);
+    expect(r.daysHeld).toBe(45);
+    expect(r.purchasePerBox).toBe(10_000);
+    expect(r.refrigerationPerBox).toBe(1_800); // 40 × 45
+    expect(r.inOutPerBox).toBe(300);
+    expect(r.unionPerBox).toBe(140);
+    expect(r.freezePerBox).toBe(100);
+    expect(r.carriedPerBox).toBe(0);
+    expect(r.totalPerBox).toBe(12_340); // 10000+1800+300+140+100
+  });
+
+  test("이동 LOT — 이월(총액) 4종이 입고수량으로 박스당 환산되어 합산", () => {
+    const r = calculateLotCostBasis({
+      ...base,
+      carriedRefrigeration: 2_000,
+      carriedInOutFee: 1_000,
+      carriedUnionFee: 600,
+      carriedFreezeFee: 400, // 합 4000 / 20박스 = 200/박스
+    });
+    expect(r.carriedPerBox).toBe(200);
+    expect(r.totalPerBox).toBe(12_540); // 12340 + 200
+  });
+
+  test("totalPerBox는 calculateOutboundCost(전량·오늘).totalCost / 입고수량과 일치", () => {
+    const input = {
+      ...base,
+      carriedRefrigeration: 2_000,
+      carriedInOutFee: 1_000,
+      carriedUnionFee: 600,
+      carriedFreezeFee: 400,
+    };
+    const basis = calculateLotCostBasis(input);
+    const ob = calculateOutboundCost({
+      purchasePrice: input.purchasePrice,
+      totalWeight: 0, // unitCost는 비교 대상 아님
+      inboxQty: input.inboxQty,
+      refrigerationFeePerUnit: input.refrigerationFeePerUnit,
+      inOutFee: input.inOutFee,
+      unionFee: input.unionFee,
+      freezeFee: input.freezeFee,
+      carriedRefrigeration: input.carriedRefrigeration,
+      carriedInOutFee: input.carriedInOutFee,
+      carriedUnionFee: input.carriedUnionFee,
+      carriedFreezeFee: input.carriedFreezeFee,
+      saleAmount: 0,
+      inboundDate: input.inboundDate,
+      outboundDate: input.asOfDate,
+      outQty: input.inboxQty, // 전량
+    });
+    expect(basis.totalPerBox).toBeCloseTo(ob.totalCost / input.inboxQty, 6);
+  });
+
+  test("입고수량 0 — 이월 박스당 환산 분모 0이면 carriedPerBox = 0", () => {
+    const r = calculateLotCostBasis({
+      ...base,
+      inboxQty: 0,
+      carriedRefrigeration: 5_000,
+    });
+    expect(r.carriedPerBox).toBe(0);
+    // 박스당 기본 비용은 그대로 (수매가+냉장료+입출고+노조+동결)
+    expect(r.totalPerBox).toBe(12_340);
+  });
+
+  test("입고일 빈 값 — 보관일수 0 → 냉장료 0", () => {
+    const r = calculateLotCostBasis({ ...base, inboundDate: "" });
+    expect(r.daysHeld).toBe(0);
+    expect(r.refrigerationPerBox).toBe(0);
+    expect(r.totalPerBox).toBe(10_540); // 10000+0+300+140+100
   });
 });
