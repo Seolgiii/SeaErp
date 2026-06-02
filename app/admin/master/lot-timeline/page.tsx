@@ -118,7 +118,7 @@ export default function LotTimelinePage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-[14px] font-mono font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+            className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
           />
         </div>
         <button
@@ -149,7 +149,7 @@ export default function LotTimelinePage() {
             {/* 재고 정보 — 절반 폭에 맞춰 세로 구성(식별 정보 → 구분선 → 수량/상태) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
               <div>
-                <p className="font-mono font-black text-[18px] text-gray-900">
+                <p className="font-black text-[18px] text-gray-900">
                   {data.lotNumber}
                 </p>
                 <p className="text-[14px] font-bold text-gray-900 mt-1">
@@ -200,7 +200,11 @@ export default function LotTimelinePage() {
                   return (
                     <Fragment key={`${ev.recordId}-${i}`}>
                       {isBirth && <GenerationDivider event={ev} first={i === 0} />}
-                      <EventItem event={ev} currentLot={data.lotNumber} />
+                      <EventItem
+                        event={ev}
+                        currentLot={data.lotNumber}
+                        isLast={i === data.events.length - 1}
+                      />
                     </Fragment>
                   );
                 })}
@@ -229,9 +233,14 @@ function CostCard({ cost, stockQty }: { cost: LotCostInfo; stockQty: number }) {
     );
   }
 
-  const rows: { label: string; value: number }[] = [
+  const rows: { label: string; value: number; title?: string }[] = [
     { label: '수매가', value: cost.purchasePerBox },
-    { label: `냉장료 (${cost.daysHeld}일)`, value: cost.refrigerationPerBox },
+    {
+      label: `냉장료 (${cost.daysHeld}일)`,
+      value: cost.refrigerationPerBox,
+      title:
+        '현 보관처 입고일(이동 LOT은 이동입고일)부터 오늘까지. 재고 조회의 보관일수(최초입고 기준)와 다를 수 있음.',
+    },
     { label: '입출고비', value: cost.inOutPerBox },
     { label: '노조비', value: cost.unionPerBox },
     { label: '동결비', value: cost.freezePerBox },
@@ -257,7 +266,7 @@ function CostCard({ cost, stockQty }: { cost: LotCostInfo; stockQty: number }) {
                 key={r.label}
                 className="flex items-center justify-between gap-8 text-[13px]"
               >
-                <span className="text-gray-500">· {r.label}</span>
+                <span className="text-gray-500" title={r.title}>· {r.label}</span>
                 <span className="font-bold text-gray-700 tabular-nums">
                   {won(r.value)}
                 </span>
@@ -306,7 +315,7 @@ function GenerationDivider({ event, first }: { event: LifecycleEvent; first: boo
         }`}
       >
         <span>{isTransfer ? '🔁' : '📦'}</span>
-        {lotLabel && <span className="font-mono">{lotLabel}</span>}
+        {lotLabel && <span>{lotLabel}</span>}
         <span className="opacity-70">· {sub}</span>
       </span>
       <span className="h-px flex-1 bg-gradient-to-l from-transparent to-gray-200" />
@@ -317,9 +326,11 @@ function GenerationDivider({ event, first }: { event: LifecycleEvent; first: boo
 function EventItem({
   event,
   currentLot,
+  isLast,
 }: {
   event: LifecycleEvent;
   currentLot: string;
+  isLast: boolean;
 }) {
   const Icon = EVENT_ICON[event.type];
   const isTransfer = event.type === 'transfer-in' || event.type === 'transfer-out';
@@ -340,7 +351,7 @@ function EventItem({
         >
           <Icon className="w-5 h-5" />
         </div>
-        <div className="flex-1 w-px bg-gray-200 mt-1" />
+        {!isLast && <div className="flex-1 w-px bg-gray-200 mt-1" />}
       </div>
       <div className="flex-1 bg-gray-50 rounded-xl p-4 mb-1">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
@@ -360,7 +371,7 @@ function EventItem({
             </span>
             {showLotBadge && (
               <span
-                className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-gray-100 text-gray-500"
+                className="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-100 text-gray-500"
                 title="이동 전(원본) LOT의 기록"
               >
                 LOT {event.lotNumber}
@@ -382,7 +393,7 @@ function EventItem({
         <div className="text-[12px] text-gray-600 space-y-0.5">
           {/* 이동: LOT 전이 (원본 → 신규) — 이동 사건의 핵심 정보 */}
           {isTransfer && (event.fromLot || event.toLot) && (
-            <p className="flex items-center gap-1.5 font-mono font-bold text-gray-700">
+            <p className="flex items-center gap-1.5 font-bold text-gray-700">
               {event.fromLot && <span>{event.fromLot}</span>}
               {event.fromLot && event.toLot && (
                 <ArrowRightIcon className="w-3 h-3 text-gray-400" />

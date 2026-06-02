@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowsUpDownIcon,
@@ -159,14 +159,6 @@ export default function LotsMasterPage() {
   const sumWeight = summaryRows.reduce((s, l) => s + l.stockWeight, 0);
   const sumVal = summaryRows.reduce((s, l) => s + l.valuation, 0);
 
-  const toggleOne = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
   const toggleAllVisible = () =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -174,6 +166,38 @@ export default function LotsMasterPage() {
       else visible.forEach((l) => next.add(l.id));
       return next;
     });
+
+  // 드래그 선택 — 체크박스 컬럼에서 mousedown 후 아래/위로 드래그하면 구간 선택.
+  //   시작 행의 현재 선택 상태의 반대(target)를 드래그 구간 전체에 적용.
+  //   snapshot(드래그 시작 시점 선택)을 기준으로 매 행 진입마다 구간을 재계산 → 되돌리기 자연스러움.
+  const dragRef = useRef<{ start: number; target: boolean; snapshot: Set<string> } | null>(null);
+  useEffect(() => {
+    const end = () => {
+      dragRef.current = null;
+    };
+    window.addEventListener('mouseup', end);
+    return () => window.removeEventListener('mouseup', end);
+  }, []);
+  const applyDrag = (toIndex: number) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const next = new Set(d.snapshot);
+    const lo = Math.min(d.start, toIndex);
+    const hi = Math.max(d.start, toIndex);
+    for (let j = lo; j <= hi; j++) {
+      const id = visible[j]?.id;
+      if (!id) continue;
+      if (d.target) next.add(id);
+      else next.delete(id);
+    }
+    setSelected(next);
+  };
+  const onSelectMouseDown = (index: number, id: string, e: React.MouseEvent) => {
+    if (e.button !== 0) return; // 좌클릭만
+    e.preventDefault(); // 드래그 중 텍스트 선택 방지
+    dragRef.current = { start: index, target: !selected.has(id), snapshot: new Set(selected) };
+    applyDrag(index);
+  };
 
   // 재고장 인쇄 — 선택 LOT을 localStorage로 넘기고 새 탭에서 인쇄 화면 열기.
   const handlePrint = () => {
@@ -194,20 +218,23 @@ export default function LotsMasterPage() {
   const handleCsv = () => {
     if (selectedVisible.length === 0) return;
     const asOf = seoulToday();
-    const header = ['LOT번호', '품목명', '규격', '미수', '보관처', '재고수량(박스)', '박스당 판매원가(원)', '평가액(원)'];
+    const header = ['LOT번호', '품목명', '규격', '미수', '원산지', '보관처', '보관일수', '재고수량(박스)', '박스당 수매가(원)', '박스당 판매원가(원)', '평가액(원)'];
     const body = selectedVisible.map((l) => [
       l.lotNumber,
       l.productName,
       formatSpec(l.spec),
       formatMisu(l.misu),
+      l.origin,
       l.storageName,
+      l.firstInboundDate ? String(l.daysHeld) : '',
       String(l.stockQty),
+      l.purchasePrice > 0 ? String(Math.round(l.purchasePrice)) : '',
       l.costPerBox > 0 ? String(Math.round(l.costPerBox)) : '',
       l.costPerBox > 0 ? String(l.valuation) : '',
     ]);
     const totalQty = selectedVisible.reduce((s, l) => s + l.stockQty, 0);
     const totalVal = selectedVisible.reduce((s, l) => s + l.valuation, 0);
-    const footer = ['합계', '', '', '', '', String(totalQty), '', String(totalVal)];
+    const footer = ['합계', '', '', '', '', '', '', String(totalQty), '', '', String(totalVal)];
     const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
     const csv =
       '﻿' + [header, ...body, footer].map((r) => r.map(cell).join(',')).join('\n');
@@ -416,7 +443,7 @@ export default function LotsMasterPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr className="text-left font-bold text-gray-500 text-[12px]">
                   <th className="px-4 py-3 w-10">
                     <input
@@ -427,7 +454,7 @@ export default function LotsMasterPage() {
                       className="w-4 h-4 accent-[#3182F6] cursor-pointer align-middle"
                     />
                   </th>
-                  <Th label="LOT번호" field="lotNumber" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th label="LOT번호" field="lotNumber" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} thClassName="sticky left-0 z-30 bg-gray-50" />
                   <Th label="최초입고일" field="firstInboundDate" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="품목명" field="productName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <th className="px-4 py-3">규격</th>
@@ -438,13 +465,13 @@ export default function LotsMasterPage() {
                   <Th label="판매원가" field="costPerBox" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="평가액" field="valuation" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="보관처" field="storageName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="보관일수" field="daysHeld" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th label="보관일수" field="daysHeld" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} title="최초 입고일 기준 총 보관기간 (이동해도 원본 입고일 유지). 냉장료는 현 보관처 입고일 기준이라 더 짧을 수 있음." />
                   <th className="px-4 py-3">상태</th>
                   <th className="px-4 py-3">비고</th>
                 </tr>
               </thead>
               <tbody>
-                {visible.map((l) => (
+                {visible.map((l, idx) => (
                   <tr
                     key={l.id}
                     onClick={
@@ -458,16 +485,23 @@ export default function LotsMasterPage() {
                     title={l.lotNumber ? '클릭해 LOT 생애주기·원가 보기' : undefined}
                     className={`border-t border-gray-100 hover:bg-blue-50/40 transition-colors ${l.lotNumber ? 'cursor-pointer' : ''}`}
                   >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => onSelectMouseDown(idx, l.id, e)}
+                      onMouseEnter={() => {
+                        if (dragRef.current) applyDrag(idx);
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={selected.has(l.id)}
-                        onChange={() => toggleOne(l.id)}
+                        readOnly
                         aria-label="선택"
-                        className="w-4 h-4 accent-[#3182F6] cursor-pointer align-middle"
+                        className="w-4 h-4 accent-[#3182F6] cursor-pointer align-middle pointer-events-none"
                       />
                     </td>
-                    <td className="px-4 py-3 font-bold text-gray-900">{l.lotNumber || '-'}</td>
+                    <td className="px-4 py-3 font-bold text-gray-900 whitespace-nowrap sticky left-0 z-10 bg-white">{l.lotNumber || '-'}</td>
                     <td className="px-4 py-3 text-gray-500">{l.firstInboundDate || '-'}</td>
                     <td className="px-4 py-3 font-bold text-gray-900">{l.productName || '-'}</td>
                     <td className="px-4 py-3 text-gray-500">{formatSpec(l.spec)}</td>
@@ -624,12 +658,16 @@ function Th({
   sortField,
   sortDir,
   onToggle,
+  title,
+  thClassName = '',
 }: {
   label: string;
   field: SortField;
   sortField: SortField;
   sortDir: SortDir;
   onToggle: (f: SortField) => void;
+  title?: string;
+  thClassName?: string;
 }) {
   const Icon =
     sortField === field
@@ -640,7 +678,8 @@ function Th({
   return (
     <th
       onClick={() => onToggle(field)}
-      className="px-4 py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors"
+      title={title}
+      className={`px-4 py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors ${thClassName}`}
     >
       <span className="inline-flex items-center gap-1">
         {label}

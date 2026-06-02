@@ -27,6 +27,8 @@ type Row = {
   misu: string;
   lots: number;
   qty: number;
+  /** 현재 재고 총중량 합(kg) = Σ(박스당 무게 × 재고수량) */
+  weight: number;
   /** 현재고 평가액 합(원) = Σ(박스당 판매원가 × 재고수량) */
   valuation: number;
   /** 현재고에 묶인 누적 보관비 합(원) = Σ((박스당 판매원가 − 수매가) × 재고수량). 오늘 기준 */
@@ -104,15 +106,15 @@ export default function InventorySummaryPage() {
       const storage = l.storageName || '(미지정)';
       const product = l.productName || '(미지정)';
       let key: string;
-      let row: Omit<Row, 'lots' | 'qty' | 'valuation' | 'storageCost'>;
+      let row: Omit<Row, 'lots' | 'qty' | 'weight' | 'valuation' | 'storageCost'>;
       if (view === 'storage-product') {
-        key = `${storage}${product}${l.spec}${l.misu}`;
+        key = JSON.stringify([storage, product, l.spec, l.misu]);
         row = { key, storage, product, spec: l.spec, misu: l.misu };
       } else if (view === 'storage-only') {
         key = storage;
         row = { key, storage, product: '', spec: '', misu: '' };
       } else {
-        key = `${product}${l.spec}${l.misu}`;
+        key = JSON.stringify([product, l.spec, l.misu]);
         row = { key, storage: '', product, spec: l.spec, misu: l.misu };
       }
       // 보관비 = 박스당(판매원가 − 수매가) × 재고수량 — 현재고에 묶인 보관 비용분(오늘 기준).
@@ -122,6 +124,7 @@ export default function InventorySummaryPage() {
       if (prev) {
         prev.lots += 1;
         prev.qty += l.stockQty;
+        prev.weight += l.stockWeight;
         prev.valuation += l.valuation;
         prev.storageCost += lotStorageCost;
       } else {
@@ -129,6 +132,7 @@ export default function InventorySummaryPage() {
           ...row,
           lots: 1,
           qty: l.stockQty,
+          weight: l.stockWeight,
           valuation: l.valuation,
           storageCost: lotStorageCost,
         });
@@ -164,6 +168,7 @@ export default function InventorySummaryPage() {
     () => ({
       qty: rows.reduce((s, r) => s + r.qty, 0),
       lots: rows.reduce((s, r) => s + r.lots, 0),
+      weight: rows.reduce((s, r) => s + r.weight, 0),
       valuation: rows.reduce((s, r) => s + r.valuation, 0),
       storageCost: rows.reduce((s, r) => s + r.storageCost, 0),
     }),
@@ -221,7 +226,7 @@ export default function InventorySummaryPage() {
           <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고 집계</h1>
           <p className="text-[13px] text-gray-500 mt-1">
             {isLoading ? '집계 중...' : `${rows.length}행 · 총 ${formatIntKo(totals.qty)}박스 · ${totals.lots}LOT`}
-            <span className="ml-2 text-gray-400">(승인 완료 LOT 기준)</span>
+            <span className="ml-2 text-gray-400">(승인 완료·소진 LOT 기준)</span>
           </p>
         </div>
       </div>
@@ -309,6 +314,7 @@ export default function InventorySummaryPage() {
                   <col style={{ width: '140px' }} />
                   <col style={{ width: '90px' }} />
                   <col style={{ width: '130px' }} />
+                  <col style={{ width: '110px' }} />
                 </colgroup>
               )}
               {view === 'storage-only' && (
@@ -316,6 +322,7 @@ export default function InventorySummaryPage() {
                   <col />
                   <col style={{ width: '90px' }} />
                   <col style={{ width: '130px' }} />
+                  <col style={{ width: '110px' }} />
                   <col style={{ width: '140px' }} />
                   <col style={{ width: '140px' }} />
                 </colgroup>
@@ -328,6 +335,7 @@ export default function InventorySummaryPage() {
                   <col style={{ width: '140px' }} />
                   <col style={{ width: '90px' }} />
                   <col style={{ width: '130px' }} />
+                  <col style={{ width: '110px' }} />
                 </colgroup>
               )}
               <thead className="bg-gray-50 sticky top-0">
@@ -349,7 +357,7 @@ export default function InventorySummaryPage() {
                   ) : view === 'storage-only' ? (
                     <Th label="보관처" field="group" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} paddingX="px-3" />
                   ) : (
-                    <th className="px-3 py-3">품목</th>
+                    <Th label="품목" field="group" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} paddingX="px-3" />
                   )}
                   {view !== 'storage-only' && (
                     <>
@@ -360,6 +368,7 @@ export default function InventorySummaryPage() {
                   )}
                   <Th label="LOT 수" field="lots" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="재고 합계" field="qty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <th className="px-4 py-3" title="현재 재고 총중량(kg) = 박스당 무게 × 재고수량">총중량</th>
                   {view === 'storage-only' && (
                     <>
                       <th
@@ -406,6 +415,9 @@ export default function InventorySummaryPage() {
                     <td className={`px-4 py-3 font-bold ${r.qty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`}>
                       {formatIntKo(r.qty)}박스
                     </td>
+                    <td className="px-4 py-3 tabular-nums text-gray-600">
+                      {r.weight > 0 ? `${formatIntKo(r.weight)} kg` : '-'}
+                    </td>
                     {view === 'storage-only' && (
                       <>
                         <td className="px-4 py-3 tabular-nums text-gray-700">
@@ -429,6 +441,9 @@ export default function InventorySummaryPage() {
                   </td>
                   <td className="px-4 py-3">{totals.lots}</td>
                   <td className="px-4 py-3 text-[#3182F6]">{formatIntKo(totals.qty)}박스</td>
+                  <td className="px-4 py-3 tabular-nums text-gray-700">
+                    {totals.weight > 0 ? `${formatIntKo(totals.weight)} kg` : '-'}
+                  </td>
                   {view === 'storage-only' && (
                     <>
                       <td className="px-4 py-3 tabular-nums text-gray-700">

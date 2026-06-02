@@ -3,7 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldExclamationIcon, ArrowRightOnRectangleIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import {
+  ShieldExclamationIcon,
+  ArrowRightOnRectangleIcon,
+  ChevronDownIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
+  Bars3Icon,
+} from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired, clearSession } from '@/lib/session';
 import { NAV_GROUPS } from './_nav';
 
@@ -14,6 +21,7 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const NAV_COLLAPSE_KEY = 'seafood-erp:nav-collapsed';
+const NAV_RAIL_KEY = 'seafood-erp:nav-rail';
 // 자주 안 보는 카테고리는 기본 접힘 — 첫 진입 시 사이드바 짧게.
 const DEFAULT_COLLAPSED = ['마스터', '시스템·운영'];
 
@@ -35,6 +43,9 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
   const [workerName, setWorkerName] = useState<string>('');
   const [role, setRole] = useState<string>('');
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(DEFAULT_COLLAPSED));
+  // 사이드바 전체 접기(rail). railPinned=접힘 고정 / hovering=접힌 상태에서 마우스 올림(임시 펼침).
+  const [railPinned, setRailPinned] = useState(false);
+  const [hovering, setHovering] = useState(false);
 
   useEffect(() => {
     const session = readSession();
@@ -71,6 +82,24 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
       return next;
     });
   }, [pathname]);
+
+  // rail 접힘 상태 복원
+  useEffect(() => {
+    try {
+      setRailPinned(window.localStorage.getItem(NAV_RAIL_KEY) === '1');
+    } catch {
+      /* 기본값 유지 */
+    }
+  }, []);
+
+  const setRail = (next: boolean) => {
+    setRailPinned(next);
+    try {
+      window.localStorage.setItem(NAV_RAIL_KEY, next ? '1' : '0');
+    } catch {
+      /* 무시 */
+    }
+  };
 
   const toggleCollapse = (title: string) => {
     setCollapsed((prev) => {
@@ -111,19 +140,69 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
     );
   }
 
+  // 접힘 고정이 아니거나(펼침) 마우스를 올린 동안(임시 펼침) 펼쳐서 보여준다.
+  const expanded = !railPinned || hovering;
+
   return (
     <div
       className="min-h-screen bg-[#F2F4F6] flex"
       style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
     >
-      {/* 사이드바 — 뷰포트 높이로 고정(엑셀 틀고정): 헤더는 위 고정, 카테고리만 내부 스크롤 */}
-      <aside className="w-60 bg-white border-r border-gray-100 shrink-0 flex flex-col sticky top-0 h-screen">
-        <div className="px-6 py-5 border-b border-gray-100">
-          <Link href="/admin/master" className="text-[18px] font-black text-gray-900 hover:text-[#3182F6] transition-colors">
-            SEAERP
-          </Link>
-          <p className="text-[12px] font-bold text-gray-400 mt-1">관리자 시스템</p>
-        </div>
+      {/* 사이드바 — rail 접기 지원: 우상단 토글로 접힘 고정, 접힌 상태에서 마우스 올리면 임시 펼침(flyout).
+          aside는 폭만 차지하는 스페이서(접힘 w-12 / 펼침 w-60), 실제 패널은 absolute라 flyout이 본문을 밀지 않고 덮는다. */}
+      <aside
+        className={`shrink-0 sticky top-0 h-screen z-40 transition-[width] duration-200 ${railPinned ? 'w-12' : 'w-60'}`}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+      >
+        <div
+          className={`absolute inset-y-0 left-0 h-screen bg-white border-r border-gray-100 flex flex-col transition-[width] duration-200 ${
+            expanded ? 'w-60' : 'w-12'
+          } ${railPinned && hovering ? 'shadow-2xl' : ''}`}
+        >
+          {!expanded ? (
+            // 접힘(rail) — 펼치기 버튼만. 마우스 올리면(hovering) 아래 펼침 분기로 전환.
+            <div className="flex flex-col items-center py-4">
+              <button
+                type="button"
+                onClick={() => setRail(false)}
+                title="사이드바 펼치기"
+                aria-label="사이드바 펼치기"
+                className="p-2 rounded-lg text-gray-400 hover:text-[#3182F6] hover:bg-gray-50 active:scale-95 transition-all"
+              >
+                <Bars3Icon className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="px-6 py-5 border-b border-gray-100 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <Link href="/admin/master" className="text-[18px] font-black text-gray-900 hover:text-[#3182F6] transition-colors">
+                    SEAERP
+                  </Link>
+                  <p className="text-[12px] font-bold text-gray-400 mt-1">관리자 시스템</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (railPinned) {
+                      setRail(false); // flyout에서 고정 펼치기
+                    } else {
+                      setRail(true);
+                      setHovering(false); // 마우스가 위에 있어도 즉시 접힘
+                    }
+                  }}
+                  title={railPinned ? '사이드바 고정 펼치기' : '사이드바 접기'}
+                  aria-label={railPinned ? '사이드바 고정 펼치기' : '사이드바 접기'}
+                  className="shrink-0 p-1.5 -mr-1.5 rounded-lg text-gray-400 hover:text-[#3182F6] hover:bg-gray-50 active:scale-95 transition-all"
+                >
+                  {railPinned ? (
+                    <ChevronDoubleRightIcon className="w-5 h-5" />
+                  ) : (
+                    <ChevronDoubleLeftIcon className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
         <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1">
           {NAV_GROUPS.map((group) => {
             const isCollapsed = collapsed.has(group.title);
@@ -205,6 +284,9 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
           <p className="px-3 mt-2 text-[10px] font-bold text-gray-300">
             Phase 3 IA 미정착 — URL은 phase 후반 정리
           </p>
+        </div>
+            </>
+          )}
         </div>
       </aside>
 

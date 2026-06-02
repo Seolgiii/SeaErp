@@ -532,7 +532,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <ul className="text-[12px] font-medium text-green-700 space-y-1 pl-7">
                     {bulkResult.results.filter((r) => r.success).map((r) => (
-                      <li key={r.recordId} className="truncate font-mono">{r.lotNumber}</li>
+                      <li key={r.recordId} className="truncate">{r.lotNumber}</li>
                     ))}
                   </ul>
                 </div>
@@ -548,7 +548,7 @@ export default function AdminDashboardPage() {
                   <ul className="space-y-2 pl-7">
                     {bulkResult.results.filter((r) => !r.success).map((r) => (
                       <li key={r.recordId} className="text-[12px]">
-                        <p className="font-bold text-gray-800 truncate font-mono">{r.lotNumber}</p>
+                        <p className="font-bold text-gray-800 truncate">{r.lotNumber}</p>
                         <p className="text-gray-500 mt-0.5">{r.message ?? "알 수 없는 오류"}</p>
                       </li>
                     ))}

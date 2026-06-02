@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isSessionExpired, readSession, writeSession } from "@/lib/session";
+import { APP_VERSION } from "@/lib/version";
 
 /**
  * PC 전용 로그인 — split-screen (좌: 브랜드 파노라마 / 우: 작업자 그리드 → PIN).
@@ -259,16 +260,9 @@ export function WorkerPinLoginDesktop() {
           </p>
         </div>
 
-        {/* 중단 — 기능 캘러우트 */}
-        <ul className="relative space-y-3.5 text-white/85">
-          <FeatureItem>입고·출고·재고 일괄 관리</FeatureItem>
-          <FeatureItem>결재·원가·손익 자동 집계</FeatureItem>
-          <FeatureItem>LOT 자동번호 + QR 추적</FeatureItem>
-        </ul>
-
-        {/* 하단 — 작은 메타 */}
+        {/* 하단 — 작은 메타 + 버전 (연도 오른쪽) */}
         <p className="relative text-[12px] font-medium text-white/60 tracking-tight">
-          관리자 시스템 · PC 전용 · {new Date().getFullYear()}
+          관리자 시스템 · PC 전용 · {new Date().getFullYear()} · v{APP_VERSION}
         </p>
       </aside>
 
@@ -300,15 +294,6 @@ export function WorkerPinLoginDesktop() {
         </div>
       </section>
     </div>
-  );
-}
-
-function FeatureItem({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex items-center gap-3 text-[15px] font-medium">
-      <span className="w-1.5 h-1.5 rounded-full bg-white/60 shrink-0" />
-      {children}
-    </li>
   );
 }
 

@@ -22,6 +22,7 @@ import { getMyRequests } from '@/app/actions';
 import { getHealthSummary, type HealthSummary } from '@/app/actions/admin/master-health';
 import { PENDING_STATUSES } from '@/app/components/approval-card-shared';
 import { NAV_GROUPS, type NavGroup } from './_nav';
+import { APP_VERSION } from '@/lib/version';
 
 /**
  * PC 관리자 홈 (control center).
@@ -231,6 +232,9 @@ export default function MasterHomePage() {
           <CategoryCard key={group.title} group={group} />
         ))}
       </div>
+
+      {/* 좌측 하단 버전 — 사용자가 현재 배포 버전을 보고 판단 */}
+      <p className="mt-10 text-[11px] font-bold text-gray-300">SEAERP v{APP_VERSION}</p>
     </div>
   );
 }

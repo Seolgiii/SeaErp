@@ -25,6 +25,7 @@ export default function LedgerPrintPage() {
   const router = useRouter();
   const [payload, setPayload] = useState<LedgerPayload | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [printedAt, setPrintedAt] = useState('');
 
   useEffect(() => {
     try {
@@ -33,6 +34,18 @@ export default function LedgerPrintPage() {
     } catch {
       /* 무시 — 아래 빈 화면 안내 */
     }
+    // 출력 일시(인쇄 시점) — 서울 기준 날짜·시각.
+    setPrintedAt(
+      new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date()),
+    );
     setLoaded(true);
   }, []);
 
@@ -80,23 +93,27 @@ export default function LedgerPrintPage() {
       </div>
 
       {/* 재고장 본문 (A4) */}
-      <div className="ledger-doc mx-auto max-w-[800px] px-10 py-8">
-        <div className="flex items-end justify-between border-b-2 border-gray-900 pb-3">
-          <h1 className="text-[26px] font-black tracking-tight">재고장</h1>
-          <p className="text-[13px] font-bold text-gray-600">
+      <div className="ledger-doc mx-auto max-w-[1100px] px-10 py-8">
+        <div className="flex items-end gap-4 border-b-2 border-gray-900 pb-3">
+          <p className="flex-1 text-[12px] font-bold text-gray-500">출력 {printedAt}</p>
+          <h1 className="text-[26px] font-black tracking-tight text-center">재고장</h1>
+          <p className="flex-1 text-right text-[13px] font-bold text-gray-600">
             기준일 {asOf} · 총 {lots.length}건
           </p>
         </div>
 
         <table className="w-full mt-5 text-[12px] border-collapse">
           <thead>
-            <tr className="border-b border-gray-300 text-left text-gray-500">
-              <th className="py-2 pr-2 font-bold">LOT번호</th>
+            <tr className="border-b border-gray-300 text-center text-gray-500">
+              <th className="py-2 pr-2 font-bold text-left">LOT번호</th>
               <th className="py-2 px-2 font-bold">품목</th>
               <th className="py-2 px-2 font-bold">규격</th>
               <th className="py-2 px-2 font-bold">미수</th>
+              <th className="py-2 px-2 font-bold">원산지</th>
               <th className="py-2 px-2 font-bold">보관처</th>
+              <th className="py-2 px-2 font-bold text-right">보관일수</th>
               <th className="py-2 px-2 font-bold text-right">재고(박스)</th>
+              <th className="py-2 px-2 font-bold text-right">박스당 수매가</th>
               <th className="py-2 px-2 font-bold text-right">박스당 판매원가</th>
               <th className="py-2 pl-2 font-bold text-right">평가액</th>
             </tr>
@@ -104,12 +121,19 @@ export default function LedgerPrintPage() {
           <tbody>
             {lots.map((l) => (
               <tr key={l.id} className="border-b border-gray-100">
-                <td className="py-1.5 pr-2 font-mono font-bold">{l.lotNumber || '-'}</td>
-                <td className="py-1.5 px-2">{l.productName || '-'}</td>
-                <td className="py-1.5 px-2 text-gray-600">{formatSpec(l.spec)}</td>
-                <td className="py-1.5 px-2 text-gray-600">{formatMisu(l.misu)}</td>
-                <td className="py-1.5 px-2 text-gray-600">{l.storageName || '-'}</td>
+                <td className="py-1.5 pr-2 font-bold">{l.lotNumber || '-'}</td>
+                <td className="py-1.5 px-2 text-center">{l.productName || '-'}</td>
+                <td className="py-1.5 px-2 text-center text-gray-600">{formatSpec(l.spec)}</td>
+                <td className="py-1.5 px-2 text-center text-gray-600">{formatMisu(l.misu)}</td>
+                <td className="py-1.5 px-2 text-center text-gray-600">{l.origin || '-'}</td>
+                <td className="py-1.5 px-2 text-center text-gray-600">{l.storageName || '-'}</td>
+                <td className="py-1.5 px-2 text-right tabular-nums text-gray-600">
+                  {l.firstInboundDate ? `${formatIntKo(l.daysHeld)}일` : '-'}
+                </td>
                 <td className="py-1.5 px-2 text-right tabular-nums">{formatIntKo(l.stockQty)}</td>
+                <td className="py-1.5 px-2 text-right tabular-nums text-gray-600">
+                  {l.purchasePrice > 0 ? formatIntKo(Math.round(l.purchasePrice)) : '-'}
+                </td>
                 <td className="py-1.5 px-2 text-right tabular-nums">
                   {l.costPerBox > 0 ? formatIntKo(Math.round(l.costPerBox)) : '-'}
                 </td>
@@ -121,10 +145,12 @@ export default function LedgerPrintPage() {
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-gray-900 font-black">
-              <td className="py-2 pr-2" colSpan={5}>
+              <td className="py-2 pr-2" colSpan={6}>
                 합계
               </td>
+              <td className="py-2 px-2"></td>
               <td className="py-2 px-2 text-right tabular-nums">{formatIntKo(totalQty)}</td>
+              <td className="py-2 px-2"></td>
               <td className="py-2 px-2"></td>
               <td className="py-2 pl-2 text-right tabular-nums">{formatIntKo(totalVal)}원</td>
             </tr>
@@ -141,7 +167,15 @@ export default function LedgerPrintPage() {
         @media print {
           .no-print { display: none !important; }
           .ledger-doc { max-width: none; padding: 0; }
-          @page { size: A4 portrait; margin: 14mm; }
+          @page {
+            size: A4 landscape;
+            margin: 12mm 12mm 16mm;
+            @bottom-right {
+              content: "페이지 " counter(page) " / " counter(pages);
+              font-size: 10px;
+              color: #9ca3af;
+            }
+          }
         }
       `}</style>
     </div>

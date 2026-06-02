@@ -155,7 +155,7 @@ export default function ShipsMasterPage() {
                     <td className="px-4 py-3 text-gray-600">{s.company || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">{s.captain || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">{s.homePort || '-'}</td>
-                    <td className="px-4 py-3 font-mono text-gray-500">{s.licenseNo || '-'}</td>
+                    <td className="px-4 py-3 text-gray-500">{s.licenseNo || '-'}</td>
                     <td className="px-4 py-3 text-gray-500">{s.phone || '-'}</td>
                   </tr>
                 ))}

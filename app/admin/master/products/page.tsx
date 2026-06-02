@@ -168,7 +168,7 @@ export default function ProductsMasterPage() {
                     className="border-t border-gray-100 hover:bg-blue-50/40 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 font-bold text-gray-900">{p.name || '-'}</td>
-                    <td className="px-4 py-3 font-mono text-gray-600">{p.code || '-'}</td>
+                    <td className="px-4 py-3 text-gray-600">{p.code || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">{p.category || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">{p.spec || '-'}</td>
                     <td className="px-4 py-3 text-gray-500">{p.detailSpec || '-'}</td>

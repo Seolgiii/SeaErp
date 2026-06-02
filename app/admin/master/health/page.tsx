@@ -249,7 +249,7 @@ function NegativeStockTable({ items }: { items: NegativeStockLot[] }) {
         <tbody>
           {items.map((it) => (
             <tr key={it.id} className="border-t border-gray-100">
-              <td className="px-4 py-3 font-mono font-bold text-blue-700">{it.lotNumber || '-'}</td>
+              <td className="px-4 py-3 font-bold text-blue-700">{it.lotNumber || '-'}</td>
               <td className="px-4 py-3 font-bold text-gray-900">{it.productName || '-'}</td>
               <td className="px-4 py-3 text-gray-600">{it.storageName || '-'}</td>
               <td className="px-4 py-3 font-bold text-red-600">
