@@ -54,7 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // 집계·분석 전용. 개별 LOT 원가는 재고 조회 → LOT 상세 drill-down으로,
       //   보관처 비용 이력은 기준정보라 마스터로 이동 → 'LOT 누적 비용'·'보관비 이력' 제거.
       { href: '/admin/master/cost/profit-trend', label: '손익 추이', enabled: true },
-      { href: '/admin/master/cost/purchase-stats', label: '매입 통계', enabled: false },
+      { href: '/admin/master/cost/purchase-stats', label: '매입 통계', enabled: true },
       { href: '/admin/master/cost/erp-export', label: '외부 ERP export', enabled: false },
     ],
   },

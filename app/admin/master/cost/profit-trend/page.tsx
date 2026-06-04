@@ -53,9 +53,9 @@ function presetRange(preset: Preset): { from: string; to: string } {
   return { from: `${t.slice(0, 4)}-01-01`, to: t };
 }
 
-const won = (n: number) => `₩${formatIntKo(Math.round(n))}`;
+const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
 const signedWon = (n: number) =>
-  n < 0 ? `-₩${formatIntKo(Math.abs(Math.round(n)))}` : `₩${formatIntKo(Math.round(n))}`;
+  n < 0 ? `-${formatIntKo(Math.abs(Math.round(n)))}원` : `${formatIntKo(Math.round(n))}원`;
 const pct = (g: number, base: number) =>
   base > 0 ? `${((g / base) * 100).toFixed(1)}%` : '—';
 
@@ -419,51 +419,47 @@ export default function ProfitTrendPage() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-[13px]">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
-                    <th className="px-3 py-2 text-left font-medium">
-                      {tab === 'product' ? '품목' : '판매처'}
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium">매출</th>
-                    <th className="px-3 py-2 text-right font-medium">매출원가</th>
-                    <th className="px-3 py-2 text-right font-medium">매출총이익</th>
-                    <th className="px-3 py-2 text-right font-medium">마진율</th>
-                    <th className="px-3 py-2 text-right font-medium">수량</th>
-                    <th className="px-3 py-2 text-right font-medium">건</th>
+                  <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
+                    <th className="px-4 py-3">{tab === 'product' ? '품목' : '판매처'}</th>
+                    <th className="px-4 py-3">매출</th>
+                    <th className="px-4 py-3">매출원가</th>
+                    <th className="px-4 py-3">매출총이익</th>
+                    <th className="px-4 py-3">마진율</th>
+                    <th className="px-4 py-3">수량</th>
+                    <th className="px-4 py-3">건</th>
                   </tr>
                 </thead>
                 <tbody>
                   {shownBreakdown.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-8 text-center text-sm text-gray-400">
+                      <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
                         {breakdownSearch.trim() ? '검색 결과 없음' : '데이터 없음'}
                       </td>
                     </tr>
                   ) : (
                     shownBreakdown.map((r) => (
-                      <tr key={r.name} className="border-b border-gray-100 last:border-0">
-                        <td className="px-3 py-2 text-gray-700">{r.name}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-gray-700">
+                      <tr key={r.name} className="border-t border-gray-100">
+                        <td className="px-4 py-3 font-bold text-gray-900">{r.name}</td>
+                        <td className="px-4 py-3 tabular-nums text-gray-700">
                           {won(r.revenue)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-gray-500">
-                          {won(r.cogs)}
-                        </td>
+                        <td className="px-4 py-3 tabular-nums text-gray-500">{won(r.cogs)}</td>
                         <td
-                          className={`px-3 py-2 text-right tabular-nums font-medium ${
+                          className={`px-4 py-3 tabular-nums font-bold ${
                             r.grossProfit >= 0 ? 'text-[#00C471]' : 'text-[#ef4444]'
                           }`}
                         >
                           {signedWon(r.grossProfit)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-gray-500">
+                        <td className="px-4 py-3 tabular-nums text-gray-500">
                           {pct(r.grossProfit, r.marginRevenue)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-gray-500">
-                          {formatIntKo(r.qty)}
+                        <td className="px-4 py-3 tabular-nums text-gray-500">
+                          {formatIntKo(r.qty)}박스
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-gray-400">
+                        <td className="px-4 py-3 tabular-nums text-gray-400">
                           {formatIntKo(r.count)}
                         </td>
                       </tr>
@@ -476,18 +472,18 @@ export default function ProfitTrendPage() {
 
           {/* 추이 표 */}
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full text-sm">
+            <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-xs text-gray-500">
-                  <th className="px-3 py-2 text-left font-medium">기간</th>
-                  <th className="px-3 py-2 text-right font-medium">매출</th>
-                  <th className="px-3 py-2 text-right font-medium">매출원가</th>
-                  <th className="px-3 py-2 text-right font-medium">매출총이익</th>
-                  <th className="px-3 py-2 text-right font-medium">마진율</th>
-                  <th className="px-3 py-2 text-left font-medium" style={{ width: 180 }}>
+                <tr className="border-b border-gray-200 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
+                  <th className="px-4 py-3">기간</th>
+                  <th className="px-4 py-3">매출</th>
+                  <th className="px-4 py-3">매출원가</th>
+                  <th className="px-4 py-3">매출총이익</th>
+                  <th className="px-4 py-3">마진율</th>
+                  <th className="px-4 py-3" style={{ width: 180 }}>
                     이익 추이
                   </th>
-                  <th className="px-3 py-2 text-right font-medium">현금흐름</th>
+                  <th className="px-4 py-3">현금흐름</th>
                 </tr>
               </thead>
               <tbody>
@@ -495,25 +491,23 @@ export default function ProfitTrendPage() {
                   const positive = p.grossProfit >= 0;
                   const w = (Math.abs(p.grossProfit) / maxGross) * 100;
                   return (
-                    <tr key={p.key} className="border-b border-gray-100 last:border-0">
-                      <td className="whitespace-nowrap px-3 py-2 text-gray-700">{p.label}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-gray-700">
-                        {won(p.revenue)}
+                    <tr key={p.key} className="border-t border-gray-100">
+                      <td className="whitespace-nowrap px-4 py-3 font-bold text-gray-900">
+                        {p.label}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-gray-500">
-                        {won(p.cogs)}
-                      </td>
+                      <td className="px-4 py-3 tabular-nums text-gray-700">{won(p.revenue)}</td>
+                      <td className="px-4 py-3 tabular-nums text-gray-500">{won(p.cogs)}</td>
                       <td
-                        className={`px-3 py-2 text-right tabular-nums font-medium ${
+                        className={`px-4 py-3 tabular-nums font-bold ${
                           positive ? 'text-[#00C471]' : 'text-[#ef4444]'
                         }`}
                       >
                         {signedWon(p.grossProfit)}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-gray-500">
+                      <td className="px-4 py-3 tabular-nums text-gray-500">
                         {pct(p.grossProfit, p.marginRevenue)}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         <div className="h-2.5 w-full rounded-full bg-gray-100">
                           <div
                             className={`h-2.5 rounded-full ${
@@ -524,7 +518,7 @@ export default function ProfitTrendPage() {
                         </div>
                       </td>
                       <td
-                        className={`px-3 py-2 text-right tabular-nums ${
+                        className={`px-4 py-3 tabular-nums ${
                           p.cashFlow >= 0 ? 'text-gray-700' : 'text-[#ef4444]'
                         }`}
                       >
@@ -535,23 +529,23 @@ export default function ProfitTrendPage() {
                 })}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-[#191F28]">
-                  <td className="px-3 py-2">합계</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{won(totals.revenue)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{won(totals.cogs)}</td>
+                <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold text-[#191F28]">
+                  <td className="px-4 py-3">합계</td>
+                  <td className="px-4 py-3 tabular-nums">{won(totals.revenue)}</td>
+                  <td className="px-4 py-3 tabular-nums">{won(totals.cogs)}</td>
                   <td
-                    className={`px-3 py-2 text-right tabular-nums ${
+                    className={`px-4 py-3 tabular-nums ${
                       totals.grossProfit >= 0 ? 'text-[#00C471]' : 'text-[#ef4444]'
                     }`}
                   >
                     {signedWon(totals.grossProfit)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td className="px-4 py-3 tabular-nums">
                     {pct(totals.grossProfit, totals.marginRevenue)}
                   </td>
-                  <td className="px-3 py-2" />
+                  <td className="px-4 py-3" />
                   <td
-                    className={`px-3 py-2 text-right tabular-nums ${
+                    className={`px-4 py-3 tabular-nums ${
                       totals.cashFlow >= 0 ? '' : 'text-[#ef4444]'
                     }`}
                   >
