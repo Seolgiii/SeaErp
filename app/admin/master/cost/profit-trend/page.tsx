@@ -408,13 +408,13 @@ export default function ProfitTrendPage() {
                 </button>
               ))}
               <div className="relative my-1.5 ml-auto">
-                <MagnifyingGlassIcon className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   value={breakdownSearch}
                   onChange={(e) => setBreakdownSearch(e.target.value)}
-                  placeholder={tab === 'product' ? '품목 검색' : '판매처 검색'}
-                  className="w-44 rounded-lg border border-gray-300 py-1 pl-7 pr-2.5 text-sm"
+                  placeholder={tab === 'product' ? '품목명 검색' : '판매처명 검색'}
+                  className="w-44 rounded-lg border border-gray-200 py-1 pl-[31px] pr-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
                 />
               </div>
             </div>
