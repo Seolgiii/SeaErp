@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ShieldExclamationIcon,
@@ -10,9 +10,12 @@ import {
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
   Bars3Icon,
+  ArrowTopRightOnSquareIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired, clearSession } from '@/lib/session';
 import { NAV_GROUPS } from './_nav';
+import AdminTabBar from './_tab-bar';
 
 const ROLE_LABEL: Record<string, string> = {
   MASTER: '마스터',
@@ -36,9 +39,10 @@ const DEFAULT_COLLAPSED = ['마스터', '시스템·운영'];
  * 모바일 BottomTabBar/PageHeader 패턴과 분리. PC 전용 시작 (반응형은 추후).
  */
 
-export default function MasterAdminLayout({ children }: { children: React.ReactNode }) {
+function MasterAdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [workerName, setWorkerName] = useState<string>('');
   const [role, setRole] = useState<string>('');
@@ -46,6 +50,22 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
   // 사이드바 전체 접기(rail). railPinned=접힘 고정 / hovering=접힌 상태에서 마우스 올림(임시 펼침).
   const [railPinned, setRailPinned] = useState(false);
   const [hovering, setHovering] = useState(false);
+
+  // 임베드(맨몸) 모드 — 분할 칸(iframe)으로 자기 자신을 띄울 때 사이드바·탭바 없이 본문만.
+  // pane=1로 진입하나 칸 내부 필터 변경 시 useSyncQueryParams가 쿼리를 통째로 새로 써 pane=1이
+  // 날아갈 수 있어 sessionStorage로 고정(sticky). 최상위 창은 self===top 가드로 절대 맨몸 안 됨.
+  const embedParam = searchParams.get('pane') === '1';
+  const [embed, setEmbed] = useState(embedParam);
+
+  // 창 안 분할 — 오른쪽 칸에 띄울 화면(없으면 분할 안 함) + 좌우 폭 비율 + 드래그 상태
+  const [split, setSplit] = useState<{ url: string; label: string } | null>(null);
+  const [ratio, setRatio] = useState(0.5); // 왼쪽 칸 폭 비율 (0.2~0.8)
+  const [dragging, setDragging] = useState(false);
+  const splitRowRef = useRef<HTMLDivElement | null>(null);
+
+  const openSplit = useCallback((url: string, label: string) => {
+    setSplit({ url, label });
+  }, []);
 
   useEffect(() => {
     const session = readSession();
@@ -92,6 +112,49 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
     }
   }, []);
 
+  // 임베드 판정 — iframe 안에서만, pane 파라미터 또는 sticky 플래그로. 최상위 창은 항상 풀 레이아웃.
+  useEffect(() => {
+    let framed = false;
+    try {
+      framed = window.self !== window.top;
+    } catch {
+      framed = true; // 접근 차단 = 프레임 안으로 간주
+    }
+    if (!framed) {
+      setEmbed(false);
+      return;
+    }
+    if (embedParam) {
+      try { window.sessionStorage.setItem('seafood-erp:pane', '1'); } catch {}
+      setEmbed(true);
+      return;
+    }
+    try {
+      setEmbed(window.sessionStorage.getItem('seafood-erp:pane') === '1');
+    } catch {
+      /* 무시 */
+    }
+  }, [embedParam]);
+
+  // 분할 구분선 드래그 — 좌우 비율 조절. iframe이 마우스 이벤트를 삼키므로 드래그 중 칸 pointer-events 차단.
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => {
+      const row = splitRowRef.current;
+      if (!row) return;
+      const rect = row.getBoundingClientRect();
+      const r = (e.clientX - rect.left) / rect.width;
+      setRatio(Math.min(0.8, Math.max(0.2, r)));
+    };
+    const onUp = () => setDragging(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [dragging]);
+
   const setRail = (next: boolean) => {
     setRailPinned(next);
     try {
@@ -136,6 +199,18 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
         >
           홈으로 돌아가기
         </Link>
+      </div>
+    );
+  }
+
+  // 임베드(분할 칸) — 사이드바·탭바·분할 없이 본문만 꽉 채워 렌더 (중첩 크롬 방지).
+  if (embed) {
+    return (
+      <div
+        className="min-h-screen bg-[#F2F4F6]"
+        style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
+      >
+        {children}
       </div>
     );
   }
@@ -242,6 +317,15 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
                           key={item.href}
                           href={item.href}
                           title={!item.enabled ? '준비 중 — 클릭하면 안내 화면이 표시됩니다' : undefined}
+                          draggable
+                          onDragStart={(e) => {
+                            // 탭바로 끌어다 놓으면 탭으로 열림 (_tab-bar.tsx handleDrop)
+                            e.dataTransfer.setData(
+                              'application/x-nav-item',
+                              JSON.stringify({ href: item.href, label: item.label }),
+                            );
+                            e.dataTransfer.effectAllowed = 'copy';
+                          }}
                           className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-[13px] transition-colors ${cls}`}
                         >
                           <span className="truncate">{item.label}</span>
@@ -290,8 +374,95 @@ export default function MasterAdminLayout({ children }: { children: React.ReactN
         </div>
       </aside>
 
-      {/* 본문 */}
-      <main className="flex-1 min-w-0">{children}</main>
+      {/* 본문 — 상단 라우트 탭바(크롬식 화면 전환) + children (+ 창 안 분할 시 우측 iframe 칸) */}
+      <main className="flex-1 min-w-0">
+        {/* useSearchParams를 쓰는 클라이언트 컴포넌트는 Suspense 경계 필요 (next build 요구) */}
+        <Suspense fallback={<div className="h-[42px] bg-[#DEE1E6]" />}>
+          <AdminTabBar onSplit={openSplit} />
+        </Suspense>
+        {split ? (
+          <div
+            ref={splitRowRef}
+            className={`flex h-[calc(100vh-42px)] ${dragging ? 'select-none' : ''}`}
+          >
+            {/* 왼쪽 — 실제 라우트 화면 */}
+            <div
+              className="h-full overflow-auto"
+              style={{ width: `calc(${ratio * 100}% - 3px)` }}
+            >
+              {children}
+            </div>
+            {/* 구분선 — 드래그로 폭 조절 */}
+            <div
+              onMouseDown={() => setDragging(true)}
+              title="드래그하여 폭 조절"
+              className={`w-1.5 shrink-0 cursor-col-resize transition-colors ${
+                dragging ? 'bg-[#3182F6]/60' : 'bg-gray-200 hover:bg-[#3182F6]/40'
+              }`}
+            />
+            {/* 오른쪽 — 분할 칸(iframe, 독립 화면) */}
+            <div
+              className="h-full min-w-0 flex flex-col"
+              style={{ width: `calc(${(1 - ratio) * 100}% - 3px)` }}
+            >
+              <div className="flex h-9 shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3">
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-gray-700">
+                  {split.label}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const w = Math.max(720, Math.floor(window.screen.availWidth / 2));
+                    const win = window.open(
+                      split.url,
+                      '_blank',
+                      `width=${w},height=${window.screen.availHeight},left=${window.screen.availWidth - w},top=0`,
+                    );
+                    if (win) setSplit(null);
+                  }}
+                  title="새 창으로 꺼내기"
+                  aria-label="분할 칸을 새 창으로 꺼내기"
+                  className="shrink-0 rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                >
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSplit(null)}
+                  title="분할 닫기"
+                  aria-label="분할 닫기"
+                  className="shrink-0 rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              </div>
+              <iframe
+                key={split.url}
+                src={split.url + (split.url.includes('?') ? '&' : '?') + 'pane=1'}
+                title={split.label}
+                className="min-h-0 flex-1 w-full border-0"
+                style={dragging ? { pointerEvents: 'none' } : undefined}
+              />
+            </div>
+          </div>
+        ) : (
+          children
+        )}
+      </main>
     </div>
+  );
+}
+
+export default function MasterAdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#F2F4F6] flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <MasterAdminLayoutInner>{children}</MasterAdminLayoutInner>
+    </Suspense>
   );
 }

@@ -433,7 +433,7 @@ export default function ApprovalInboxPage() {
   };
 
   return (
-    <div className="p-8 min-w-0">
+    <div className="mx-auto max-w-[1200px] p-8 min-w-0">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-[22px] font-black text-gray-900 tracking-tight">결재 수신함</h1>

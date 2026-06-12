@@ -371,15 +371,21 @@ export type PurchaseBreakdownRow = {
   count: number;
 };
 
-/** 일별 × 품목(규격·미수) 버킷 — 품목 검색 시 추이 표를 그 품목으로 좁히기 위한 분해. */
+/**
+ * 일별 × 품목(규격·미수) × 매입처 × 선박 버킷 — 화면에서 어느 차원으로든(품목/매입처/선박)
+ * 검색 스코프를 좁혀 랭킹·분포·추이를 재집계하기 위한 최소 단위 분해.
+ */
 export type PurchaseProductDay = {
   date: string; // YYYY-MM-DD
   name: string;
   spec: string;
   misu: string;
+  supplier: string;
+  ship: string;
   purchaseTotal: number;
   qty: number;
   count: number;
+  priceMissingCount: number; // 수매가 미기록(0) 건수 — 스코프별 경고용
 };
 
 export type PurchaseStats = {
@@ -490,16 +496,28 @@ export async function getPurchaseStats(
       addBreakdown(productMap, product, total, qty, spec, misu);
       addBreakdown(shipMap, ship, total, qty);
 
-      // 일별 × 품목(규격·미수) 버킷 — 품목 검색 시 추이 표 필터용.
-      const pdKey = `${date} ${product} ${spec} ${misu}`;
+      // 일별 × 품목(규격·미수) × 매입처 × 선박 버킷 — 화면 스코프 검색(랭킹·분포·추이) 필터용.
+      const pdKey = `${date} ${product} ${spec} ${misu} ${supplier} ${ship}`;
       let pd = productDayMap.get(pdKey);
       if (!pd) {
-        pd = { date, name: product, spec, misu, purchaseTotal: 0, qty: 0, count: 0 };
+        pd = {
+          date,
+          name: product,
+          spec,
+          misu,
+          supplier,
+          ship,
+          purchaseTotal: 0,
+          qty: 0,
+          count: 0,
+          priceMissingCount: 0,
+        };
         productDayMap.set(pdKey, pd);
       }
       pd.purchaseTotal += total;
       pd.qty += qty;
       pd.count += 1;
+      if (unitPrice <= 0) pd.priceMissingCount += 1;
     }
 
     const days = [...dayMap.values()].sort((a, b) => a.date.localeCompare(b.date));

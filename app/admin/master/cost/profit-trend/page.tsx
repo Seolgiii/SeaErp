@@ -6,6 +6,7 @@ import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
   MagnifyingGlassIcon,
+  PrinterIcon,
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -23,17 +24,8 @@ type BreakdownTab = 'product' | 'buyer';
 const seoulToday = () =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
 
-/** YYYY-MM-DD를 deltaDays 만큼 이동(UTC 날짜 산술). */
-function shiftDate(ymd: string, delta: number): string {
-  const [y, m, d] = ymd.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + delta);
-  return dt.toISOString().slice(0, 10);
-}
-
-type Preset = 'last30' | 'thisMonth' | 'lastMonth' | 'thisYear';
+type Preset = 'thisMonth' | 'lastMonth' | 'thisYear';
 const PRESETS: { k: Preset; label: string }[] = [
-  { k: 'last30', label: '최근 30일' },
   { k: 'thisMonth', label: '이번 달' },
   { k: 'lastMonth', label: '지난 달' },
   { k: 'thisYear', label: '올해' },
@@ -42,7 +34,6 @@ const PRESETS: { k: Preset; label: string }[] = [
 /** 프리셋 → {from, to} 범위 (적용·활성표시 공용). */
 function presetRange(preset: Preset): { from: string; to: string } {
   const t = seoulToday();
-  if (preset === 'last30') return { from: shiftDate(t, -29), to: t };
   if (preset === 'thisMonth') return { from: `${t.slice(0, 7)}-01`, to: t };
   if (preset === 'lastMonth') {
     const [y, m] = t.split('-').map(Number);
@@ -136,10 +127,10 @@ export default function ProfitTrendPage() {
   const router = useRouter();
   const [workerId, setWorkerId] = useState<string | null>(null);
   const today = seoulToday();
-  const [from, setFrom] = useState(() => shiftDate(today, -29));
+  const [from, setFrom] = useState(() => `${today.slice(0, 7)}-01`);
   const [to, setTo] = useState(today);
   const [granularity, setGranularity] = useState<Granularity>('day');
-  const [activePreset, setActivePreset] = useState<Preset | null>('last30');
+  const [activePreset, setActivePreset] = useState<Preset | null>('thisMonth');
   const [tab, setTab] = useState<BreakdownTab>('product');
   const [breakdownSearch, setBreakdownSearch] = useState('');
   const [data, setData] = useState<ProfitTrend | null>(null);
@@ -247,7 +238,8 @@ export default function ProfitTrendPage() {
   };
 
   return (
-    <div className="p-6 space-y-5">
+    /* 분석 화면은 읽기 폭 제한(max-w) — 와이드 모니터에서 표가 비례로 벌어지는 것 방지. 재고 챕터는 full width 유지 */
+    <div id="pt-print" className="mx-auto max-w-[1200px] p-6 space-y-5">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
@@ -256,13 +248,23 @@ export default function ProfitTrendPage() {
             매출총이익(출고시점 매칭 원가) + 현금흐름(매출 − 수매 − 지출)
           </p>
         </div>
-        <button
-          onClick={exportCsv}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowDownTrayIcon className="h-4 w-4" />
-          CSV
-        </button>
+        <div className="no-print flex items-center gap-2">
+          <button
+            onClick={exportCsv}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            CSV
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            title="A4 가로로 인쇄 (화면 그대로)"
+          >
+            <PrinterIcon className="h-4 w-4" />
+            인쇄
+          </button>
+        </div>
       </div>
 
       {/* 컨트롤 — 좌: 조회 기간(얼마나) / 우: 묶음 단위(어떻게 묶을지) */}
@@ -340,7 +342,7 @@ export default function ProfitTrendPage() {
             </div>
             <button
               onClick={() => void loadData()}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+              className="no-print inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
               title="새로고침"
             >
               <ArrowPathIcon className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -389,7 +391,7 @@ export default function ProfitTrendPage() {
           )}
 
           {/* 분해: 품목별 / 판매처별 */}
-          <div className="rounded-xl border border-gray-200 bg-white">
+          <div className="print-section rounded-xl border border-gray-200 bg-white">
             <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 px-3 pt-2">
               {[
                 { k: 'product' as const, label: '품목별' },
@@ -401,13 +403,13 @@ export default function ProfitTrendPage() {
                   className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
                     tab === t.k
                       ? 'border-[#3182F6] text-[#3182F6]'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 no-print'
                   }`}
                 >
                   {t.label}
                 </button>
               ))}
-              <div className="relative my-1.5 ml-auto">
+              <div className="no-print relative my-1.5 ml-auto">
                 <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
@@ -419,7 +421,17 @@ export default function ProfitTrendPage() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full min-w-[960px] table-fixed text-[13px]">
+                <colgroup>
+                  {/* 숫자 컬럼은 px 고정, 남는 폭은 맨 끝(건) 컬럼이 흡수 — 화면이 넓어져도 컬럼이 벌어지지 않음 */}
+                  <col style={{ width: 200 }} />
+                  <col style={{ width: 140 }} />
+                  <col style={{ width: 140 }} />
+                  <col style={{ width: 145 }} />
+                  <col style={{ width: 80 }} />
+                  <col style={{ width: 100 }} />
+                  <col />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
                     <th className="px-4 py-3">{tab === 'product' ? '품목' : '판매처'}</th>
@@ -471,8 +483,18 @@ export default function ProfitTrendPage() {
           </div>
 
           {/* 추이 표 */}
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full text-[13px]">
+          <div className="print-section overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table className="w-full min-w-[960px] table-fixed text-[13px]">
+              <colgroup>
+                {/* 숫자 컬럼 px 고정 — 남는 폭은 막대(이익 추이) 컬럼이 흡수 */}
+                <col style={{ width: 110 }} />
+                <col style={{ width: 140 }} />
+                <col style={{ width: 140 }} />
+                <col style={{ width: 145 }} />
+                <col style={{ width: 80 }} />
+                <col />
+                <col style={{ width: 130 }} />
+              </colgroup>
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
                   <th className="px-4 py-3">기간</th>
@@ -480,9 +502,7 @@ export default function ProfitTrendPage() {
                   <th className="px-4 py-3">매출원가</th>
                   <th className="px-4 py-3">매출총이익</th>
                   <th className="px-4 py-3">마진율</th>
-                  <th className="px-4 py-3" style={{ width: 180 }}>
-                    이익 추이
-                  </th>
+                  <th className="px-4 py-3">이익 추이</th>
                   <th className="px-4 py-3">현금흐름</th>
                 </tr>
               </thead>
@@ -556,14 +576,37 @@ export default function ProfitTrendPage() {
             </table>
           </div>
 
-          {/* 설명 */}
-          <p className="text-xs leading-relaxed text-gray-400">
+          {/* 설명 — 화면 안내용, 인쇄 제외(no-print) */}
+          <p className="no-print text-xs leading-relaxed text-gray-400">
             * 매출총이익 = 출고 판매금액 − 출고시점 판매원가(승인 시 스냅샷, 매칭 원가). 현금흐름 =
             매출 − 입고 수매가 − 지출(기간 현금 입출, 재고이동·기존재고 입고 제외). 두 값은 기간 매칭
             방식이 달라 의미가 다릅니다.
           </p>
         </>
       )}
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          /* 인쇄 영역(이 화면)만 보이게 — 사이드바·탭바 등 앱 크롬 숨김 */
+          body * { visibility: hidden; }
+          #pt-print, #pt-print * { visibility: visible; }
+          #pt-print {
+            position: absolute; left: 0; top: 0; width: 100%;
+            max-width: none; margin: 0; padding: 0;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          /* 화면용 버튼은 인쇄 제외 */
+          .no-print { display: none !important; }
+          /* 가로 스크롤 표가 잘리지 않도록 펼침 */
+          #pt-print .overflow-x-auto { overflow: visible !important; }
+          /* 섹션(분해 표·추이 표)을 독립된 장으로 — 각 섹션 새 페이지 시작.
+             요약 카드는 헤더·조회기간과 함께 1페이지에 둠(print-section 미부착). */
+          #pt-print .print-section { break-before: page; }
+          /* 표: 페이지마다 헤더 반복 + 행이 경계에서 잘리지 않게 */
+          #pt-print thead { display: table-header-group; }
+          #pt-print tr { break-inside: avoid; }
+        }
+      `}</style>
     </div>
   );
 }

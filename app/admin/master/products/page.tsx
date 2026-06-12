@@ -98,7 +98,7 @@ export default function ProductsMasterPage() {
   }
 
   return (
-    <div className="p-8 min-w-0">
+    <div className="mx-auto max-w-[1200px] p-8 min-w-0">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <div>

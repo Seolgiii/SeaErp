@@ -9,6 +9,19 @@ export function formatSpec(specRaw: string): string {
 }
 
 /**
+ * 규격 문자열을 박스당 kg 숫자로 해석: "11" → 11, "11kg" → 11, "7.5" → 7.5.
+ * 숫자로 해석할 수 없으면 null — 총중량(규격×박스) 환산에서 제외 대상.
+ */
+export function parseSpecKg(specRaw: string): number | null {
+  const t = (specRaw ?? '').trim();
+  if (!t || t === '-') return null;
+  const m = t.match(/^(\d+(?:\.\d+)?)\s*(?:kg)?$/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
  * 미수만 단독 표기: "42/44" → "42/44미", "26" → "26미", "52/54미" → "52/54미" (중복 방지).
  */
 export function formatMisu(misuRaw: string): string {

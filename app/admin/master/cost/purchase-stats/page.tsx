@@ -1,40 +1,60 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
   MagnifyingGlassIcon,
+  PrinterIcon,
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { formatIntKo } from '@/lib/number-format';
-import { formatSpec, formatMisu } from '@/lib/spec-display';
+import { formatSpec, formatMisu, parseSpecKg } from '@/lib/spec-display';
+import { useSyncQueryParams } from '@/lib/use-sync-query-params';
 import {
   getPurchaseStats,
   type PurchaseStats,
   type PurchaseDayBucket,
-  type PurchaseBreakdownRow,
+  type PurchaseProductDay,
 } from '@/app/actions/admin/master-cost';
 
 type Granularity = 'day' | 'week' | 'month';
 type BreakdownTab = 'product' | 'supplier' | 'ship';
+type DonutBasis = 'amount' | 'weight';
+
+const TABS: { k: BreakdownTab; label: string; noun: string; unit: string }[] = [
+  { k: 'product', label: '품목별', noun: '품목', unit: '종' },
+  { k: 'supplier', label: '매입처별', noun: '매입처', unit: '곳' },
+  { k: 'ship', label: '선박별', noun: '선박', unit: '척' },
+];
 
 const seoulToday = () =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
 
-/** YYYY-MM-DD를 deltaDays 만큼 이동(UTC 날짜 산술). */
-function shiftDate(ymd: string, delta: number): string {
-  const [y, m, d] = ymd.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + delta);
-  return dt.toISOString().slice(0, 10);
+/** 두 날짜 차이 (b − a, 일 단위). */
+function diffDays(a: string, b: string): number {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
 }
 
-type Preset = 'last30' | 'thisMonth' | 'lastMonth' | 'thisYear';
+/**
+ * 묶음 단위 자동 결정 — 기간 길이에 맞는 단위를 화면이 고른다 (수동 토글 제거).
+ * ≤31일 일별 / ≤120일 주별 / 그 외 월별. 퇴화 조합(지난 달+월별=1행, 올해+일별=150행) 방지.
+ */
+function autoGranularity(from: string, to: string): Granularity {
+  const days = diffDays(from, to) + 1;
+  if (days <= 31) return 'day';
+  if (days <= 120) return 'week';
+  return 'month';
+}
+
+const GRAN_LABEL: Record<Granularity, string> = { day: '일별', week: '주별', month: '월별' };
+
+type Preset = 'thisMonth' | 'lastMonth' | 'thisYear';
 const PRESETS: { k: Preset; label: string }[] = [
-  { k: 'last30', label: '최근 30일' },
   { k: 'thisMonth', label: '이번 달' },
   { k: 'lastMonth', label: '지난 달' },
   { k: 'thisYear', label: '올해' },
@@ -43,7 +63,6 @@ const PRESETS: { k: Preset; label: string }[] = [
 /** 프리셋 → {from, to} 범위 (적용·활성표시 공용). */
 function presetRange(preset: Preset): { from: string; to: string } {
   const t = seoulToday();
-  if (preset === 'last30') return { from: shiftDate(t, -29), to: t };
   if (preset === 'thisMonth') return { from: `${t.slice(0, 7)}-01`, to: t };
   if (preset === 'lastMonth') {
     const [y, m] = t.split('-').map(Number);
@@ -55,10 +74,65 @@ function presetRange(preset: Preset): { from: string; to: string } {
 }
 
 const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
+const kg = (n: number) => `${formatIntKo(Math.round(n))}kg`;
 const share = (part: number, whole: number) =>
   whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : '—';
 /** 박스당 평균 수매가. */
 const avgUnit = (total: number, qty: number) => (qty > 0 ? won(total / qty) : '—');
+
+/** 검색 스코프 매칭 — 품목별: 품목명+규격+미수 / 매입처별: 매입처명 / 선박별: 선박명. */
+const matchesScope = (pd: PurchaseProductDay, tab: BreakdownTab, q: string) =>
+  tab === 'ship'
+    ? pd.ship.toLowerCase().includes(q)
+    : tab === 'supplier'
+      ? pd.supplier.toLowerCase().includes(q)
+      : `${pd.name} ${pd.spec} ${pd.misu}`.toLowerCase().includes(q);
+
+/** 탭 차원의 개체명 (랭킹 그룹키·매칭 칩 공용). */
+const entityName = (pd: PurchaseProductDay, tab: BreakdownTab) =>
+  tab === 'ship' ? pd.ship : tab === 'supplier' ? pd.supplier : pd.name;
+
+/** 분해 표 행 — 랭킹(개체별) / 상세(품목·규격·미수별) 공용. */
+type BreakdownRow = {
+  name: string;
+  spec: string; // 상세 모드에서만 채움
+  misu: string;
+  purchaseTotal: number;
+  qty: number;
+  weightKg: number; // 규격(kg) × 박스 합 — 규격을 kg로 해석 못하는 건은 제외
+  count: number;
+};
+
+function aggregateRows(
+  pds: PurchaseProductDay[],
+  keyOf: (pd: PurchaseProductDay) => string,
+  nameOf: (pd: PurchaseProductDay) => string,
+  withSpec: boolean,
+): BreakdownRow[] {
+  const map = new Map<string, BreakdownRow>();
+  for (const pd of pds) {
+    const key = keyOf(pd);
+    let row = map.get(key);
+    if (!row) {
+      row = {
+        name: nameOf(pd),
+        spec: withSpec ? pd.spec : '',
+        misu: withSpec ? pd.misu : '',
+        purchaseTotal: 0,
+        qty: 0,
+        weightKg: 0,
+        count: 0,
+      };
+      map.set(key, row);
+    }
+    row.purchaseTotal += pd.purchaseTotal;
+    row.qty += pd.qty;
+    const specKg = parseSpecKg(pd.spec);
+    if (specKg != null) row.weightKg += specKg * pd.qty;
+    row.count += pd.count;
+  }
+  return [...map.values()].sort((a, b) => b.purchaseTotal - a.purchaseTotal);
+}
 
 /** 일별 버킷을 기간 단위(일/주/월)로 집계. */
 type PeriodRow = {
@@ -98,7 +172,7 @@ function bucketToPeriods(days: PurchaseDayBucket[], g: Granularity): PeriodRow[]
   return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
 
-// ── 사이즈별 단가 추이 차트 ──
+// ── 사이즈별 단가 추이 차트 (품목 탭) ──
 const CHART_COLORS = ['#3182F6', '#00C471', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'];
 
 type SizeTrendVariant = {
@@ -116,22 +190,55 @@ type SizeTrend = {
   droppedCount: number; // 매입액 상위 6개 초과로 제외된 사이즈 수
 };
 
+// ── 구성 도넛 (매입처·선박 탭) — 색이 부족해 "기타"가 비대해지지 않게 도넛만 10색 ──
+const DONUT_COLORS = [...CHART_COLORS, '#0ea5e9', '#f472b6', '#84cc16', '#f97316'];
+
+type ShareSlice = {
+  label: string; // "참조기·11kg·52/54미"
+  value: number; // 매입액(원) 또는 총중량(kg)
+  share: number; // 0~1
+  color: string;
+};
+
 /**
  * 매입 통계 — 원가·손익 챕터 2번 화면 (PC 관리, ADMIN/MASTER).
- * 승인 완료 입고만, 재고 이동·기존 재고 제외. 매입처별/품목별 매입액·물량 분해.
+ * 승인 완료 입고만, 재고 이동·기존 재고 제외.
+ *
+ * 구조: 탭(품목/매입처/선박)으로 차원을 고르면 개체 랭킹이 먼저 보이고,
+ * 행 클릭(또는 검색)으로 그 개체의 품목·규격·미수 분포 + 구성 차트 + 추이로 들어간다.
+ * "이 배는 뭘 얼마나 잡나 / 이 매입처는 뭘 파나 / 이 품목은 얼마에 사오나"가 한 동선.
  */
 export default function PurchaseStatsPage() {
   const router = useRouter();
-  const [workerId, setWorkerId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
   const today = seoulToday();
-  const [from, setFrom] = useState(() => shiftDate(today, -29));
-  const [to, setTo] = useState(today);
-  const [granularity, setGranularity] = useState<Granularity>('day');
-  const [activePreset, setActivePreset] = useState<Preset | null>('last30');
-  const [tab, setTab] = useState<BreakdownTab>('product');
-  const [breakdownSearch, setBreakdownSearch] = useState('');
+  const [workerId, setWorkerId] = useState<string | null>(null);
+
+  // URL 쿼리 복원 (북마크·새로고침·drill-down 링크 대응)
+  const isYmd = (s: string | null): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const [from, setFrom] = useState(() => {
+    const p = searchParams.get('from');
+    return isYmd(p) ? p : `${today.slice(0, 7)}-01`;
+  });
+  const [to, setTo] = useState(() => {
+    const p = searchParams.get('to');
+    return isYmd(p) ? p : today;
+  });
+  const [tab, setTab] = useState<BreakdownTab>(() => {
+    const p = searchParams.get('tab');
+    return p === 'supplier' || p === 'ship' ? p : 'product';
+  });
+  const [breakdownSearch, setBreakdownSearch] = useState(() => searchParams.get('q') ?? '');
+  const [donutBasis, setDonutBasis] = useState<DonutBasis>('amount');
   const [data, setData] = useState<PurchaseStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useSyncQueryParams({
+    tab: tab === 'product' ? null : tab, // 기본 탭은 URL 생략
+    q: breakdownSearch,
+    from,
+    to,
+  });
 
   useEffect(() => {
     const session = readSession();
@@ -155,15 +262,41 @@ export default function PurchaseStatsPage() {
     if (workerId) void loadData();
   }, [workerId, loadData]);
 
-  // 추이 표 데이터 — 품목별 탭에선 검색된 품목만의 일별 버킷으로 좁힘 (검색 전엔 비움).
+  const tabMeta = TABS.find((t) => t.k === tab) ?? TABS[0];
+  const granularity = autoGranularity(from, to);
+  const q = breakdownSearch.trim().toLowerCase();
+  // 상세 모드: 검색어가 있으면 그 개체(들)의 품목·규격·미수 분포 / 랭킹 모드: 개체별 일람
+  const isDetail = q.length > 0;
+
+  // 검색 스코프에 매칭된 최소 단위 버킷 (상세 모드 전용)
+  const matchedPds = useMemo<PurchaseProductDay[]>(
+    () => (data && isDetail ? data.productDays.filter((pd) => matchesScope(pd, tab, q)) : []),
+    [data, isDetail, tab, q],
+  );
+
+  // 상세 모드에서 실제 매칭된 개체명 — 부분일치로 여러 개체가 합산될 수 있어 명시 (매입액 순)
+  const matchedNames = useMemo<string[]>(() => {
+    if (!isDetail) return [];
+    const totals = new Map<string, number>();
+    for (const pd of matchedPds) {
+      const name = entityName(pd, tab);
+      totals.set(name, (totals.get(name) ?? 0) + pd.purchaseTotal);
+    }
+    return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([n]) => n);
+  }, [isDetail, tab, matchedPds]);
+
+  // 검색 스코프의 수매가 미기록 건수 — 구성·비중이 실제보다 낮게 보일 수 있음을 경고
+  const scopedPriceMissing = useMemo(
+    () => matchedPds.reduce((s, pd) => s + pd.priceMissingCount, 0),
+    [matchedPds],
+  );
+
+  // 추이 표 데이터 — 상세 모드: 검색 스코프만 / 랭킹 모드: 기간 전체
   const trendDays = useMemo<PurchaseDayBucket[]>(() => {
     if (!data) return [];
-    if (tab !== 'product') return data.days;
-    const q = breakdownSearch.trim().toLowerCase();
-    if (!q) return [];
+    if (!isDetail) return data.days;
     const map = new Map<string, PurchaseDayBucket>();
-    for (const pd of data.productDays) {
-      if (!`${pd.name} ${pd.spec} ${pd.misu}`.toLowerCase().includes(q)) continue;
+    for (const pd of matchedPds) {
       let b = map.get(pd.date);
       if (!b) {
         b = { date: pd.date, purchaseTotal: 0, qty: 0, count: 0 };
@@ -174,25 +307,20 @@ export default function PurchaseStatsPage() {
       b.count += pd.count;
     }
     return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
-  }, [data, tab, breakdownSearch]);
+  }, [data, isDetail, matchedPds]);
 
   const periods = useMemo(() => bucketToPeriods(trendDays, granularity), [trendDays, granularity]);
 
-  // 사이즈별(규격·미수) 가중평균 단가 추이 — 품목 검색 시에만, 묶음 단위 공유.
+  // 사이즈별(규격·미수) 가중평균 단가 추이 — 품목 검색 시에만.
+  // (매입처·선박은 품목이 섞여 단가 추이 시리즈 의미가 약함 → 구성 도넛으로 대체)
   const sizeTrend = useMemo<SizeTrend | null>(() => {
-    if (!data || tab !== 'product') return null;
-    const q = breakdownSearch.trim().toLowerCase();
-    if (!q) return null;
-    const matched = data.productDays.filter((pd) =>
-      `${pd.name} ${pd.spec} ${pd.misu}`.toLowerCase().includes(q),
-    );
-    if (!matched.length) return null;
+    if (tab !== 'product' || !isDetail || !matchedPds.length) return null;
 
     const periodKeys: string[] = [];
     const periodLabels = new Map<string, string>();
     const cells = new Map<string, { total: number; qty: number }>();
     const variantAgg = new Map<string, { spec: string; misu: string; total: number }>();
-    for (const pd of matched) {
+    for (const pd of matchedPds) {
       const { key, label } = periodKeyLabel(pd.date, granularity);
       if (!periodLabels.has(key)) {
         periodLabels.set(key, label);
@@ -244,9 +372,9 @@ export default function PurchaseStatsPage() {
       max,
       droppedCount: Math.max(0, sorted.length - CHART_COLORS.length),
     };
-  }, [data, tab, breakdownSearch, granularity]);
+  }, [tab, isDetail, matchedPds, granularity]);
 
-  // 추이 표 합계 — 품목 스코프가 적용된 데이터 기준.
+  // 추이 표 합계 — 현재 스코프 기준.
   const trendTotals = useMemo(
     () =>
       trendDays.reduce(
@@ -266,61 +394,149 @@ export default function PurchaseStatsPage() {
   );
 
   const totals = data?.totals;
-  const shownBreakdown = useMemo(() => {
-    const breakdown: PurchaseBreakdownRow[] =
-      tab === 'product'
-        ? data?.byProduct ?? []
-        : tab === 'supplier'
-          ? data?.bySupplier ?? []
-          : data?.byShip ?? [];
-    const q = breakdownSearch.trim().toLowerCase();
-    // 품목별은 검색-우선: 품목명을 입력해야 해당 품목의 규격·미수 분포가 표시됨.
-    if (tab === 'product' && !q) return [];
-    return q
-      ? breakdown.filter((r) =>
-          `${r.name} ${r.spec} ${r.misu}`.toLowerCase().includes(q),
-        )
-      : breakdown;
-  }, [data, tab, breakdownSearch]);
 
-  // 표시된 행 합계 — 분해 표 합계 행(검색 결과 반영).
+  // 분해 표 — 랭킹 모드: 탭 개체별 일람(클릭→상세) / 상세 모드: 품목·규격·미수 분포
+  const shownBreakdown = useMemo<BreakdownRow[]>(() => {
+    if (!data) return [];
+    if (!isDetail) {
+      return aggregateRows(
+        data.productDays,
+        (pd) => entityName(pd, tab),
+        (pd) => entityName(pd, tab),
+        false,
+      );
+    }
+    return aggregateRows(
+      matchedPds,
+      (pd) => `${pd.name}|${pd.spec}|${pd.misu}`,
+      (pd) => pd.name,
+      true,
+    );
+  }, [data, isDetail, tab, matchedPds]);
+
+  // 표시된 행 합계 — 분해 표 합계 행.
   const shownTotals = useMemo(
     () =>
       shownBreakdown.reduce(
         (t, r) => {
           t.purchaseTotal += r.purchaseTotal;
           t.qty += r.qty;
+          t.weightKg += r.weightKg;
           t.count += r.count;
           return t;
         },
-        { purchaseTotal: 0, qty: 0, count: 0 },
+        { purchaseTotal: 0, qty: 0, weightKg: 0, count: 0 },
       ),
     [shownBreakdown],
   );
 
-  // 비중 분모 — 품목별은 검색된 품목 내 비중(규격·미수 분포), 그 외는 전체 매입액 대비.
-  const shareBase =
-    tab === 'product' ? shownTotals.purchaseTotal : data?.totals.purchaseTotal ?? 0;
+  // 비중 분모 — 랭킹 모드는 전체 매입액(=표시 행 합), 상세 모드는 검색 스코프 합.
+  const shareBase = shownTotals.purchaseTotal;
 
-  // ── 기간 프리셋 ──
+  // 매입처·선박 상세 — 구성 도넛 데이터 (매입액/중량 토글, 상위 10개 + 기타).
+  const sizeShare = useMemo<{
+    total: number;
+    slices: ShareSlice[];
+    excluded: number;
+  } | null>(() => {
+    if (!isDetail || tab === 'product' || !shownBreakdown.length) return null;
+    const valueOf = (r: BreakdownRow) => (donutBasis === 'amount' ? r.purchaseTotal : r.weightKg);
+    const rows = shownBreakdown
+      .filter((r) => valueOf(r) > 0)
+      .sort((a, b) => valueOf(b) - valueOf(a));
+    const excluded = shownBreakdown.length - rows.length;
+    const total = rows.reduce((s, r) => s + valueOf(r), 0);
+    if (total <= 0) return null;
+    const top = rows.slice(0, DONUT_COLORS.length);
+    const rest = rows.slice(DONUT_COLORS.length);
+    const slices: ShareSlice[] = top.map((r, i) => ({
+      label: [r.name, formatSpec(r.spec), formatMisu(r.misu)]
+        .filter((s) => s && s !== '-')
+        .join('·'),
+      value: valueOf(r),
+      share: valueOf(r) / total,
+      color: DONUT_COLORS[i],
+    }));
+    const restSum = rest.reduce((s, r) => s + valueOf(r), 0);
+    if (restSum > 0)
+      slices.push({
+        label: `기타 ${rest.length}개`,
+        value: restSum,
+        share: restSum / total,
+        color: '#d1d5db',
+      });
+    return { total, slices, excluded };
+  }, [isDetail, tab, shownBreakdown, donutBasis]);
+
+  // ── 기간 프리셋 — 활성 표시는 현재 from/to가 프리셋 범위와 일치하는지로 판정 ──
+  const activePreset = useMemo<Preset | null>(() => {
+    for (const p of PRESETS) {
+      const r = presetRange(p.k);
+      if (r.from === from && r.to === to) return p.k;
+    }
+    return null;
+  }, [from, to]);
+
   const applyPreset = (preset: Preset) => {
     const r = presetRange(preset);
     setFrom(r.from);
     setTo(r.to);
-    setActivePreset(preset);
   };
 
+  // CSV — 화면에 보이는 분포 표 + 추이 표를 그대로 내보냄.
   const exportCsv = () => {
-    if (!periods.length) {
+    if (!shownBreakdown.length && !periods.length) {
       toast('내보낼 데이터가 없습니다.', 'info');
       return;
     }
-    const header = ['기간', '매입액', '수량(박스)', '평균단가(박스)', '건수'];
     const esc = (v: string | number) => {
       const s = String(v);
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const lines = [header.join(',')];
+    const lines: string[] = [];
+
+    // ── 분포 표 섹션 ──
+    const scopeLabel = isDetail
+      ? `${tabMeta.label} · 검색 "${breakdownSearch.trim()}"`
+      : tabMeta.label;
+    lines.push(esc(`분포 (${scopeLabel}, ${from}~${to})`));
+    const head1 = isDetail
+      ? ['품목', '규격', '미수', '매입액', '수량(박스)', '총중량(kg)', '평균단가(박스)', '비중', '건']
+      : [tabMeta.noun, '매입액', '수량(박스)', '총중량(kg)', '평균단가(박스)', '비중', '건'];
+    lines.push(head1.map(esc).join(','));
+    for (const r of shownBreakdown) {
+      const cols: (string | number)[] = [r.name];
+      if (isDetail) cols.push(formatSpec(r.spec), formatMisu(r.misu));
+      cols.push(
+        Math.round(r.purchaseTotal),
+        r.qty,
+        r.weightKg > 0 ? Math.round(r.weightKg) : '',
+        r.qty > 0 ? Math.round(r.purchaseTotal / r.qty) : '',
+        share(r.purchaseTotal, shareBase),
+        r.count,
+      );
+      lines.push(cols.map(esc).join(','));
+    }
+    {
+      const cols: (string | number)[] = ['합계'];
+      if (isDetail) cols.push('', '');
+      cols.push(
+        Math.round(shownTotals.purchaseTotal),
+        shownTotals.qty,
+        shownTotals.weightKg > 0 ? Math.round(shownTotals.weightKg) : '',
+        shownTotals.qty > 0
+          ? Math.round(shownTotals.purchaseTotal / shownTotals.qty)
+          : '',
+        share(shownTotals.purchaseTotal, shareBase),
+        shownTotals.count,
+      );
+      lines.push(cols.map(esc).join(','));
+    }
+
+    // ── 추이 섹션 ──
+    lines.push('');
+    lines.push(esc(`추이 (${GRAN_LABEL[granularity]} 묶음)`));
+    lines.push(['기간', '매입액', '수량(박스)', '평균단가(박스)', '건수'].map(esc).join(','));
     for (const p of periods) {
       lines.push(
         [
@@ -347,39 +563,59 @@ export default function PurchaseStatsPage() {
         .map(esc)
         .join(','),
     );
+
     const blob = new Blob(['﻿' + lines.join('\n')], {
       type: 'text/csv;charset=utf-8;',
     });
+    const safeQ = breakdownSearch.trim().replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `매입통계_${from}_${to}.csv`;
+    a.download = `매입통계_${tabMeta.label}${safeQ ? `_${safeQ}` : ''}_${from}_${to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="p-6 space-y-5">
+    /* 분석 화면은 읽기 폭 제한(max-w) — 와이드 모니터에서 표가 비례로 벌어지는 것 방지. 재고 챕터는 full width 유지
+       id=ps-print: 인쇄 시 이 영역만 보이게(사이드바·탭바 숨김) — 하단 @media print 참고 */
+    <div id="ps-print" className="mx-auto max-w-[1200px] p-6 space-y-5">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#191F28]">매입 통계</h1>
           <p className="mt-0.5 text-sm text-gray-500">
-            매입처별·품목별 매입액과 물량 (승인 완료 입고, 재고이동·기존재고 제외)
+            품목·매입처·선박별 매입액과 물량 (승인 완료 입고, 재고이동·기존재고 제외)
           </p>
         </div>
-        <button
-          onClick={exportCsv}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowDownTrayIcon className="h-4 w-4" />
-          CSV
-        </button>
+        <div className="no-print flex items-center gap-2">
+          <button
+            onClick={() => void loadData()}
+            className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            title="새로고침"
+          >
+            <ArrowPathIcon className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={exportCsv}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            CSV
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            title="A4 가로로 인쇄 (화면 그대로)"
+          >
+            <PrinterIcon className="h-4 w-4" />
+            인쇄
+          </button>
+        </div>
       </div>
 
-      {/* 컨트롤 — 좌: 조회 기간(얼마나) / 우: 묶음 단위(어떻게 묶을지) */}
-      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4 rounded-xl border border-gray-200 bg-white p-4">
-        {/* 조회 기간 */}
+      {/* 조회 기간 — 묶음 단위는 기간 길이에 따라 자동 (추이 표 헤더에 표기) */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4">
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-semibold text-gray-500">조회 기간</span>
           <div className="flex flex-wrap items-center gap-2">
@@ -387,10 +623,7 @@ export default function PurchaseStatsPage() {
               type="date"
               value={from}
               max={to}
-              onChange={(e) => {
-                setFrom(e.target.value);
-                setActivePreset(null);
-              }}
+              onChange={(e) => setFrom(e.target.value)}
               className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm"
             />
             <span className="text-gray-400">~</span>
@@ -399,10 +632,7 @@ export default function PurchaseStatsPage() {
               value={to}
               min={from}
               max={seoulToday()}
-              onChange={(e) => {
-                setTo(e.target.value);
-                setActivePreset(null);
-              }}
+              onChange={(e) => setTo(e.target.value)}
               className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm"
             />
             <span className="mx-1 h-5 w-px bg-gray-200" />
@@ -426,39 +656,6 @@ export default function PurchaseStatsPage() {
             </div>
           </div>
         </div>
-
-        {/* 묶음 단위 */}
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold text-gray-500">묶음 단위</span>
-          <div className="flex items-center gap-2">
-            <div className="inline-flex overflow-hidden rounded-lg border border-gray-200">
-              {[
-                { k: 'day' as const, label: '일별' },
-                { k: 'week' as const, label: '주별' },
-                { k: 'month' as const, label: '월별' },
-              ].map((g) => (
-                <button
-                  key={g.k}
-                  onClick={() => setGranularity(g.k)}
-                  className={`px-3 py-1.5 text-sm font-medium ${
-                    granularity === g.k
-                      ? 'bg-[#3182F6] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {g.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => void loadData()}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-              title="새로고침"
-            >
-              <ArrowPathIcon className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
       </div>
 
       {isLoading && !data ? (
@@ -466,76 +663,118 @@ export default function PurchaseStatsPage() {
       ) : !totals ? (
         <div className="py-20 text-center text-sm text-gray-400">데이터가 없습니다.</div>
       ) : (
-        <>
-
-          {totals.priceMissingCount > 0 && (
+        <div
+          className={`space-y-5 transition-opacity ${isLoading ? 'opacity-60' : ''}`}
+        >
+          {/* 수매가 미기록 경고 — 랭킹 모드는 기간 전체, 상세 모드는 검색 스코프 기준 */}
+          {!isDetail && totals.priceMissingCount > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
               ⚠ 수매가가 기록되지 않은 입고 {totals.priceMissingCount}건은 매입액 0원으로
               집계되었습니다(물량·건수에는 포함). 입고 기록의 수매가 입력 누락 가능성.
             </div>
           )}
+          {isDetail && scopedPriceMissing > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              ⚠ 검색 결과에 수매가 미기록 입고 {scopedPriceMissing}건 — 매입액·비중이 실제보다
+              낮게 보일 수 있습니다.
+            </div>
+          )}
 
-          {/* 분해: 매입처별 / 품목별 */}
-          <div className="rounded-xl border border-gray-200 bg-white">
+          {/* 분해 카드 — 랭킹(개체 일람, 행 클릭→상세) ↔ 상세(품목·규격·미수 분포) */}
+          <div className="print-section rounded-xl border border-gray-200 bg-white">
             <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 px-3 pt-2">
-              {[
-                { k: 'product' as const, label: '품목별' },
-                { k: 'supplier' as const, label: '매입처별' },
-                { k: 'ship' as const, label: '선박별' },
-              ].map((t) => (
+              {TABS.map((t) => (
                 <button
                   key={t.k}
-                  onClick={() => setTab(t.k)}
+                  onClick={() => {
+                    // 탭 전환 시 검색어 초기화 — 탭마다 검색 대상(품목명/매입처명/선박명)이 달라 이전 검색어가 무의미
+                    if (tab !== t.k) setBreakdownSearch('');
+                    setTab(t.k);
+                  }}
                   className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
                     tab === t.k
                       ? 'border-[#3182F6] text-[#3182F6]'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 no-print'
                   }`}
                 >
                   {t.label}
                 </button>
               ))}
-              <div className="relative my-1.5 ml-auto">
+              <div className="no-print relative my-1.5 ml-auto">
                 <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   value={breakdownSearch}
                   onChange={(e) => setBreakdownSearch(e.target.value)}
-                  placeholder={
-                    tab === 'product'
-                      ? '품목명 검색'
-                      : tab === 'supplier'
-                        ? '매입처명 검색'
-                        : '선박명 검색'
-                  }
+                  placeholder={`${tabMeta.noun}명 검색`}
                   className="w-44 rounded-lg border border-gray-200 py-1 pl-[31px] pr-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
                 />
               </div>
             </div>
+
+            {/* 랭킹 모드 안내 — 행 클릭이 상세 진입점임을 알림 */}
+            {!isDetail && shownBreakdown.length > 0 && (
+              <div className="border-b border-gray-100 px-4 py-2 text-xs text-gray-400">
+                행을 클릭하면 해당 {tabMeta.noun}의{' '}
+                {tab === 'product' ? '규격·미수' : '품목·규격·미수'} 분포를 분석합니다.
+              </div>
+            )}
+
+            {/* 매칭 칩 — 부분일치로 여러 개체가 합산될 수 있어 분석 대상을 명시 */}
+            {isDetail && matchedNames.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-gray-100 px-4 py-2 text-xs">
+                <span className="text-gray-400">
+                  분석 대상 {tabMeta.noun} {matchedNames.length}
+                  {tabMeta.unit}
+                  {matchedNames.length > 1 && ' (합산)'}:
+                </span>
+                {matchedNames.map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setBreakdownSearch(n)}
+                    className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-[#3182F6] hover:bg-blue-100"
+                    title="이 이름으로 좁히기"
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               {/* table-fixed — 검색 타이핑으로 행이 바뀌어도 컬럼 폭이 재계산되지 않게 고정 */}
-              <table className="w-full table-fixed text-[13px]">
+              <table className="w-full min-w-[960px] table-fixed text-[13px]">
                 <colgroup>
-                  {/* 품목별: 이름 17% 고정(기존 잔여폭 25%의 2/3), 남는 폭은 맨 끝(건 뒤)으로 — 컬럼들이 왼쪽으로 당겨짐 */}
-                  <col style={tab === 'product' ? { width: '17%' } : undefined} />
-                  {tab === 'product' && (
+                  {/* 숫자 컬럼은 px 고정, 남는 폭은 맨 끝(건) 컬럼이 흡수 — 화면이 넓어져도 컬럼이 벌어지지 않음 */}
+                  {isDetail ? (
                     <>
-                      <col style={{ width: '9%' }} />
-                      <col style={{ width: '9%' }} />
+                      <col style={{ width: 170 }} />
+                      <col style={{ width: 80 }} />
+                      <col style={{ width: 84 }} />
+                      <col style={{ width: 135 }} />
+                      <col style={{ width: 95 }} />
+                      <col style={{ width: 100 }} />
+                      <col style={{ width: 125 }} />
+                      <col style={{ width: 78 }} />
+                      <col />
+                    </>
+                  ) : (
+                    <>
+                      <col style={{ width: 220 }} />
+                      <col style={{ width: 140 }} />
+                      <col style={{ width: 100 }} />
+                      <col style={{ width: 105 }} />
+                      <col style={{ width: 130 }} />
+                      <col style={{ width: 80 }} />
+                      <col />
                     </>
                   )}
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '11%' }} />
-                  <col style={{ width: '14%' }} />
-                  <col style={{ width: '9%' }} />
-                  {tab === 'product' ? <col /> : <col style={{ width: '8%' }} />}
                 </colgroup>
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
-                    <th className="px-4 py-3">
-                      {tab === 'product' ? '품목' : tab === 'supplier' ? '매입처' : '선박'}
-                    </th>
-                    {tab === 'product' && (
+                    {/* 상세 모드 행은 어느 탭이든 품목(규격·미수) 분포 */}
+                    <th className="px-4 py-3">{isDetail ? '품목' : tabMeta.noun}</th>
+                    {isDetail && (
                       <>
                         <th className="px-4 py-3">규격</th>
                         <th className="px-4 py-3">미수</th>
@@ -543,12 +782,15 @@ export default function PurchaseStatsPage() {
                     )}
                     <th className="px-4 py-3">매입액</th>
                     <th className="px-4 py-3">수량</th>
+                    <th className="px-4 py-3" title="규격(kg) × 박스 수 — 규격 미상 건 제외">
+                      총중량
+                    </th>
                     <th className="px-4 py-3">평균단가(박스)</th>
                     <th
                       className="px-4 py-3"
                       title={
-                        tab === 'product'
-                          ? '검색된 품목 매입액 내 비중 (규격·미수 분포)'
+                        isDetail
+                          ? `검색된 ${tabMeta.noun} 매입액 내 비중`
                           : '기간 전체 매입액 대비 비중'
                       }
                     >
@@ -561,24 +803,24 @@ export default function PurchaseStatsPage() {
                   {shownBreakdown.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={tab === 'product' ? 8 : 6}
+                        colSpan={isDetail ? 9 : 7}
                         className="px-4 py-8 text-center text-sm text-gray-400"
                       >
-                        {breakdownSearch.trim()
-                          ? '검색 결과 없음'
-                          : tab === 'product'
-                            ? '품목명을 검색하면 해당 품목의 규격·미수별 매입 분포가 표시됩니다.'
-                            : '데이터 없음'}
+                        {isDetail ? '검색 결과 없음' : '데이터 없음'}
                       </td>
                     </tr>
                   ) : (
                     shownBreakdown.map((r) => (
                       <tr
                         key={`${r.name}|${r.spec}|${r.misu}`}
-                        className="border-t border-gray-100"
+                        onClick={isDetail ? undefined : () => setBreakdownSearch(r.name)}
+                        title={isDetail ? undefined : `${r.name} 상세 분포 보기`}
+                        className={`border-t border-gray-100 ${
+                          isDetail ? '' : 'cursor-pointer hover:bg-blue-50/40'
+                        }`}
                       >
                         <td className="px-4 py-3 font-bold text-gray-900">{r.name}</td>
-                        {tab === 'product' && (
+                        {isDetail && (
                           <>
                             <td className="px-4 py-3 text-gray-500">{formatSpec(r.spec)}</td>
                             <td className="px-4 py-3 text-gray-500">{formatMisu(r.misu)}</td>
@@ -589,6 +831,9 @@ export default function PurchaseStatsPage() {
                         </td>
                         <td className="px-4 py-3 tabular-nums text-gray-500">
                           {formatIntKo(r.qty)}박스
+                        </td>
+                        <td className="px-4 py-3 tabular-nums text-gray-500">
+                          {r.weightKg > 0 ? kg(r.weightKg) : '—'}
                         </td>
                         <td className="px-4 py-3 tabular-nums text-gray-500">
                           {avgUnit(r.purchaseTotal, r.qty)}
@@ -607,7 +852,7 @@ export default function PurchaseStatsPage() {
                   <tfoot>
                     <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold text-[#191F28]">
                       <td className="px-4 py-3">합계</td>
-                      {tab === 'product' && (
+                      {isDetail && (
                         <>
                           <td className="px-4 py-3" />
                           <td className="px-4 py-3" />
@@ -616,6 +861,9 @@ export default function PurchaseStatsPage() {
                       <td className="px-4 py-3 tabular-nums">{won(shownTotals.purchaseTotal)}</td>
                       <td className="px-4 py-3 tabular-nums">
                         {formatIntKo(shownTotals.qty)}박스
+                      </td>
+                      <td className="px-4 py-3 tabular-nums">
+                        {shownTotals.weightKg > 0 ? kg(shownTotals.weightKg) : '—'}
                       </td>
                       <td className="px-4 py-3 tabular-nums">
                         {avgUnit(shownTotals.purchaseTotal, shownTotals.qty)}
@@ -631,21 +879,100 @@ export default function PurchaseStatsPage() {
             </div>
           </div>
 
-          {/* 추이 표 — 품목별 탭에선 검색된 품목만의 추이 (검색 전 숨김) */}
+          {/* 사이즈별 단가 추이 — 품목 검색 시에만 */}
+          {sizeTrend && (
+            <div className="print-section rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-sm font-bold text-[#191F28]">사이즈별 단가 추이</h2>
+                <span className="text-xs text-gray-400">
+                  규격·미수별 기간 가중평균 수매가 (박스당)
+                  {sizeTrend.droppedCount > 0 &&
+                    ` · 매입액 상위 ${CHART_COLORS.length}개 표시, ${sizeTrend.droppedCount}개 제외`}
+                </span>
+              </div>
+              <SizePriceChart trend={sizeTrend} />
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                {sizeTrend.variants.map((v) => (
+                  <span key={v.key} className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: v.color }}
+                    />
+                    {v.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 구성 도넛 — 매입처/선박 검색 시: 그 개체의 품목·규격·미수 구성비 */}
+          {sizeShare && (
+            <div className="print-section rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <h2 className="text-sm font-bold text-[#191F28]">
+                    {tab === 'ship' ? '어획 구성' : '매입 구성'}
+                  </h2>
+                  <span className="text-xs text-gray-400">
+                    검색된 {tabMeta.noun}의 품목·규격·미수 구성비 ·{' '}
+                    {donutBasis === 'amount' ? '매입액' : '총중량'} 기준
+                    {sizeShare.excluded > 0 &&
+                      ` · ${
+                        donutBasis === 'amount' ? '수매가 미기록' : '규격 미상'
+                      } ${sizeShare.excluded}개 항목 제외`}
+                  </span>
+                </div>
+                <div className="inline-flex overflow-hidden rounded-lg border border-gray-200">
+                  {(
+                    [
+                      { k: 'amount', label: '매입액' },
+                      { k: 'weight', label: '중량' },
+                    ] as const
+                  ).map((b) => (
+                    <button
+                      key={b.k}
+                      onClick={() => setDonutBasis(b.k)}
+                      className={`px-2.5 py-1 text-xs font-medium ${
+                        donutBasis === b.k
+                          ? 'bg-[#3182F6] text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <SizeShareDonut
+                total={sizeShare.total}
+                slices={sizeShare.slices}
+                centerLabel={donutBasis === 'amount' ? '매입액' : '총중량'}
+                fmt={donutBasis === 'amount' ? won : kg}
+              />
+            </div>
+          )}
+
+          {/* 추이 표 — 랭킹 모드: 기간 전체 / 상세 모드: 검색 스코프 */}
           {periods.length > 0 && (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full table-fixed text-[13px]">
+          <div className="print-section overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table className="w-full min-w-[860px] table-fixed text-[13px]">
               <colgroup>
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '20%' }} />
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '16%' }} />
+                {/* 숫자 컬럼 px 고정 — 남는 폭은 막대(매입 추이) 컬럼이 흡수 */}
+                <col style={{ width: 110 }} />
+                <col style={{ width: 140 }} />
+                <col style={{ width: 105 }} />
+                <col style={{ width: 130 }} />
                 <col />
-                <col style={{ width: '9%' }} />
+                <col style={{ width: 64 }} />
               </colgroup>
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
-                  <th className="px-4 py-3">기간</th>
+                  <th className="whitespace-nowrap px-4 py-3">
+                    기간{' '}
+                    <span className="font-normal text-gray-400">
+                      ({GRAN_LABEL[granularity]})
+                    </span>
+                  </th>
                   <th className="px-4 py-3">매입액</th>
                   <th className="px-4 py-3">수량</th>
                   <th className="px-4 py-3">평균단가(박스)</th>
@@ -702,39 +1029,120 @@ export default function PurchaseStatsPage() {
           </div>
           )}
 
-          {/* 사이즈별 단가 추이 그래프 — 품목 검색 시에만 */}
-          {sizeTrend && (
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-sm font-bold text-[#191F28]">사이즈별 단가 추이</h2>
-                <span className="text-xs text-gray-400">
-                  규격·미수별 기간 가중평균 수매가 (박스당)
-                  {sizeTrend.droppedCount > 0 &&
-                    ` · 매입액 상위 ${CHART_COLORS.length}개 표시, ${sizeTrend.droppedCount}개 제외`}
-                </span>
-              </div>
-              <SizePriceChart trend={sizeTrend} />
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                {sizeTrend.variants.map((v) => (
-                  <span key={v.key} className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-                    <span
-                      className="inline-block h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: v.color }}
-                    />
-                    {v.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 설명 */}
-          <p className="text-xs leading-relaxed text-gray-400">
+          {/* 설명 — 화면 안내용, 인쇄 제외(no-print) */}
+          <p className="no-print text-xs leading-relaxed text-gray-400">
             * 매입액 = 입고 수매가 × 입고수량(박스). 승인 완료 입고만 집계하며 재고 이동·기존 재고
-            입고는 실제 매입이 아니라 제외합니다. 평균단가 = 매입액 ÷ 수량(가중 평균).
+            입고는 실제 매입이 아니라 제외합니다. 평균단가 = 매입액 ÷ 수량(가중 평균). 총중량 =
+            규격(kg) × 박스 수 — 규격을 kg로 해석할 수 없는 입고는 총중량에서 제외됩니다.
           </p>
-        </>
+        </div>
       )}
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          /* 인쇄 영역(이 화면)만 보이게 — 사이드바·탭바 등 앱 크롬 숨김 */
+          body * { visibility: hidden; }
+          #ps-print, #ps-print * { visibility: visible; }
+          #ps-print {
+            position: absolute; left: 0; top: 0; width: 100%;
+            max-width: none; margin: 0; padding: 0;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          /* 화면용 버튼은 인쇄 제외 */
+          .no-print { display: none !important; }
+          /* 가로 스크롤 표가 잘리지 않도록 펼침 */
+          #ps-print .overflow-x-auto { overflow: visible !important; }
+          /* 섹션을 독립된 장으로 — 각 섹션이 새 페이지에서 시작(서로 섞이지 않게).
+             첫 섹션은 헤더·조회기간과 같은 페이지(인접 형제만 break-before). */
+          #ps-print .print-section + .print-section { break-before: page; }
+          /* 표: 페이지마다 헤더 반복 + 행이 경계에서 잘리지 않게 */
+          #ps-print thead { display: table-header-group; }
+          #ps-print tr { break-inside: avoid; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/** 구성 도넛 차트 — 차트 라이브러리 없이 SVG (최소 수정 원칙). */
+function SizeShareDonut({
+  total,
+  slices,
+  centerLabel,
+  fmt,
+}: {
+  total: number;
+  slices: ShareSlice[];
+  centerLabel: string;
+  fmt: (n: number) => string;
+}) {
+  const SZ = 200;
+  const C = SZ / 2;
+  const R = 92; // 외경
+  const r = 58; // 내경
+  const polar = (deg: number, radius: number): [number, number] => {
+    const a = ((deg - 90) * Math.PI) / 180; // 12시 방향 시작, 시계 방향
+    return [C + radius * Math.cos(a), C + radius * Math.sin(a)];
+  };
+  const arcPath = (start: number, sweep: number) => {
+    // 단일 슬라이스 100%는 시작·끝점이 겹쳐 호가 소실 → 359.99°로 클램프
+    const end = start + Math.min(sweep, 359.99);
+    const large = end - start > 180 ? 1 : 0;
+    const [x0, y0] = polar(start, R);
+    const [x1, y1] = polar(end, R);
+    const [x2, y2] = polar(end, r);
+    const [x3, y3] = polar(start, r);
+    return [
+      `M${x0.toFixed(2)},${y0.toFixed(2)}`,
+      `A${R},${R} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`,
+      `L${x2.toFixed(2)},${y2.toFixed(2)}`,
+      `A${r},${r} 0 ${large} 0 ${x3.toFixed(2)},${y3.toFixed(2)}`,
+      'Z',
+    ].join(' ');
+  };
+
+  let acc = 0;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-4">
+      <svg
+        viewBox={`0 0 ${SZ} ${SZ}`}
+        className="h-44 w-44 shrink-0"
+        role="img"
+        aria-label="구성 비율"
+      >
+        {slices.map((s, i) => {
+          const start = acc * 360;
+          acc += s.share;
+          return (
+            <path key={i} d={arcPath(start, s.share * 360)} fill={s.color}>
+              <title>{`${s.label} — ${fmt(s.value)} (${(s.share * 100).toFixed(1)}%)`}</title>
+            </path>
+          );
+        })}
+        <text x={C} y={C - 6} textAnchor="middle" fontSize={11} fill="#9ca3af">
+          {centerLabel}
+        </text>
+        <text x={C} y={C + 12} textAnchor="middle" fontSize={13} fontWeight={700} fill="#191F28">
+          {fmt(total)}
+        </text>
+      </svg>
+      <ul className="min-w-0 flex-1 space-y-1.5">
+        {slices.map((s, i) => (
+          <li key={i} className="flex items-center gap-2 text-[13px]">
+            <span
+              className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: s.color }}
+            />
+            <span className="truncate font-medium text-gray-700">{s.label}</span>
+            <span className="ml-auto shrink-0 tabular-nums font-bold text-gray-900">
+              {(s.share * 100).toFixed(1)}%
+            </span>
+            <span className="w-28 shrink-0 text-right tabular-nums text-gray-400">
+              {fmt(s.value)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -822,4 +1230,3 @@ function SizePriceChart({ trend }: { trend: SizeTrend }) {
     </svg>
   );
 }
-

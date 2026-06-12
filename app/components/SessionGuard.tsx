@@ -24,6 +24,15 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  // 분할 칸(iframe)으로 띄워졌는지. 칸 안에서는 세션 배너·리다이렉트를 위쪽 창에 위임한다.
+  const [isFramed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true; // 접근 차단 = 프레임 안으로 간주
+    }
+  });
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
@@ -33,6 +42,18 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
       setReady(true);
       setRemainingMs(null);
       return;
+    }
+
+    // 분할 칸(iframe) 안 — 세션 만료 UI/리다이렉트는 위쪽 창이 단독으로 담당.
+    // 여기선 배너·카운트다운·만료 리다이렉트 없이 활동 감지만 유지해, 칸에서 작업해도
+    // 공유 세션(localStorage lastActivityAt)이 연장되도록 한다.
+    if (isFramed) {
+      setReady(true);
+      setRemainingMs(null);
+      const onActivity = () => touchSession();
+      const EVENTS = ['click', 'touchstart', 'keydown', 'scroll'] as const;
+      EVENTS.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+      return () => EVENTS.forEach((e) => window.removeEventListener(e, onActivity));
     }
 
     // ── 초기 세션 유효성 검사 ─────────────────────────────────────────
@@ -107,7 +128,7 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
       clearInterval(countdownInterval);
       EVENTS.forEach((e) => window.removeEventListener(e, onActivity));
     };
-  }, [pathname, isPublic, router]);
+  }, [pathname, isPublic, isFramed, router]);
 
   const handleExtend = () => {
     touchSession();
@@ -119,7 +140,7 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
 
   return (
     <>
-      {remainingMs != null && remainingMs > 0 && (
+      {!isFramed && remainingMs != null && remainingMs > 0 && (
         <SessionExpiryBanner
           remainingMs={remainingMs}
           onExtend={handleExtend}

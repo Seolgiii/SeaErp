@@ -5,6 +5,7 @@ import {
   formatSpec,
   formatMisu,
   formatSize,
+  parseSpecKg,
 } from './spec-display';
 
 describe('formatSpecKgMisu', () => {
@@ -120,5 +121,32 @@ describe('formatLotSpecDisplayLine', () => {
 
   test('상세규격_표기를 미수보다 우선 사용', () => {
     expect(formatLotSpecDisplayLine({ 규격: '13', 상세규격_표기: '100' })).toBe('13kg (100미)');
+  });
+});
+
+describe('parseSpecKg', () => {
+  test('숫자만: "11" → 11', () => {
+    expect(parseSpecKg('11')).toBe(11);
+  });
+
+  test('kg 접미사: "11kg" → 11 (대소문자 무관)', () => {
+    expect(parseSpecKg('11kg')).toBe(11);
+    expect(parseSpecKg('11KG')).toBe(11);
+    expect(parseSpecKg('11 kg')).toBe(11);
+  });
+
+  test('소수점: "7.5" → 7.5', () => {
+    expect(parseSpecKg('7.5')).toBe(7.5);
+  });
+
+  test('빈 값 / "-" / 해석 불가 → null', () => {
+    expect(parseSpecKg('')).toBeNull();
+    expect(parseSpecKg('-')).toBeNull();
+    expect(parseSpecKg('대')).toBeNull();
+    expect(parseSpecKg('10/12')).toBeNull();
+  });
+
+  test('0 이하 → null (총중량 환산 제외)', () => {
+    expect(parseSpecKg('0')).toBeNull();
   });
 });
