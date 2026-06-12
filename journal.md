@@ -1047,6 +1047,36 @@ UX (3건):
 
 ---
 
+### 2026-06-12
+
+**완료한 작업**
+- 거래 이력 챕터 1번 화면 '입고 이력' 신설 (`/admin/master/transactions/inbound` + `app/actions/admin/master-transactions.ts:getInboundHistory`) — 개별 입고 건 원장(read-only). 상태 무관 전체 조회(승인 완료·대기·반려), 재고이동·기존재고 포함, 입고일 내림차순. 매입처·품목·보관처·매입자 link를 마스터 이름 map으로 resolve.
+- 기간 프리셋(전체 기본·이번 달·지난 달·올해) + 상태 필터 칩(전체/완료/대기/반려) + 통합 검색(LOT·품목·매입처·선박·보관처) + 합계 행 + CSV(15컬럼 풀세트).
+- LOT번호 클릭 드릴다운 → `/admin/master/lot-timeline?lot=` (재고 조회 기존 패턴 일관). 승인 대기 등 LOT 없는 행은 `—` 비활성.
+- 표 정렬 다듬기 — `table-fixed` + `colgroup` 11컬럼 폭 고정, 숫자 우측 정렬·`tabular-nums`, 긴 텍스트(품목·매입처·보관처) `truncate`+툴팁, `min-width:1180` 가로 스크롤.
+- `_nav.ts` 입고 이력 `enabled:true`. 커밋 `69772fe` → `local-work-mac` 브랜치 푸시.
+- (세션 시작) `git pull` origin/main fast-forward(다른 PC 06-05·06-11 docs 수신) + dev 서버 기동.
+
+**결정 사항**
+- **별도 브랜치 `local-work-mac` 분기** — journal의 v0.8.0(탭바·창 안 분할·매입통계 개편·인쇄)은 다른 PC에 미커밋으로 남아 있고 이 PC엔 0.7.0 코드만 존재함을 확인(stash·브랜치·reflog 전수). 이 PC 작업이 다른 PC v0.8.0과 안 섞이게 별도 브랜치로 진행, 추후 main에 v0.8.0 올라오면 rebase 합류.
+- 거래 이력 진행 = 입고 하나 먼저(CLAUDE.md '1개씩 → dogfooding → 다음' 원칙), PDF 재발행 제외. 출고/이동/지출은 dogfooding 후 동일 패턴 확장.
+- 거래 이력 성격 = 개별 건 '원장'(원가·손익은 집계). 그래서 상태 무관 전체·재고이동/기존재고 포함(실제 일어난 거래라 audit 관점에서 모두 노출).
+- LOT번호 컬럼 = 드롭 대신 드릴다운 링크 — LOT 형식에 날짜·품목·규격·미수가 인코딩돼 다른 컬럼과 중복이지만, 유일키·화면 간 교차참조 키라 클릭 내비게이션으로 가치 전환.
+- 버전 미bump — `package.json` 0.7.0 유지. v0.8.0 합류 시 충돌 방지 위해 bump는 합류/릴리스 시점에.
+- 서버 헬퍼(fetchInRange/fetchNameMap/firstId) = master-cost와 안 엮이게 별도 복제(최소 수정 원칙, 기존 inline 스타일과 일관).
+
+**미해결 이슈**
+- 입고 이력 **데이터 렌더링 dogfooding 미검증**(검증 사각지대) — link resolve(매입처/보관처/매입자 이름 표기), 특히 보관처가 link인지 텍스트인지 실데이터 확인, `품목명` lookup 존재 여부, 날짜 경계, '전체' 프리셋의 전건 페이지네이션 성능.
+- 컬럼 폭(특히 LOT번호 184px) 실데이터로 잘림 확인 필요.
+- 다른 PC v0.8.0 실재 확인 후 main 합류 + 버전 정리 대기.
+
+**다음 작업 후보**
+- 입고 이력 dogfooding → 확인되면 출고/이동/지출 이력 동일 패턴 확장.
+- 다른 PC v0.8.0 → origin/main 푸시 후 이 브랜치 rebase 합류(package.json 버전 정리).
+- (이월) 매입 통계 drill-down · 기간 비교 · 외부 ERP export CSV.
+
+---
+
 ## 누적 통계 (2026-05-18 기준)
 
 - 단위 테스트: 5 files / **110 pass** (변동 없음)
