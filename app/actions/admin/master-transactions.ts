@@ -336,3 +336,310 @@ export async function createInboundDirect(
 
   return { success: true, lotNumber: created.lotNumber, committed: true };
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 거래 이력 — 출고 / 이동 / 지출 (read-only 원장, 입고 이력과 동일 패턴)
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** LOT id → 표시정보 map (이동 이력의 원본 LOT resolve용). */
+type LotInfo = { lotNumber: string; product: string; spec: string; misu: string };
+async function fetchLotInfoMap(): Promise<Map<string, LotInfo>> {
+  const path = encodeURIComponent(AIRTABLE_TABLE.lots);
+  const map = new Map<string, LotInfo>();
+  let offset: string | undefined;
+  do {
+    const params = new URLSearchParams({ pageSize: "100" });
+    for (const fld of ["LOT번호", "품목명", "규격", "미수"]) params.append("fields[]", fld);
+    if (offset) params.set("offset", offset);
+    const data = (await fetchAirtable(`${path}?${params}`)) as {
+      records?: { id: string; fields?: Record<string, unknown> }[];
+      offset?: string;
+    };
+    for (const rec of data.records ?? []) {
+      const fl = rec.fields ?? {};
+      map.set(rec.id, {
+        lotNumber: str(fl["LOT번호"]),
+        product: str(fl["품목명"]),
+        spec: str(fl["규격"]),
+        misu: str(fl["미수"]),
+      });
+    }
+    offset = data.offset;
+  } while (offset);
+  return map;
+}
+
+// ── 출고 이력 ───────────────────────────────────────────────────────────────
+export type OutboundHistoryRow = {
+  id: string;
+  date: string; // 출고일 YYYY-MM-DD
+  lotNumber: string;
+  product: string;
+  spec: string;
+  misu: string;
+  qty: number; // 출고수량 (실출고 우선, 없으면 요청수량)
+  salePrice: number; // 박스당 판매가
+  saleTotal: number; // 판매금액(formula)
+  seller: string; // 판매처
+  storage: string;
+  worker: string;
+  approvalStatus: string;
+  pdfUrl: string; // 출고증URL
+};
+
+export type OutboundHistory = {
+  from: string;
+  to: string;
+  rows: OutboundHistoryRow[];
+  totals: { count: number; qty: number; saleTotal: number; byStatus: Record<string, number> };
+};
+
+export async function getOutboundHistory(
+  adminWorkerId: string,
+  from: string,
+  to: string,
+): Promise<Result<OutboundHistory>> {
+  const auth = await ensureAdmin(adminWorkerId, TAG);
+  if (!auth.success) return { success: false, error: auth.error };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return { success: false, error: "기간 형식이 올바르지 않습니다 (YYYY-MM-DD)." };
+  }
+  if (from > to) [from, to] = [to, from];
+
+  try {
+    const [outbounds, storageNames, workerNames] = await Promise.all([
+      fetchInRange(AIRTABLE_TABLE.outbound, "출고일", from, to),
+      fetchNameMap(AIRTABLE_TABLE.storageMaster, "보관처명"),
+      fetchNameMap(AIRTABLE_TABLE.workers, "작업자명"),
+    ]);
+
+    const rows: OutboundHistoryRow[] = [];
+    const byStatus: Record<string, number> = {};
+    let qtyTotal = 0;
+    let saleTotalSum = 0;
+
+    for (const r of outbounds) {
+      const f = r.fields;
+      const date = str(f["출고일"]).slice(0, 10);
+      if (!date || date < from || date > to) continue;
+
+      const qty = num(f["실출고수량"]) || num(f["출고요청수량"]);
+      const salePrice = num(f["판매가"]);
+      const saleTotal = num(f["판매금액"]) || salePrice * qty;
+      const approvalStatus = str(f["승인상태"]) || "(미상)";
+
+      byStatus[approvalStatus] = (byStatus[approvalStatus] ?? 0) + 1;
+      qtyTotal += qty;
+      saleTotalSum += saleTotal;
+
+      rows.push({
+        id: r.id,
+        date,
+        lotNumber: str(f["LOT번호"]),
+        product: str(f["품목명"]) || "(미상)",
+        spec: str(f["규격"]),
+        misu: str(f["미수"]),
+        qty,
+        salePrice,
+        saleTotal,
+        seller: str(f["판매처"]),
+        storage: storageNames.get(firstId(f["보관처"])) || str(f["보관처"]),
+        worker: workerNames.get(firstId(f["작업자"])) || "",
+        approvalStatus,
+        pdfUrl: str(f["출고증URL"]),
+      });
+    }
+
+    rows.sort(
+      (a, b) => b.date.localeCompare(a.date) || b.lotNumber.localeCompare(a.lotNumber),
+    );
+
+    return {
+      success: true,
+      data: {
+        from,
+        to,
+        rows,
+        totals: { count: rows.length, qty: qtyTotal, saleTotal: saleTotalSum, byStatus },
+      },
+    };
+  } catch (e) {
+    logError(`[${TAG}] 출고 이력 조회 실패:`, e);
+    return { success: false, error: e instanceof Error ? e.message : "조회 실패" };
+  }
+}
+
+// ── 이동 이력 ───────────────────────────────────────────────────────────────
+export type TransferHistoryRow = {
+  id: string;
+  date: string; // 이동일
+  lotNumber: string; // 원본 LOT
+  product: string;
+  spec: string;
+  misu: string;
+  qty: number; // 이동수량
+  fromStorage: string;
+  toStorage: string;
+  worker: string;
+  approvalStatus: string;
+};
+
+export type TransferHistory = {
+  from: string;
+  to: string;
+  rows: TransferHistoryRow[];
+  totals: { count: number; qty: number; byStatus: Record<string, number> };
+};
+
+export async function getTransferHistory(
+  adminWorkerId: string,
+  from: string,
+  to: string,
+): Promise<Result<TransferHistory>> {
+  const auth = await ensureAdmin(adminWorkerId, TAG);
+  if (!auth.success) return { success: false, error: auth.error };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return { success: false, error: "기간 형식이 올바르지 않습니다 (YYYY-MM-DD)." };
+  }
+  if (from > to) [from, to] = [to, from];
+
+  try {
+    const [transfers, storageNames, workerNames, lotInfo] = await Promise.all([
+      fetchInRange(AIRTABLE_TABLE.transfer, "이동일", from, to),
+      fetchNameMap(AIRTABLE_TABLE.storageMaster, "보관처명"),
+      fetchNameMap(AIRTABLE_TABLE.workers, "작업자명"),
+      fetchLotInfoMap(),
+    ]);
+
+    const rows: TransferHistoryRow[] = [];
+    const byStatus: Record<string, number> = {};
+    let qtyTotal = 0;
+
+    for (const r of transfers) {
+      const f = r.fields;
+      const date = str(f["이동일"]).slice(0, 10);
+      if (!date || date < from || date > to) continue;
+
+      const qty = num(f["이동수량"]);
+      const approvalStatus = str(f["승인상태"]) || "(미상)";
+      const lot = lotInfo.get(firstId(f["원본 LOT번호"]));
+
+      byStatus[approvalStatus] = (byStatus[approvalStatus] ?? 0) + 1;
+      qtyTotal += qty;
+
+      rows.push({
+        id: r.id,
+        date,
+        lotNumber: lot?.lotNumber || "",
+        product: lot?.product || "(미상)",
+        spec: lot?.spec || "",
+        misu: lot?.misu || "",
+        qty,
+        fromStorage: storageNames.get(firstId(f["이동 전 보관처"])) || "",
+        toStorage: storageNames.get(firstId(f["이동 후 보관처"])) || "",
+        worker: workerNames.get(firstId(f["작업자"])) || "",
+        approvalStatus,
+      });
+    }
+
+    rows.sort(
+      (a, b) => b.date.localeCompare(a.date) || b.lotNumber.localeCompare(a.lotNumber),
+    );
+
+    return {
+      success: true,
+      data: {
+        from,
+        to,
+        rows,
+        totals: { count: rows.length, qty: qtyTotal, byStatus },
+      },
+    };
+  } catch (e) {
+    logError(`[${TAG}] 이동 이력 조회 실패:`, e);
+    return { success: false, error: e instanceof Error ? e.message : "조회 실패" };
+  }
+}
+
+// ── 지출 이력 ───────────────────────────────────────────────────────────────
+export type ExpenseHistoryRow = {
+  id: string;
+  date: string; // 지출일(없으면 작성일)
+  title: string; // 건명
+  description: string; // 적요
+  amount: number; // 금액
+  applicant: string; // 신청자
+  approvalStatus: string;
+  memo: string; // 비고
+  pdfUrl: string; // 지출결의서URL
+};
+
+export type ExpenseHistory = {
+  from: string;
+  to: string;
+  rows: ExpenseHistoryRow[];
+  totals: { count: number; amount: number; byStatus: Record<string, number> };
+};
+
+export async function getExpenseHistory(
+  adminWorkerId: string,
+  from: string,
+  to: string,
+): Promise<Result<ExpenseHistory>> {
+  const auth = await ensureAdmin(adminWorkerId, TAG);
+  if (!auth.success) return { success: false, error: auth.error };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return { success: false, error: "기간 형식이 올바르지 않습니다 (YYYY-MM-DD)." };
+  }
+  if (from > to) [from, to] = [to, from];
+
+  try {
+    const [expenses, workerNames] = await Promise.all([
+      fetchInRange(AIRTABLE_TABLE.expense, "지출일", from, to),
+      fetchNameMap(AIRTABLE_TABLE.workers, "작업자명"),
+    ]);
+
+    const rows: ExpenseHistoryRow[] = [];
+    const byStatus: Record<string, number> = {};
+    let amountTotal = 0;
+
+    for (const r of expenses) {
+      const f = r.fields;
+      const date = (str(f["지출일"]) || str(f["작성일"])).slice(0, 10);
+      if (!date || date < from || date > to) continue;
+
+      const amount = num(f["금액"]);
+      const approvalStatus = str(f["승인상태"]) || "(미상)";
+
+      byStatus[approvalStatus] = (byStatus[approvalStatus] ?? 0) + 1;
+      amountTotal += amount;
+
+      rows.push({
+        id: r.id,
+        date,
+        title: str(f["건명"]) || str(f["항목명"]),
+        description: str(f["적요"]),
+        amount,
+        applicant: workerNames.get(firstId(f["신청자"])) || "",
+        approvalStatus,
+        memo: str(f["비고"]),
+        pdfUrl: str(f["지출결의서URL"]),
+      });
+    }
+
+    rows.sort((a, b) => b.date.localeCompare(a.date));
+
+    return {
+      success: true,
+      data: {
+        from,
+        to,
+        rows,
+        totals: { count: rows.length, amount: amountTotal, byStatus },
+      },
+    };
+  } catch (e) {
+    logError(`[${TAG}] 지출 이력 조회 실패:`, e);
+    return { success: false, error: e instanceof Error ? e.message : "조회 실패" };
+  }
+}

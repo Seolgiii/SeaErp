@@ -42,9 +42,9 @@ export const NAV_GROUPS: NavGroup[] = [
     title: '거래 이력',
     items: [
       { href: '/admin/master/transactions/inbound', label: '입고 이력', enabled: true },
-      { href: '/admin/master/transactions/outbound', label: '출고 이력', enabled: false },
-      { href: '/admin/master/transactions/transfer', label: '이동 이력', enabled: false },
-      { href: '/admin/master/transactions/expense', label: '지출 이력', enabled: false },
+      { href: '/admin/master/transactions/outbound', label: '출고 이력', enabled: true },
+      { href: '/admin/master/transactions/transfer', label: '이동 이력', enabled: true },
+      { href: '/admin/master/transactions/expense', label: '지출 이력', enabled: true },
       { href: '/admin/master/transactions/pdf-reissue', label: 'PDF 재발행', enabled: false },
     ],
   },
