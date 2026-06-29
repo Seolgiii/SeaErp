@@ -68,6 +68,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/admin/master/cost/storage-history', label: '보관처 비용 이력', enabled: false },
       { href: '/admin/master/workers', label: '작업자', enabled: true },
       { href: '/admin/master/ships', label: '선박', enabled: true },
+      { href: '/admin/master/materials', label: '부자재·경비', enabled: true },
     ],
   },
   {
