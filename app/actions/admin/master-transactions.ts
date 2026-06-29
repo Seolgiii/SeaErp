@@ -105,6 +105,7 @@ export type InboundHistoryRow = {
   shipName: string;
   storage: string;
   purchaser: string; // 매입자
+  worker: string; // 입고 작업자(입고 신청·등록한 작업자)
   approvalStatus: string;
   memo: string;
   pdfUrl: string;
@@ -170,6 +171,7 @@ export async function getInboundHistory(
       const supplier = supplierNames.get(firstId(f["매입처"])) || "";
       const storage = storageNames.get(firstId(f["보관처"])) || str(f["보관처"]);
       const purchaser = workerNames.get(firstId(f["매입자"])) || "";
+      const worker = workerNames.get(firstId(f["작업자"])) || "";
       const approvalStatus = str(f["승인상태"]) || "(미상)";
 
       byStatus[approvalStatus] = (byStatus[approvalStatus] ?? 0) + 1;
@@ -191,6 +193,7 @@ export async function getInboundHistory(
         shipName: str(f["선박명"]),
         storage,
         purchaser,
+        worker,
         approvalStatus,
         memo: str(f["비고"]),
         pdfUrl: str(f["입고증URL"]),

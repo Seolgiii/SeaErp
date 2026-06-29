@@ -104,7 +104,7 @@ export default function InboundHistoryPage() {
     return data.rows.filter((r) => {
       if (statusFilter !== '전체' && r.approvalStatus !== statusFilter) return false;
       if (!q) return true;
-      return [r.lotNumber, r.product, r.supplier, r.shipName, r.storage, r.origin, r.purchaser]
+      return [r.lotNumber, r.product, r.supplier, r.shipName, r.storage, r.origin, r.purchaser, r.worker]
         .join(' ')
         .toLowerCase()
         .includes(q);
@@ -138,7 +138,7 @@ export default function InboundHistoryPage() {
     }
     const header = [
       '입고일', 'LOT번호', '품목', '규격', '미수', '원산지', '수량(박스)',
-      '수매가(박스)', '매입액', '매입처', '선박', '보관처', '매입자', '상태', '비고',
+      '수매가(박스)', '매입액', '매입처', '선박', '보관처', '매입자', '작업자', '상태', '비고',
     ];
     const esc = (v: string | number) => {
       const s = String(v);
@@ -150,14 +150,14 @@ export default function InboundHistoryPage() {
         [
           r.date, r.lotNumber, r.product, r.spec, r.misu, r.origin, r.qty,
           Math.round(r.purchasePrice), Math.round(r.purchaseTotal), r.supplier,
-          r.shipName, r.storage, r.purchaser, r.approvalStatus, r.memo,
+          r.shipName, r.storage, r.purchaser, r.worker, r.approvalStatus, r.memo,
         ]
           .map(esc)
           .join(','),
       );
     }
     lines.push(
-      ['합계', '', '', '', '', '', shown.qty, '', Math.round(shown.purchaseTotal), '', '', '', '', '', '']
+      ['합계', '', '', '', '', '', shown.qty, '', Math.round(shown.purchaseTotal), '', '', '', '', '', '', '']
         .map(esc)
         .join(','),
     );
@@ -307,13 +307,14 @@ export default function InboundHistoryPage() {
                   <th className="whitespace-nowrap px-4 py-3 text-right">매입액</th>
                   <th className="px-4 py-3">매입처</th>
                   <th className="px-4 py-3">보관처</th>
+                  <th className="whitespace-nowrap px-4 py-3">작업자</th>
                   <th className="whitespace-nowrap px-4 py-3">상태</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-12 text-center text-sm text-gray-400">
+                    <td colSpan={12} className="px-4 py-12 text-center text-sm text-gray-400">
                       조건에 맞는 입고 건이 없습니다.
                     </td>
                   </tr>
@@ -352,6 +353,7 @@ export default function InboundHistoryPage() {
                       </td>
                       <td className="px-4 py-3 text-gray-700">{r.supplier || '—'}</td>
                       <td className="px-4 py-3 text-gray-700">{r.storage || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-gray-700">{r.worker || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className={`rounded-md px-2 py-0.5 text-[12px] font-medium ${statusBadgeClass(r.approvalStatus)}`}>
                           {r.approvalStatus}
@@ -374,7 +376,7 @@ export default function InboundHistoryPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
                       {won(shown.purchaseTotal)}
                     </td>
-                    <td className="px-4 py-3" colSpan={3} />
+                    <td className="px-4 py-3" colSpan={4} />
                   </tr>
                 </tfoot>
               )}
