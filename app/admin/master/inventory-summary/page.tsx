@@ -29,9 +29,9 @@ type Row = {
   qty: number;
   /** 현재 재고 총중량 합(kg) = Σ(박스당 무게 × 재고수량) */
   weight: number;
-  /** 현재고 평가액 합(원) = Σ(박스당 판매원가 × 재고수량) */
+  /** 현재고 평가액 합(원) = Σ(박스당 재고원가 × 재고수량) */
   valuation: number;
-  /** 현재고에 묶인 누적 보관비 합(원) = Σ((박스당 판매원가 − 수매가) × 재고수량). 오늘 기준 */
+  /** 현재고에 묶인 누적 보관비 합(원) = Σ((박스당 재고원가 − 수매가) × 재고수량). 오늘 기준 */
   storageCost: number;
 };
 
@@ -117,7 +117,7 @@ export default function InventorySummaryPage() {
         key = JSON.stringify([product, l.spec, l.misu]);
         row = { key, storage: '', product, spec: l.spec, misu: l.misu };
       }
-      // 보관비 = 박스당(판매원가 − 수매가) × 재고수량 — 현재고에 묶인 보관 비용분(오늘 기준).
+      // 보관비 = 박스당(재고원가 − 수매가) × 재고수량 — 현재고에 묶인 보관 비용분(오늘 기준).
       const lotStorageCost =
         Math.max(0, l.costPerBox - l.purchasePrice) * Math.max(0, l.stockQty);
       const prev = map.get(key);
@@ -377,7 +377,7 @@ export default function InventorySummaryPage() {
                       >
                         보관비
                       </th>
-                      <th className="px-4 py-3" title="현재고 평가액 = 박스당 판매원가 × 재고수량">
+                      <th className="px-4 py-3" title="현재고 평가액 = 박스당 재고원가 × 재고수량">
                         평가액
                       </th>
                     </>

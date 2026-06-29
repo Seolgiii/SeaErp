@@ -144,7 +144,7 @@ export default function LotTimelinePage() {
 
       {!isLoading && data && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-          {/* 좌: 재고 정보 + 판매원가 (요약 카드 묶음) */}
+          {/* 좌: 재고 정보 + 재고원가 (요약 카드 묶음) */}
           <div className="space-y-4">
             {/* 재고 정보 — 절반 폭에 맞춰 세로 구성(식별 정보 → 구분선 → 수량/상태) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -177,7 +177,7 @@ export default function LotTimelinePage() {
               </div>
             </div>
 
-            {/* 판매원가 (오늘 기준 박스당 + 현재 재고 평가액) */}
+            {/* 재고원가 (오늘 기준 박스당 + 현재 재고 평가액) */}
             <CostCard cost={data.cost} stockQty={data.currentStockQty} />
           </div>
 
@@ -255,7 +255,7 @@ function CostCard({ cost, stockQty }: { cost: LotCostInfo; stockQty: number }) {
       <div className="flex items-start justify-between gap-6 flex-wrap">
         {/* 좌: 박스당 원가 + 분해 */}
         <div className="min-w-0">
-          <p className="text-[11px] font-bold text-gray-400">판매원가 (오늘 기준)</p>
+          <p className="text-[11px] font-bold text-gray-400">재고원가 (오늘 기준)</p>
           <p className="text-[22px] font-black text-gray-900 mt-0.5">
             {won(cost.totalPerBox)}
             <span className="text-[14px] font-bold text-gray-400 ml-1">원/박스</span>

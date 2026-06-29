@@ -218,7 +218,7 @@ export default function LotsMasterPage() {
   const handleCsv = () => {
     if (selectedVisible.length === 0) return;
     const asOf = seoulToday();
-    const header = ['LOT번호', '품목명', '규격', '미수', '원산지', '보관처', '보관일수', '재고수량(박스)', '박스당 수매가(원)', '박스당 판매원가(원)', '평가액(원)'];
+    const header = ['LOT번호', '품목명', '규격', '미수', '원산지', '보관처', '보관일수', '재고수량(박스)', '박스당 수매가(원)', '박스당 재고원가(원)', '평가액(원)'];
     const body = selectedVisible.map((l) => [
       l.lotNumber,
       l.productName,
@@ -462,7 +462,7 @@ export default function LotsMasterPage() {
                   <Th label="재고수량" field="stockQty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="총중량" field="stockWeight" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="수매가" field="purchasePrice" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="판매원가" field="costPerBox" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th label="재고원가" field="costPerBox" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="평가액" field="valuation" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="보관처" field="storageName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="보관일수" field="daysHeld" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} title="최초 입고일 기준 총 보관기간 (이동해도 원본 입고일 유지). 냉장료는 현 보관처 입고일 기준이라 더 짧을 수 있음." />

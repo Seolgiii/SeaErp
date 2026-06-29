@@ -36,11 +36,11 @@ export type Lot = {
   firstInboundDate: string;
   /** 보관일수 (최초입고일~오늘) — 오래 묵은 재고(회전 느린 LOT) 식별용 */
   daysHeld: number;
-  /** 박스당 수매가(매입가, 원). 판매원가에서 이걸 빼면 누적 보관비 */
+  /** 박스당 수매가(매입가, 원). 재고원가에서 이걸 빼면 누적 보관비 */
   purchasePrice: number;
-  /** 박스당 판매원가(오늘 기준 누적, 원). 비용 미입력이면 0 — admin 화면 전용 노출 */
+  /** 박스당 재고원가(오늘 기준 누적, 원). 비용 미입력이면 0 — admin 화면 전용 노출 */
   costPerBox: number;
-  /** 현재 재고 평가액(원) = 박스당 판매원가 × 재고수량 */
+  /** 현재 재고 평가액(원) = 박스당 재고원가 × 재고수량 */
   valuation: number;
   /** 비고(메모) — 운영 표기(라벨 색상·재포장·구물·상환 메모 등). admin 화면 노출용 */
   memo: string;
@@ -73,7 +73,7 @@ function parseLot(
       ? Math.round((totalWeight / inboxQty) * Math.max(0, stockQty))
       : 0;
 
-  // 박스당 판매원가(오늘 기준) — LOT 상세 비용 카드와 동일 로직(calculateLotCostBasis) 재사용.
+  // 박스당 재고원가(오늘 기준) — LOT 상세 비용 카드와 동일 로직(calculateLotCostBasis) 재사용.
   const basis = calculateLotCostBasis({
     purchasePrice: num(f["수매가"]),
     refrigerationFeePerUnit: num(f["냉장료단가"]),

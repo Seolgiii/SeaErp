@@ -14,7 +14,7 @@ import type { Lot } from '@/app/actions/admin/master-lots';
  *   인쇄에 깨끗하다.
  * - 선택 데이터는 localStorage(LEDGER_KEY)로 핸드오프받는다(새 탭 열림 → sessionStorage
  *   대신 localStorage라야 안정적으로 공유됨).
- * - 내용은 "현재 보유 스냅샷": 선택 LOT들의 수량·박스당 판매원가·평가액 + 합계, 기준일.
+ * - 내용은 "현재 보유 스냅샷": 선택 LOT들의 수량·박스당 재고원가·평가액 + 합계, 기준일.
  */
 
 const LEDGER_KEY = 'seaerp:ledger-print';
@@ -114,7 +114,7 @@ export default function LedgerPrintPage() {
               <th className="py-2 px-2 font-bold text-right">보관일수</th>
               <th className="py-2 px-2 font-bold text-right">재고(박스)</th>
               <th className="py-2 px-2 font-bold text-right">박스당 수매가</th>
-              <th className="py-2 px-2 font-bold text-right">박스당 판매원가</th>
+              <th className="py-2 px-2 font-bold text-right">박스당 재고원가</th>
               <th className="py-2 pl-2 font-bold text-right">평가액</th>
             </tr>
           </thead>
@@ -158,7 +158,7 @@ export default function LedgerPrintPage() {
         </table>
 
         <p className="mt-6 text-[11px] text-gray-400">
-          ※ 박스당 판매원가·평가액은 기준일({asOf}) 시점 누적 비용(매입가 + 보관비)으로 산정한
+          ※ 박스당 재고원가·평가액은 기준일({asOf}) 시점 누적 비용(매입가 + 보관비)으로 산정한
           관리회계상 추정치입니다.
         </p>
       </div>
