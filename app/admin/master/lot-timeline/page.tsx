@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowDownTrayIcon,
@@ -12,7 +13,7 @@ import {
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { formatIntKo } from '@/lib/number-format';
-import { formatSpecKgMisu } from '@/lib/spec-display';
+import { formatSpecKgMisu, formatSpec, parseSpecKg } from '@/lib/spec-display';
 import {
   fetchLotLifecycle,
   type LifecycleEvent,
@@ -156,7 +157,7 @@ export default function LotTimelinePage() {
 
       {!isLoading && data && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-          {/* 좌: 재고 정보 + 재고원가 (요약 카드 묶음) */}
+          {/* 좌: 재고 정보 + 재고원가 + 판매원가 (요약 카드 묶음) */}
           <div className="space-y-4">
             {/* 재고 정보 — 절반 폭에 맞춰 세로 구성(식별 정보 → 구분선 → 수량/상태) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -192,11 +193,12 @@ export default function LotTimelinePage() {
             {/* 재고원가 (오늘 기준 박스당 + 현재 재고 평가액) */}
             <CostCard cost={data.cost} stockQty={data.currentStockQty} />
 
-            {/* 판매원가 (계산기) — 재고원가 + 선택한 부자재·경비(박스당) */}
+            {/* 판매원가 (계산기) — 재고원가 + 선택 부자재·경비. 폭은 재고원가와 동일(좌측 칸). */}
             <SalePriceCard
               baseCostPerBox={data.cost.totalPerBox}
               hasBase={data.cost.hasData}
               stockQty={data.currentStockQty}
+              spec={data.spec}
               materials={materials}
             />
           </div>
@@ -250,102 +252,129 @@ function SalePriceCard({
   baseCostPerBox,
   hasBase,
   stockQty,
+  spec,
   materials,
 }: {
   baseCostPerBox: number;
   hasBase: boolean;
   stockQty: number;
+  spec: string;
   materials: Material[];
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
-
-  const toggle = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // 섹션별 단일 선택 (materialId | '') — 포장은 보통 박스 1종·아이스팩 1종.
+  const [picked, setPicked] = useState<Record<string, string>>({});
 
   const base = hasBase ? baseCostPerBox : 0;
-  const addOn = materials
-    .filter((m) => selected.has(m.id))
-    .reduce((sum, m) => sum + m.price, 0);
+  const byId = new Map(materials.map((m) => [m.id, m]));
+  const chosen = MATERIAL_SECTIONS.map((s) => byId.get(picked[s] ?? '')).filter(
+    (m): m is Material => !!m,
+  );
+  const addOn = chosen.reduce((sum, m) => sum + m.price, 0);
   const salePerBox = base + addOn;
+  // kg단가 환산 — 일단 규격(박스당 kg)으로 나눔. (아이스팩·박스 무게 차감은 추후)
+  const kgPerBox = parseSpecKg(spec);
+  const salePerKg = kgPerBox ? salePerBox / kgPerBox : null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-bold text-gray-400">판매원가 (박스당)</p>
-        <span className="text-[11px] text-gray-400">재고원가 + 선택한 부자재·경비</span>
-      </div>
-      <p className="text-[22px] font-black text-gray-900 mt-0.5">
-        {won(salePerBox)}
-        <span className="text-[14px] font-bold text-gray-400 ml-1">원/박스</span>
-      </p>
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div>
+        {/* 위: 결과 (영수증식 분해) */}
+        <div className="p-5">
+          <p className="text-[11px] font-bold text-gray-400">판매원가</p>
+          <p className="mt-0.5 text-[28px] font-black leading-tight text-gray-900">
+            {won(salePerBox)}
+            <span className="ml-1 text-[14px] font-bold text-gray-400">원 / 박스</span>
+          </p>
+          {salePerKg != null ? (
+            <p className="mt-0.5 text-[15px] font-bold text-[#3182F6]">
+              {won(salePerKg)}
+              <span className="font-medium text-gray-400"> 원 / kg</span>
+              <span className="ml-1.5 text-[11px] font-medium text-gray-400">
+                규격 {formatSpec(spec)} 기준
+              </span>
+            </p>
+          ) : (
+            <p className="mt-0.5 text-[12px] text-gray-400">규격이 없어 kg단가 환산 불가</p>
+          )}
 
-      <ul className="mt-2 space-y-1 text-[13px]">
-        <li className="flex justify-between">
-          <span className="text-gray-500">재고원가</span>
-          <span className="tabular-nums text-gray-800">{won(base)}원</span>
-        </li>
-        <li className="flex justify-between">
-          <span className="text-gray-500">부자재·경비 합계</span>
-          <span className="tabular-nums text-gray-800">+{won(addOn)}원</span>
-        </li>
-        {stockQty > 0 && (
-          <li className="flex justify-between border-t border-gray-100 pt-1 font-bold">
-            <span className="text-gray-700">판매원가 × 재고 {formatIntKo(stockQty)}박스</span>
-            <span className="tabular-nums text-gray-900">{won(salePerBox * stockQty)}원</span>
-          </li>
-        )}
-      </ul>
-
-      {!hasBase && (
-        <p className="mt-2 text-[12px] text-amber-600">
-          재고원가가 없어(수매가·보관비 미입력) 부자재 합계만 더해집니다.
-        </p>
-      )}
-
-      <div className="mt-4 space-y-3">
-        {MATERIAL_SECTIONS.map((section) => {
-          const rows = materials.filter((m) => m.section === section);
-          return (
-            <div key={section}>
-              <p className="text-[12px] font-bold text-gray-500 mb-1.5">{section}</p>
-              {rows.length === 0 ? (
-                <p className="text-[12px] text-gray-300">항목 없음</p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {rows.map((m) => {
-                    const on = selected.has(m.id);
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => toggle(m.id)}
-                        className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                          on
-                            ? 'border-[#3182F6] bg-blue-50 text-[#3182F6]'
-                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                        }`}
-                      >
-                        {m.name} <span className="text-gray-400">{won(m.price)}원</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+          <div className="mt-3 text-[13px]">
+            <div className="flex justify-between py-0.5">
+              <span className="text-gray-500">재고원가</span>
+              <span className="tabular-nums text-gray-700">
+                {hasBase ? `${won(base)}원` : '—'}
+              </span>
             </div>
-          );
-        })}
-      </div>
+            {chosen.map((m) => (
+              <div key={m.id} className="flex justify-between py-0.5">
+                <span className="min-w-0 truncate text-gray-500">
+                  <span className="mr-1 text-gray-300">{m.section}</span>
+                  {m.name}
+                </span>
+                <span className="ml-2 shrink-0 tabular-nums text-gray-700">
+                  +{won(m.price)}원
+                </span>
+              </div>
+            ))}
+            {stockQty > 0 && (
+              <div className="mt-1.5 flex justify-between border-t border-gray-100 pt-1.5">
+                <span className="text-gray-500">× 재고 {formatIntKo(stockQty)}박스</span>
+                <span className="tabular-nums font-bold text-gray-800">
+                  {won(salePerBox * stockQty)}원
+                </span>
+              </div>
+            )}
+          </div>
 
-      {materials.length === 0 && (
-        <p className="mt-3 text-[12px] text-gray-400">
-          부자재·경비 마스터에 활성 항목이 없습니다. 마스터에서 먼저 등록하세요.
-        </p>
-      )}
+          {!hasBase && (
+            <p className="mt-2 text-[12px] text-amber-600">
+              재고원가 없음 — 부자재 합계만 반영됩니다.
+            </p>
+          )}
+        </div>
+
+        {/* 아래: 선택 (섹션별 드롭다운 — 클릭해서 고름) */}
+        <div className="border-t border-gray-100 bg-gray-50/60 p-5">
+          <p className="mb-3 text-[11px] font-bold text-gray-400">부자재·경비 선택</p>
+          {materials.length === 0 ? (
+            <p className="text-[12px] text-gray-400">
+              활성 항목이 없습니다.{' '}
+              <Link
+                href="/admin/master/materials"
+                className="font-medium text-[#3182F6] hover:underline"
+              >
+                마스터에서 등록 →
+              </Link>
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+              {MATERIAL_SECTIONS.map((section) => {
+                const rows = materials.filter((m) => m.section === section);
+                const empty = rows.length === 0;
+                return (
+                  <label key={section} className="flex flex-col gap-1">
+                    <span className="text-[12px] font-bold text-gray-500">{section}</span>
+                    <select
+                      value={picked[section] ?? ''}
+                      disabled={empty}
+                      onChange={(e) =>
+                        setPicked((p) => ({ ...p, [section]: e.target.value }))
+                      }
+                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[13px] text-gray-800 outline-none focus:border-transparent focus:ring-2 focus:ring-[#3182F6] disabled:bg-gray-100 disabled:text-gray-300"
+                    >
+                      <option value="">{empty ? '항목 없음' : '선택 안 함'}</option>
+                      {rows.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} · {won(m.price)}원
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
