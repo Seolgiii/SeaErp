@@ -31,6 +31,8 @@ export type InventoryCreatePayload = {
   매입자RecordId?: string;
   선박명?: string;
   비고?: string;
+  /** true면 품목마스터에 없을 때 인라인 생성하지 않고 실패 (PC 직접 등록 — 마스터에서만 생성) */
+  disallowProductCreate?: boolean;
   /** 작업자 record ID — 서버에서 권한 검증용 */
   작업자: string;
   /** 호환성: 일부 폼이 영어 키로 보내는 필드(현재 서버는 무시) */
@@ -132,6 +134,13 @@ async function resolveProductMasterForInbound(formData: InventoryCreatePayload):
     return { masterId: existing.id, productCode, productCategory, lotIds };
   }
 
+  // 인라인 신규 생성 차단(PC 직접 등록 등) — 마스터에 없으면 생성하지 않고 실패시킨다.
+  // (마스터 데이터는 마스터 화면에서만 만든다는 원칙)
+  if (formData?.["disallowProductCreate"]) {
+    logWarn("[createInventoryRecord] 품목마스터 미존재 + 인라인 생성 차단:", name);
+    return null;
+  }
+
   // 기존 품목마스터가 없으면 신규 생성 (처음 입고되는 품목)
   let created: { id?: string; fields?: Record<string, unknown> };
   try {
@@ -225,7 +234,12 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
     // 품목마스터 확인 또는 신규 생성
     const productMaster = await resolveProductMasterForInbound(formData);
     if (!productMaster) {
-      return { success: false, message: "품목마스터를 확인할 수 없습니다." };
+      return {
+        success: false,
+        message: formData?.["disallowProductCreate"]
+          ? "품목 마스터에 없는 품목입니다. 품목 마스터에서 먼저 등록하세요."
+          : "품목마스터를 확인할 수 없습니다.",
+      };
     }
 
     const bizDate = inboundDateForAirtable(formData?.["입고일자"]);

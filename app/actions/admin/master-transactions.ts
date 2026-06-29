@@ -299,6 +299,8 @@ export async function createInboundDirect(
     선박명: input.선박명,
     storageRecordId: input.storageRecordId,
     비고: input.비고,
+    // 마스터 데이터는 마스터 화면에서만 — 없는 품목은 인라인 생성하지 않고 실패시킨다.
+    disallowProductCreate: true,
     작업자: adminId,
   });
 

@@ -111,4 +111,25 @@ describe("입고 PC 직접 등록", () => {
     expect(store.list("입고 관리")).toHaveLength(0);
     expect(store.list("LOT별 재고")).toHaveLength(0);
   });
+
+  test("마스터에 없는 품목은 인라인 생성 없이 거부", async () => {
+    seedMasters();
+
+    const { createInboundDirect } = await import(
+      "@/app/actions/admin/master-transactions"
+    );
+    const res = await createInboundDirect({
+      adminWorkerId: WORKER_ADMIN.id,
+      품목명: "존재하지않는품목XYZ", // 품목마스터에 없음
+      입고일자: "2026-05-06",
+      "입고수량(BOX)": 10,
+      commit: true,
+    });
+
+    expect(res.success).toBe(false);
+    // 품목마스터가 새로 생기지 않아야 함 (seed된 1건 그대로) + 입고/LOT 미생성
+    expect(store.list("품목마스터")).toHaveLength(1);
+    expect(store.list("입고 관리")).toHaveLength(0);
+    expect(store.list("LOT별 재고")).toHaveLength(0);
+  });
 });

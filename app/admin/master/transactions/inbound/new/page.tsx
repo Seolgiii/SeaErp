@@ -11,7 +11,8 @@
 //  - 매입처·보관처·매입자: 타이핑 검색 → 자동완성 목록에서 선택(record 링크).
 //    오타로 마스터가 중복 생성되지 않도록 "기존 항목 선택" 모델(모바일 카트와 동일).
 //    새 항목이 필요하면 각 마스터 화면에서 먼저 추가.
-//  - 품목명: 자유 텍스트 + 자동완성(기존 품목 재사용 유도). 신규명은 입고 시 품목마스터 자동 생성.
+//  - 품목명: 타이핑 검색 + 자동완성. 기존 품목마스터에서만 선택(인라인 신규 생성 안 함).
+//    새 품목은 품목 마스터 화면에서 먼저 등록. (마스터 데이터는 마스터에서만 만든다는 원칙)
 //  - 원산지: 국내산(기본)/일본산 칩 토글.
 //
 // 연속 입력: 저장 후 배치 공통 맥락(입고일·매입처·보관처·매입자·선박·원산지)은
@@ -218,7 +219,9 @@ export default function InboundCreatePage() {
     productRef.current?.focus();
   }, []);
 
-  // 링크 필드 미해소 표시 (텍스트는 있는데 기존 항목에 없음)
+  // 미해소 표시 (텍스트는 있는데 기존 항목에 없음) — 품목은 필수라 차단까지
+  const productUnresolved =
+    productName.trim() !== '' && resolveId(productName, '', products) === '';
   const supplierUnresolved =
     supplierText.trim() !== '' && resolveId(supplierText, supplierId, suppliers) === '';
   const storageUnresolved =
@@ -234,6 +237,14 @@ export default function InboundCreatePage() {
     }
     if (!productName.trim()) {
       toast('품목명을 입력하세요.', 'error');
+      return;
+    }
+    // 품목은 기존 마스터에서만 — 없으면 차단(인라인 생성 안 함)
+    const prod = products.find(
+      (p) => p.name.toLowerCase() === productName.trim().toLowerCase(),
+    );
+    if (!prod) {
+      toast('품목 마스터에 없는 품목입니다. 품목 마스터에서 먼저 등록하세요.', 'error');
       return;
     }
     const parsed = tryParseInboundDateInput(bizDate);
@@ -260,7 +271,7 @@ export default function InboundCreatePage() {
       const res = await createInboundDirect({
         adminWorkerId: session.workerId,
         입고일자: iso,
-        품목명: productName.trim(),
+        품목명: prod.name,
         규격: spec.trim(),
         미수: misu.trim(),
         '입고수량(BOX)': qty,
@@ -399,9 +410,10 @@ export default function InboundCreatePage() {
               onType={setProductName}
               onPick={(o) => setProductName(o.name)}
               options={products}
-              placeholder="품목명 입력 (기존 품목은 자동완성)"
+              placeholder="검색 후 선택 (기존 품목만)"
               inputRef={productRef}
               disabled={!ready}
+              unresolved={productUnresolved}
             />
           </div>
           <div className={fieldClass}>
@@ -518,10 +530,13 @@ export default function InboundCreatePage() {
           />
         </label>
 
-        {(supplierUnresolved || storageUnresolved || purchaserUnresolved) && (
+        {(productUnresolved ||
+          supplierUnresolved ||
+          storageUnresolved ||
+          purchaserUnresolved) && (
           <p className="text-xs text-amber-600">
-            노란 칸은 목록에 없는 값입니다 — 자동완성에서 선택하거나, 해당 마스터에
-            먼저 등록하세요. (선택 안 하면 비운 채로 저장됩니다)
+            노란 칸은 목록에 없는 값입니다 — 자동완성에서 선택하거나 해당 마스터에
+            먼저 등록하세요. 인라인 신규 생성은 하지 않습니다(품목은 필수라 선택해야 저장됩니다).
           </p>
         )}
       </div>
