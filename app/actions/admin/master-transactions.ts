@@ -6,6 +6,7 @@ import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
 import { logError } from "@/lib/logger";
 import { createInventoryRecord } from "@/app/actions/inventory/inbound";
 import { createOutboundRecord } from "@/app/actions/inventory/outbound";
+import { createTransferRecord } from "@/app/actions/inventory/transfer";
 import { updateApprovalStatus } from "@/app/actions/admin/admin";
 import { ensureAdmin, type Result } from "./_master-helpers";
 
@@ -404,6 +405,75 @@ export async function createOutboundDirect(input: {
     "승인 완료",
   );
   revalidatePath("/admin/master/transactions/outbound");
+
+  if (!approved.success) {
+    return {
+      success: true,
+      committed: false,
+      message: `등록은 됐으나 즉시 승인에 실패했습니다(${approved.message ?? "원인 미상"}). '승인 대기'로 저장됐습니다.`,
+    };
+  }
+  return { success: true, committed: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 이동 PC 직접 등록 (관리자 전용, 단건) — 일괄은 화면에서 행마다 호출
+//
+// 입고·출고와 동일: 입력 관리자가 곧 결정자. createTransferRecord(승인 대기 생성)
+// → updateApprovalStatus("TRANSFER","승인 완료")(approveTransfer: 새 입고관리/LOT 생성·
+// 원본 차감·이동출고증) 연쇄. 신규 도메인 로직 없음.
+// ─────────────────────────────────────────────────────────────────────────────
+export type TransferDirectItem = {
+  /** LOT별 재고 record id */
+  lotRecordId: string;
+  /** 표시용(로그·토스트) */
+  lotNumber?: string;
+  이동수량: number;
+  /** 이동 후 보관처 마스터 record id */
+  이동후보관처RecordId: string;
+  /** 이동일 YYYY-MM-DD */
+  이동일: string;
+};
+
+export async function createTransferDirect(input: {
+  adminWorkerId: string;
+  item: TransferDirectItem;
+  /** true=입력 즉시 승인(커밋) / false=승인 대기로 보류 */
+  commit: boolean;
+}): Promise<{ success: boolean; message?: string; committed: boolean }> {
+  const adminId = String(input?.adminWorkerId ?? "").trim();
+  const gate = await ensureAdmin(adminId, TAG);
+  if (!gate.success) return { success: false, message: gate.error, committed: false };
+
+  const it = input.item;
+
+  // 1. 재고 이동 생성 (승인 대기) — 작업자 = 입력 관리자
+  const created: { success: boolean; message?: string; transferRecordId?: string } =
+    await createTransferRecord({
+      lotRecordId: it.lotRecordId,
+      이동수량: it.이동수량,
+      이동후보관처RecordId: it.이동후보관처RecordId,
+      이동일: it.이동일,
+      workerId: adminId,
+    });
+
+  if (!created.success || !created.transferRecordId) {
+    return { success: false, message: created.message ?? "이동 등록 실패", committed: false };
+  }
+
+  if (!input.commit) {
+    revalidatePath("/admin/master/transactions/transfer");
+    return { success: true, committed: false };
+  }
+
+  // 2. 입력 관리자가 곧 결정자 — 기존 승인 로직 재사용(approveTransfer)
+  const approved = await updateApprovalStatus(
+    adminId,
+    created.transferRecordId,
+    "TRANSFER",
+    "승인 완료",
+  );
+  revalidatePath("/admin/master/transactions/transfer");
 
   if (!approved.success) {
     return {

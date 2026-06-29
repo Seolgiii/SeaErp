@@ -216,7 +216,7 @@ export async function createTransferRecord(payload: {
   이동후보관처RecordId: string;
   이동일: string;
   workerId: string;
-}): Promise<{ success: boolean; message?: string }> {
+}): Promise<{ success: boolean; message?: string; transferRecordId?: string }> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return { success: false, message: "환경변수 누락" };
 
   const { lotRecordId, 이동수량, 이동후보관처RecordId, 이동일, workerId } = payload;
@@ -265,7 +265,7 @@ export async function createTransferRecord(payload: {
 
     revalidatePath("/my-requests");
     revalidatePath("/admin/dashboard");
-    return { success: true };
+    return { success: true, transferRecordId: created.id };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "알 수 없는 오류";
     logError("[createTransferRecord] 실패:", msg);
