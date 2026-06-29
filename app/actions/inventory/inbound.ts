@@ -27,6 +27,8 @@ export type InventoryCreatePayload = {
   원산지?: string;
   매입처?: string;
   매입처RecordId?: string;
+  /** 매입자 작업자 record ID — 비면 작업자(입력자)로 폴백 */
+  매입자RecordId?: string;
   선박명?: string;
   비고?: string;
   /** 작업자 record ID — 서버에서 권한 검증용 */
@@ -243,6 +245,9 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
     }
 
     const supplierRecordId = String(formData?.["매입처RecordId"] ?? "").trim();
+    // 매입자는 작업자(입력자)와 별개 — 비면 작업자로 폴백 (모바일 카트는 미전달 → 기존 동작 유지)
+    const purchaserRecordId = String(formData?.["매입자RecordId"] ?? "").trim();
+    const purchaserId = isRecordId(purchaserRecordId) ? purchaserRecordId : workerRecordId;
 
     // ── 1. 입고 관리 생성 (LOT번호는 아직 비움) ──
     const inboundFields: Record<string, unknown> = {
@@ -253,7 +258,7 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
       잔여수량: qty,
       원산지: String(formData?.["원산지"] ?? ""),
       [INBOUND_WORKER_FIELD]: [workerRecordId],
-      매입자: [workerRecordId],
+      매입자: [purchaserId],
       [INBOUND_PRODUCT_MASTER_FIELD]: [productMaster.masterId],
       승인상태: "승인 대기",
       ...(Number.isFinite(purchasePrice) && purchasePrice > 0 && { 수매가: purchasePrice }),
@@ -350,7 +355,8 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
     // 재고 현황 페이지와 관리자 대시보드 캐시 초기화 (최신 데이터 반영)
     revalidatePath("/inventory/status");
     revalidatePath("/admin/dashboard");
-    return { success: true };
+    // inboundRecordId·lotNumber 반환 (PC 직접 등록에서 즉시 승인 연쇄에 사용; 기존 호출부는 무시)
+    return { success: true, inboundRecordId, lotNumber };
   } catch (error) {
     logError("[createInventoryRecord] 예외:", error);
     return { success: false };

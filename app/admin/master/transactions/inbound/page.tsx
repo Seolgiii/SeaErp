@@ -1,11 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
   MagnifyingGlassIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -180,13 +182,22 @@ export default function InboundHistoryPage() {
             기간 내 모든 입고 건 (승인 완료·대기·반려 전체, 재고이동·기존재고 포함)
           </p>
         </div>
-        <button
-          onClick={exportCsv}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowDownTrayIcon className="h-4 w-4" />
-          CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/master/transactions/inbound/new"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#3182F6] px-3 py-2 text-sm font-semibold text-white hover:bg-blue-600"
+          >
+            <PlusIcon className="h-4 w-4" />
+            입고 등록
+          </Link>
+          <button
+            onClick={exportCsv}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            CSV
+          </button>
+        </div>
       </div>
 
       {/* 컨트롤 — 조회 기간 + 상태 필터 */}

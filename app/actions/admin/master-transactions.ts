@@ -1,8 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { fetchAirtable } from "@/lib/airtable";
 import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
 import { logError } from "@/lib/logger";
+import { createInventoryRecord } from "@/app/actions/inventory/inbound";
+import { updateApprovalStatus } from "@/app/actions/admin/admin";
 import { ensureAdmin, type Result } from "./_master-helpers";
 
 /**
@@ -224,4 +227,110 @@ export async function getInboundHistory(
     logError(`[${TAG}] 입고 이력 조회 실패:`, e);
     return { success: false, error: e instanceof Error ? e.message : "조회 실패" };
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 입고 PC 직접 등록 (관리자 전용)
+//
+// 모바일 입고는 작업자 '신청' → 관리자 '승인'의 2단계지만, PC 입력자는 이미
+// 승인 권한자(관리자/마스터)다. 그래서 '승인'을 별도 결재 게이트로 두지 않고,
+// 입력하는 관리자가 곧 결정자가 되어 한 번에 커밋한다(= 입력 즉시 실재 재고).
+//
+// 신규 도메인 로직 없음 — 기존 두 함수를 이어 호출만 한다:
+//   1) createInventoryRecord  : 입고 관리 + LOT 생성(승인 대기), 매입처·선박·보관처·매입자 기록
+//   2) updateApprovalStatus("INBOUND", "승인 완료") : LOT 재고 반영 + 보관처 비용 + 입고증 PDF
+//      (멱등 가드·requireAdmin 내장)
+//
+// commit=false면 2)를 생략하고 '승인 대기'로만 저장(정보 미완성 시 보류용).
+// ─────────────────────────────────────────────────────────────────────────────
+export type InboundDirectInput = {
+  adminWorkerId: string;
+  /** YYYY-MM-DD 또는 YYYY/MM/DD */
+  입고일자: string;
+  품목명: string;
+  규격?: string;
+  미수?: string;
+  "입고수량(BOX)": number;
+  수매가?: number;
+  원산지?: string;
+  /** 매입처 마스터 record id */
+  매입처RecordId?: string;
+  선박명?: string;
+  /** 보관처 마스터 record id */
+  storageRecordId?: string;
+  /** 매입자 작업자 record id — 비면 입력 관리자로 폴백 */
+  매입자RecordId?: string;
+  비고?: string;
+  /** true=입력 즉시 승인(커밋) / false=승인 대기로 보류 */
+  commit: boolean;
+};
+
+export async function createInboundDirect(
+  input: InboundDirectInput,
+): Promise<{
+  success: boolean;
+  message?: string;
+  lotNumber?: string;
+  /** 실제로 승인까지 됐는지(커밋). false면 '승인 대기'로 저장됨. */
+  committed: boolean;
+}> {
+  const adminId = String(input?.adminWorkerId ?? "").trim();
+
+  // PC 직접 등록은 관리자/마스터 전용 게이트 (친절한 메시지 반환)
+  const gate = await ensureAdmin(adminId, TAG);
+  if (!gate.success) return { success: false, message: gate.error, committed: false };
+
+  // 1. 입고 관리 + LOT 생성 (승인 대기) — 작업자=입력 관리자, 매입자는 별도 폴백
+  const created: {
+    success: boolean;
+    message?: string;
+    inboundRecordId?: string;
+    lotNumber?: string;
+  } = await createInventoryRecord({
+    입고일자: input.입고일자,
+    품목명: input.품목명,
+    규격: input.규격 ?? "",
+    미수: input.미수 ?? "",
+    "입고수량(BOX)": input["입고수량(BOX)"],
+    수매가: input.수매가,
+    원산지: input.원산지 ?? "",
+    매입처RecordId: input.매입처RecordId,
+    매입자RecordId: input.매입자RecordId,
+    선박명: input.선박명,
+    storageRecordId: input.storageRecordId,
+    비고: input.비고,
+    작업자: adminId,
+  });
+
+  if (!created.success || !created.inboundRecordId) {
+    return { success: false, message: created.message ?? "입고 등록 실패", committed: false };
+  }
+
+  // 2. 보류(승인 대기)면 여기서 종료
+  if (!input.commit) {
+    revalidatePath("/admin/master/transactions/inbound");
+    return { success: true, lotNumber: created.lotNumber, committed: false };
+  }
+
+  // 3. 입력한 관리자가 곧 결정자 — 기존 승인 로직 재사용 (재고 반영·비용·PDF)
+  const approved = await updateApprovalStatus(
+    adminId,
+    created.inboundRecordId,
+    "INBOUND",
+    "승인 완료",
+  );
+
+  revalidatePath("/admin/master/transactions/inbound");
+
+  if (!approved.success) {
+    // 입고 자체는 '승인 대기'로 저장됨 — 결재 수신함에서 수동 승인 가능
+    return {
+      success: true,
+      committed: false,
+      lotNumber: created.lotNumber,
+      message: `등록은 됐으나 즉시 승인에 실패했습니다(${approved.message ?? "원인 미상"}). '승인 대기'로 저장됐으니 결재 수신함에서 승인하세요.`,
+    };
+  }
+
+  return { success: true, lotNumber: created.lotNumber, committed: true };
 }
