@@ -20,6 +20,8 @@ import {
   type LotCostInfo,
   type LotLifecycleData,
 } from '@/app/actions/admin/master-lot-timeline';
+import { listMaterials, type Material } from '@/app/actions/admin/master-materials';
+import { MATERIAL_SECTIONS } from '@/lib/material-sections';
 
 // 한 이동은 보내는 LOT의 '이동 출고'(−)와 받는 LOT의 '이동 입고'(+) 두 줄로 표시 →
 // 각 LOT의 잔여재고를 통장처럼 추적. LOT 전이(원본→신규)는 본문에 표기.
@@ -51,6 +53,8 @@ export default function LotTimelinePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<LotLifecycleData | null>(null);
   const [searched, setSearched] = useState(false);
+  // 판매원가 계산기용 — 활성 부자재·경비 항목 (LOT과 무관, 1회 로드)
+  const [materials, setMaterials] = useState<Material[]>([]);
 
   useEffect(() => {
     const session = readSession();
@@ -60,6 +64,14 @@ export default function LotTimelinePage() {
     }
     setWorkerId(session.workerId);
   }, [router]);
+
+  useEffect(() => {
+    if (!workerId) return;
+    void (async () => {
+      const res = await listMaterials(workerId);
+      if (res.success) setMaterials(res.data.filter((m) => m.active));
+    })();
+  }, [workerId]);
 
   const runSearch = useCallback(
     async (raw: string) => {
@@ -179,6 +191,14 @@ export default function LotTimelinePage() {
 
             {/* 재고원가 (오늘 기준 박스당 + 현재 재고 평가액) */}
             <CostCard cost={data.cost} stockQty={data.currentStockQty} />
+
+            {/* 판매원가 (계산기) — 재고원가 + 선택한 부자재·경비(박스당) */}
+            <SalePriceCard
+              baseCostPerBox={data.cost.totalPerBox}
+              hasBase={data.cost.hasData}
+              stockQty={data.currentStockQty}
+              materials={materials}
+            />
           </div>
 
           {/* 우: 이벤트 타임라인 */}
@@ -220,6 +240,114 @@ export default function LotTimelinePage() {
 /** 원가 표시 — 반올림 후 천단위 콤마 (formatIntKo는 trunc이므로 round 선행) */
 function won(n: number): string {
   return formatIntKo(Math.round(n));
+}
+
+/**
+ * 판매원가 계산기 — 재고원가(박스당) + 선택한 부자재·경비(박스당) 합.
+ * 선택은 저장하지 않는 인터랙티브 계산(계산기형). 운임·필렛 단위는 추후.
+ */
+function SalePriceCard({
+  baseCostPerBox,
+  hasBase,
+  stockQty,
+  materials,
+}: {
+  baseCostPerBox: number;
+  hasBase: boolean;
+  stockQty: number;
+  materials: Material[];
+}) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const base = hasBase ? baseCostPerBox : 0;
+  const addOn = materials
+    .filter((m) => selected.has(m.id))
+    .reduce((sum, m) => sum + m.price, 0);
+  const salePerBox = base + addOn;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-bold text-gray-400">판매원가 (박스당)</p>
+        <span className="text-[11px] text-gray-400">재고원가 + 선택한 부자재·경비</span>
+      </div>
+      <p className="text-[22px] font-black text-gray-900 mt-0.5">
+        {won(salePerBox)}
+        <span className="text-[14px] font-bold text-gray-400 ml-1">원/박스</span>
+      </p>
+
+      <ul className="mt-2 space-y-1 text-[13px]">
+        <li className="flex justify-between">
+          <span className="text-gray-500">재고원가</span>
+          <span className="tabular-nums text-gray-800">{won(base)}원</span>
+        </li>
+        <li className="flex justify-between">
+          <span className="text-gray-500">부자재·경비 합계</span>
+          <span className="tabular-nums text-gray-800">+{won(addOn)}원</span>
+        </li>
+        {stockQty > 0 && (
+          <li className="flex justify-between border-t border-gray-100 pt-1 font-bold">
+            <span className="text-gray-700">판매원가 × 재고 {formatIntKo(stockQty)}박스</span>
+            <span className="tabular-nums text-gray-900">{won(salePerBox * stockQty)}원</span>
+          </li>
+        )}
+      </ul>
+
+      {!hasBase && (
+        <p className="mt-2 text-[12px] text-amber-600">
+          재고원가가 없어(수매가·보관비 미입력) 부자재 합계만 더해집니다.
+        </p>
+      )}
+
+      <div className="mt-4 space-y-3">
+        {MATERIAL_SECTIONS.map((section) => {
+          const rows = materials.filter((m) => m.section === section);
+          return (
+            <div key={section}>
+              <p className="text-[12px] font-bold text-gray-500 mb-1.5">{section}</p>
+              {rows.length === 0 ? (
+                <p className="text-[12px] text-gray-300">항목 없음</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {rows.map((m) => {
+                    const on = selected.has(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => toggle(m.id)}
+                        className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                          on
+                            ? 'border-[#3182F6] bg-blue-50 text-[#3182F6]'
+                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {m.name} <span className="text-gray-400">{won(m.price)}원</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {materials.length === 0 && (
+        <p className="mt-3 text-[12px] text-gray-400">
+          부자재·경비 마스터에 활성 항목이 없습니다. 마스터에서 먼저 등록하세요.
+        </p>
+      )}
+    </div>
+  );
 }
 
 function CostCard({ cost, stockQty }: { cost: LotCostInfo; stockQty: number }) {
