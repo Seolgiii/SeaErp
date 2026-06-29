@@ -62,7 +62,7 @@ function lotTablePath(): string {
 
 function inboundTablePath(): string {
   return tablePathSegment(
-    process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리",
+    process.env.AIRTABLE_INBOUND_TABLE?.trim() || "입고 관리",
   );
 }
 

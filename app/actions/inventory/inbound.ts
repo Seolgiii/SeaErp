@@ -46,7 +46,7 @@ const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 /** 입고 관리 테이블 — env 우선, fallback은 테이블명 */
 function inboundTablePath(): string {
   return encodeURIComponent(
-    process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리"
+    process.env.AIRTABLE_INBOUND_TABLE?.trim() || "입고 관리"
   );
 }
 
@@ -517,7 +517,7 @@ export async function getSupplierOptions(): Promise<{ id: string; name: string }
   }
 
   // 2. 폴백: 입고 관리 테이블의 매입처 필드에서 unique 값 수집 (ID 없음)
-  const fallbackTableName = process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리";
+  const fallbackTableName = process.env.AIRTABLE_INBOUND_TABLE?.trim() || "입고 관리";
   log(`[getSupplierOptions] 폴백 — 테이블명: "${fallbackTableName}"`);
   try {
     const table = encodeURIComponent(fallbackTableName);

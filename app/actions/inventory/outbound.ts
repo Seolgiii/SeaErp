@@ -41,14 +41,14 @@ const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 /** 입고 관리 테이블 경로 (URL 인코딩 처리) */
 function inboundTablePath(): string {
   return encodeURIComponent(
-    process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리"
+    process.env.AIRTABLE_INBOUND_TABLE?.trim() || "입고 관리"
   );
 }
 
 /** 출고 관리 테이블 경로 (URL 인코딩 처리) */
 function outboundTablePath(): string {
   return encodeURIComponent(
-    process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리"
+    process.env.AIRTABLE_OUTBOUND_TABLE?.trim() || "출고 관리"
   );
 }
 
@@ -359,7 +359,7 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
     if (seller) fields["판매처"] = seller;
     if (payload?.salePrice != null && payload.salePrice !== "") fields["판매가"] = Number(payload.salePrice);
 
-    log("[createOutboundRecord] POST table:", process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리");
+    log("[createOutboundRecord] POST table:", process.env.AIRTABLE_OUTBOUND_TABLE?.trim() || "출고 관리");
     log("[createOutboundRecord] POST fields:", JSON.stringify(fields));
 
     try {
@@ -368,7 +368,7 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "저장 실패";
       logError("[createOutboundRecord] POST 실패:", {
-        table: process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리",
+        table: process.env.AIRTABLE_OUTBOUND_TABLE?.trim() || "출고 관리",
         error: msg,
         requestFields: fields,
       });
