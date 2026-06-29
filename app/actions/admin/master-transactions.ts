@@ -7,6 +7,7 @@ import { logError } from "@/lib/logger";
 import { createInventoryRecord } from "@/app/actions/inventory/inbound";
 import { createOutboundRecord } from "@/app/actions/inventory/outbound";
 import { createTransferRecord } from "@/app/actions/inventory/transfer";
+import { createExpenseRecord } from "@/app/actions/expense/expense";
 import { updateApprovalStatus } from "@/app/actions/admin/admin";
 import { ensureAdmin, type Result } from "./_master-helpers";
 
@@ -474,6 +475,77 @@ export async function createTransferDirect(input: {
     "승인 완료",
   );
   revalidatePath("/admin/master/transactions/transfer");
+
+  if (!approved.success) {
+    return {
+      success: true,
+      committed: false,
+      message: `등록은 됐으나 즉시 승인에 실패했습니다(${approved.message ?? "원인 미상"}). '승인 대기'로 저장됐습니다.`,
+    };
+  }
+  return { success: true, committed: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 지출 PC 직접 등록 (관리자 전용, 단건)
+//
+// 입고·출고·이동과 동일: 입력 관리자가 곧 결정자. createExpenseRecord(승인 대기)
+// → updateApprovalStatus("EXPENSE","승인 완료") 연쇄. 신규 도메인 로직 없음.
+//
+// 단, 100만원 권한 룰: 서버(updateApprovalStatus)가 ≥100만원 + 비MASTER면 즉시 승인을
+// 차단한다. 그 경우 commit=true여도 '승인 대기'로 남고(committed=false) 메시지로 안내 —
+// MASTER가 결재 수신함에서 승인해야 한다.
+// ─────────────────────────────────────────────────────────────────────────────
+export type ExpenseDirectInput = {
+  adminWorkerId: string;
+  /** 지출일 YYYY-MM-DD */
+  date: string;
+  /** 건명(항목) */
+  title: string;
+  amount: number;
+  description?: string;
+  remarks?: string;
+  isCorpCard?: boolean;
+  /** true=입력 즉시 승인(커밋) / false=승인 대기로 보류 */
+  commit: boolean;
+};
+
+export async function createExpenseDirect(
+  input: ExpenseDirectInput,
+): Promise<{ success: boolean; message?: string; committed: boolean }> {
+  const adminId = String(input?.adminWorkerId ?? "").trim();
+  const gate = await ensureAdmin(adminId, TAG);
+  if (!gate.success) return { success: false, message: gate.error, committed: false };
+
+  // 1. 지출결의 생성 (승인 대기) — 신청자 = 입력 관리자
+  const created: { success: boolean; error?: string; expenseRecordId?: string } =
+    await createExpenseRecord({
+      applicantRecordId: adminId,
+      date: input.date,
+      title: input.title,
+      amount: input.amount,
+      description: input.description,
+      remarks: input.remarks,
+      isCorpCard: input.isCorpCard,
+    });
+
+  if (!created.success || !created.expenseRecordId) {
+    return { success: false, message: created.error ?? "지출 등록 실패", committed: false };
+  }
+
+  if (!input.commit) {
+    revalidatePath("/admin/master/transactions/expense");
+    return { success: true, committed: false };
+  }
+
+  // 2. 입력 관리자가 곧 결정자 — 기존 승인 로직 재사용(100만원 권한은 서버가 재검증)
+  const approved = await updateApprovalStatus(
+    adminId,
+    created.expenseRecordId,
+    "EXPENSE",
+    "승인 완료",
+  );
+  revalidatePath("/admin/master/transactions/expense");
 
   if (!approved.success) {
     return {

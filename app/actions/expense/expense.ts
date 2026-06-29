@@ -79,7 +79,7 @@ export async function createExpenseRecord(formData: ExpenseCreatePayload) {
       throw e;
     }
 
-    await createAirtableRecord("지출결의", {
+    const created = await createAirtableRecord("지출결의", {
       "지출일": expenseDate,
       "작성일": createdDate,
       "건명": title,
@@ -95,7 +95,8 @@ export async function createExpenseRecord(formData: ExpenseCreatePayload) {
 
     revalidatePath("/expense/list");
     revalidatePath("/admin/dashboard");
-    return { success: true };
+    // expenseRecordId 반환 (PC 직접 등록의 즉시 승인 연쇄에 사용; 기존 호출부는 무시)
+    return { success: true, expenseRecordId: created.id };
   } catch (error) {
     logError("createExpenseRecord unexpected error", error);
     return {
