@@ -5,6 +5,7 @@ import { fetchAirtable } from "@/lib/airtable";
 import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
 import { logError } from "@/lib/logger";
 import { createInventoryRecord } from "@/app/actions/inventory/inbound";
+import { createOutboundRecord } from "@/app/actions/inventory/outbound";
 import { updateApprovalStatus } from "@/app/actions/admin/admin";
 import { ensureAdmin, type Result } from "./_master-helpers";
 
@@ -335,6 +336,83 @@ export async function createInboundDirect(
   }
 
   return { success: true, lotNumber: created.lotNumber, committed: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 출고 PC 직접 등록 (관리자 전용, 단건) — 일괄은 화면에서 행마다 호출
+//
+// 입고와 동일: 입력하는 관리자가 곧 결정자. createOutboundRecord(승인 대기 생성)
+// → updateApprovalStatus("OUTBOUND","승인 완료")(잔여수량 차감·출고시점 비용 스냅샷·
+// 출고증 PDF) 연쇄. 신규 도메인 로직 없음.
+// ─────────────────────────────────────────────────────────────────────────────
+export type OutboundDirectItem = {
+  /** LOT별 재고 record id */
+  lotRecordId: string;
+  /** 표시용(로그·토스트) */
+  lotNumber?: string;
+  quantity: number;
+  /** 출고일 YYYY-MM-DD */
+  date: string;
+  seller: string;
+  salePrice: number;
+  spec?: string;
+  misu?: string;
+  origin?: string;
+};
+
+export async function createOutboundDirect(input: {
+  adminWorkerId: string;
+  item: OutboundDirectItem;
+  /** true=입력 즉시 승인(커밋) / false=승인 대기로 보류 */
+  commit: boolean;
+}): Promise<{ success: boolean; message?: string; committed: boolean }> {
+  const adminId = String(input?.adminWorkerId ?? "").trim();
+  const gate = await ensureAdmin(adminId, TAG);
+  if (!gate.success) return { success: false, message: gate.error, committed: false };
+
+  const it = input.item;
+
+  // 1. 출고 관리 생성 (승인 대기) — 작업자 = 입력 관리자
+  const created: { success: boolean; error?: string; outboundRecordId?: string } =
+    await createOutboundRecord({
+      lotRecordId: it.lotRecordId,
+      workerRecordId: adminId,
+      quantity: it.quantity,
+      date: it.date,
+      seller: it.seller,
+      salePrice: it.salePrice,
+      spec: it.spec,
+      misu: it.misu,
+      origin: it.origin,
+      lotNumber: it.lotNumber,
+    });
+
+  if (!created.success || !created.outboundRecordId) {
+    return { success: false, message: created.error ?? "출고 등록 실패", committed: false };
+  }
+
+  if (!input.commit) {
+    revalidatePath("/admin/master/transactions/outbound");
+    return { success: true, committed: false };
+  }
+
+  // 2. 입력 관리자가 곧 결정자 — 기존 승인 로직 재사용(잔여 차감·비용·PDF)
+  const approved = await updateApprovalStatus(
+    adminId,
+    created.outboundRecordId,
+    "OUTBOUND",
+    "승인 완료",
+  );
+  revalidatePath("/admin/master/transactions/outbound");
+
+  if (!approved.success) {
+    return {
+      success: true,
+      committed: false,
+      message: `등록은 됐으나 즉시 승인에 실패했습니다(${approved.message ?? "원인 미상"}). '승인 대기'로 저장됐습니다.`,
+    };
+  }
+  return { success: true, committed: true };
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

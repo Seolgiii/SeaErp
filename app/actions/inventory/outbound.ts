@@ -362,8 +362,10 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
     log("[createOutboundRecord] POST table:", process.env.AIRTABLE_OUTBOUND_TABLE?.trim() || "출고 관리");
     log("[createOutboundRecord] POST fields:", JSON.stringify(fields));
 
+    let outboundRecordId: string;
     try {
       const { id } = await createAirtableRecord(outboundTablePath(), fields);
+      outboundRecordId = id;
       log("[createOutboundRecord] POST 성공:", { createdRecordId: id });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "저장 실패";
@@ -377,7 +379,8 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
 
     // 관리자 대시보드 캐시 초기화 (새 출고 신청이 바로 보이도록)
     revalidatePath("/admin/dashboard");
-    return { success: true };
+    // outboundRecordId 반환 (PC 직접 등록의 즉시 승인 연쇄에 사용; 기존 호출부는 무시)
+    return { success: true, outboundRecordId };
   } catch (error) {
     logError("[createOutboundRecord] 예외:", error);
     const msg = error instanceof Error ? error.message : "서버 오류가 발생했습니다.";
