@@ -69,6 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/admin/master/workers', label: '작업자', enabled: true },
       { href: '/admin/master/ships', label: '선박', enabled: true },
       { href: '/admin/master/materials', label: '부자재·경비', enabled: true },
+      { href: '/admin/master/processing-rates', label: '가공비 단가', enabled: true },
     ],
   },
   {
