@@ -1,44 +1,38 @@
 'use client';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 가공 거래 — N개 원물 LOT → 가공품 1종, 2단계 WIP
+// 가공 거래 — 재공품(가공 중) + 완료·취소 이력
 //
-//   ㉠ 가공 투입(워크리스트): 가공공장·가공품·동결방식 + 원물 LOT 담기(부분 투입)
-//      → 원물 차감 → 상태=가공 중(재공품)
-//   ㉡ 가공 완료: 산출 실측(박스·총중량) + 재입고처 → 가공품 LOT 생성 + 가공원가 롤업
-//   ⑤ 취소: 가공 중=원물 복구 / 완료=가공품 무효화(미판매 가드)
+//   ㉠ 가공 투입은 별도 전체 페이지(/processing/new, 워크리스트).
+//   ㉡ 완료(여기 모달) → 가공품 LOT 생성 + 가공원가 롤업.
+//   ⑤ 취소: 가공 중=원물 복구 / 완료=가공품 무효화(미판매 가드).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { PlusIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { fromGroupedIntegerInput, formatIntKo } from '@/lib/number-format';
 import {
   listProcessingBatches,
-  createProcessingBatch,
   completeProcessingBatch,
   cancelProcessingBatch,
   type ProcessingBatchSummary,
 } from '@/app/actions/admin/master-processing';
 import { listStorages, type Storage } from '@/app/actions/admin/master-storage';
-import { listProducts, type Product } from '@/app/actions/admin/master-products';
-import { listLots, type Lot } from '@/app/actions/admin/master-lots';
+import { listProducts } from '@/app/actions/admin/master-products';
 
 const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
-const FREEZE_TYPES = ['ONE-Frozen', 'TWO-Frozen'] as const;
 
 export default function ProcessingPage() {
   const router = useRouter();
   const [workerId, setWorkerId] = useState<string | null>(null);
   const [batches, setBatches] = useState<ProcessingBatchSummary[]>([]);
-  const [factories, setFactories] = useState<Storage[]>([]);
   const [ownStorages, setOwnStorages] = useState<Storage[]>([]);
-  const [fillets, setFillets] = useState<Product[]>([]);
-  const [lots, setLots] = useState<Lot[]>([]);
+  const [productNames, setProductNames] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
-  const [showInput, setShowInput] = useState(false);
   const [completing, setCompleting] = useState<ProcessingBatchSummary | null>(null);
 
   useEffect(() => {
@@ -53,20 +47,15 @@ export default function ProcessingPage() {
   const loadData = useCallback(async () => {
     if (!workerId) return;
     setIsLoading(true);
-    const [b, s, p, l] = await Promise.all([
+    const [b, s, p] = await Promise.all([
       listProcessingBatches(workerId),
       listStorages(workerId),
       listProducts(workerId),
-      listLots(workerId),
     ]);
     if (b.success) setBatches(b.data);
     else toast(`조회 실패: ${b.error}`, 'error');
-    if (s.success) {
-      setFactories(s.data.filter((x) => x.kind === '가공공장'));
-      setOwnStorages(s.data.filter((x) => x.kind === '자사창고'));
-    }
-    if (p.success) setFillets(p.data.filter((x) => x.category === '필렛'));
-    if (l.success) setLots(l.data.filter((x) => x.stockQty > 0));
+    if (s.success) setOwnStorages(s.data.filter((x) => x.kind === '자사창고'));
+    if (p.success) setProductNames(new Map(p.data.map((x) => [x.id, x.name])));
     setIsLoading(false);
   }, [workerId]);
 
@@ -74,10 +63,10 @@ export default function ProcessingPage() {
     if (workerId) void loadData();
   }, [workerId, loadData]);
 
-  const productName = useMemo(() => {
-    const m = new Map(fillets.map((p) => [p.id, p.name]));
-    return (id: string) => m.get(id) ?? '—';
-  }, [fillets]);
+  const productName = useMemo(
+    () => (id: string) => productNames.get(id) ?? '—',
+    [productNames],
+  );
 
   const cancel = async (batch: ProcessingBatchSummary) => {
     if (!workerId) return;
@@ -112,13 +101,13 @@ export default function ProcessingPage() {
             재공품으로 보입니다.
           </p>
         </div>
-        <button
-          onClick={() => setShowInput(true)}
+        <Link
+          href="/admin/master/processing/new"
           className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#3182F6] px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-[#1c6ce0]"
         >
           <PlusIcon className="h-4 w-4" />
           가공 투입
-        </button>
+        </Link>
       </div>
 
       {isLoading ? (
@@ -167,19 +156,6 @@ export default function ProcessingPage() {
         </div>
       )}
 
-      {showInput && (
-        <InputModal
-          workerId={workerId}
-          factories={factories}
-          fillets={fillets}
-          lots={lots}
-          onClose={() => setShowInput(false)}
-          onSaved={() => {
-            setShowInput(false);
-            void loadData();
-          }}
-        />
-      )}
       {completing && (
         <CompleteModal
           workerId={workerId}
@@ -275,242 +251,6 @@ function StatusBadge({ status }: { status: string }) {
         ? 'bg-green-50 text-green-700'
         : 'bg-gray-100 text-gray-400';
   return <span className={`rounded-md px-2 py-0.5 text-[12px] font-medium ${cls}`}>{status}</span>;
-}
-
-// ── ㉠ 가공 투입 워크리스트 모달 ──────────────────────────────────────────────
-type Row = { lotId: string; lotNumber: string; productName: string; stockQty: number; boxes: string };
-
-function InputModal({
-  workerId,
-  factories,
-  fillets,
-  lots,
-  onClose,
-  onSaved,
-}: {
-  workerId: string;
-  factories: Storage[];
-  fillets: Product[];
-  lots: Lot[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
-  const [factoryId, setFactoryId] = useState('');
-  const [productId, setProductId] = useState('');
-  const [freezeType, setFreezeType] = useState<(typeof FREEZE_TYPES)[number] | ''>('');
-  const [rows, setRows] = useState<Row[]>([]);
-  const [q, setQ] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const query = q.trim().toLowerCase();
-  const candidates = useMemo(() => {
-    const picked = new Set(rows.map((r) => r.lotId));
-    return lots
-      .filter((l) => !picked.has(l.id))
-      .filter(
-        (l) =>
-          !query ||
-          l.lotNumber.toLowerCase().includes(query) ||
-          l.productName.toLowerCase().includes(query),
-      )
-      .slice(0, 8);
-  }, [lots, rows, query]);
-
-  const addRow = (l: Lot) =>
-    setRows((rs) => [
-      ...rs,
-      { lotId: l.id, lotNumber: l.lotNumber, productName: l.productName, stockQty: l.stockQty, boxes: '' },
-    ]);
-
-  const totalBoxes = rows.reduce((s, r) => s + (fromGroupedIntegerInput(r.boxes).value || 0), 0);
-
-  const save = async () => {
-    if (!factoryId) return toast('가공공장을 선택하세요.', 'error');
-    if (!productId) return toast('가공품을 선택하세요.', 'error');
-    if (!freezeType) return toast('동결방식을 선택하세요.', 'error');
-    if (rows.length === 0) return toast('투입할 원물 LOT을 담으세요.', 'error');
-    const inputs = [];
-    for (const r of rows) {
-      const boxes = fromGroupedIntegerInput(r.boxes).value;
-      if (!(boxes > 0)) return toast(`${r.lotNumber}: 투입 박스를 입력하세요.`, 'error');
-      if (boxes > r.stockQty) return toast(`${r.lotNumber}: 재고(${r.stockQty})를 초과했습니다.`, 'error');
-      inputs.push({ lotRecordId: r.lotId, boxes });
-    }
-    setSaving(true);
-    const res = await createProcessingBatch(workerId, {
-      date,
-      factoryId,
-      factoryName: factories.find((f) => f.id === factoryId)?.name ?? '',
-      productId,
-      freezeType,
-      inputs,
-    });
-    setSaving(false);
-    if (res.success) {
-      toast('가공 투입 완료 (상태: 가공 중)', 'success');
-      onSaved();
-    } else {
-      toast(res.error ?? '투입 실패', 'error');
-    }
-  };
-
-  const labelClass = 'text-xs font-semibold text-gray-500';
-  const inputClass =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-[#3182F6]';
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900">가공 투입</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <XMarkIcon className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>가공일</span>
-            <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>동결방식</span>
-            <select
-              className={inputClass}
-              value={freezeType}
-              onChange={(e) => setFreezeType(e.target.value as (typeof FREEZE_TYPES)[number] | '')}
-            >
-              <option value="">선택</option>
-              {FREEZE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>가공공장</span>
-            <select className={inputClass} value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
-              <option value="">선택</option>
-              {factories.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>가공품 (필렛)</span>
-            <select className={inputClass} value={productId} onChange={(e) => setProductId(e.target.value)}>
-              <option value="">선택</option>
-              {fillets.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.code ? ` (${p.code})` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {/* 원물 LOT 담기 */}
-        <div className="mt-4">
-          <div className="relative mb-2">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="원물 LOT 검색 (LOT번호·품목)"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#3182F6]"
-            />
-          </div>
-          {query && candidates.length > 0 && (
-            <div className="mb-3 max-h-40 overflow-y-auto rounded-lg border border-gray-100">
-              {candidates.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => addRow(l)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-blue-50/50"
-                >
-                  <span>
-                    <span className="font-medium text-gray-900">{l.lotNumber}</span>{' '}
-                    <span className="text-gray-500">{l.productName}</span>
-                  </span>
-                  <span className="text-[12px] text-gray-400">재고 {l.stockQty}박스</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {rows.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-[13px] text-gray-400">
-              위 검색으로 투입할 원물 LOT을 담으세요. (여러 LOT·부분 투입 가능)
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100 rounded-lg border border-gray-100">
-              {rows.map((r, i) => (
-                <div key={r.lotId} className="flex items-center gap-2 px-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-gray-900">{r.lotNumber}</div>
-                    <div className="text-[11px] text-gray-400">
-                      {r.productName} · 재고 {r.stockQty}박스
-                    </div>
-                  </div>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="박스"
-                    value={r.boxes}
-                    onChange={(e) =>
-                      setRows((rs) =>
-                        rs.map((x, j) =>
-                          j === i ? { ...x, boxes: fromGroupedIntegerInput(e.target.value).display } : x,
-                        ),
-                      )
-                    }
-                    className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm outline-none focus:ring-2 focus:ring-[#3182F6]"
-                  />
-                  <button
-                    onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
-                    className="text-gray-300 hover:text-red-500"
-                  >
-                    <XMarkIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-5 flex items-center justify-between">
-          <span className="text-[13px] text-gray-500">
-            투입 {rows.length}개 LOT · 총 {totalBoxes}박스
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              취소
-            </button>
-            <button
-              onClick={() => void save()}
-              disabled={saving}
-              className="rounded-lg bg-[#3182F6] px-4 py-2 text-sm font-bold text-white hover:bg-[#1c6ce0] disabled:opacity-40"
-            >
-              {saving ? '투입 중…' : '가공 투입'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── ㉡ 가공 완료 모달 ────────────────────────────────────────────────────────
