@@ -292,3 +292,59 @@ export function calculateTransferPricing(input: TransferPricingInput): TransferP
     newCarriedFreezeFee: Math.round(totalPerBox.freezeFee * input.transferQty),
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 가공(변환) 원가 롤업 — N개 원물 LOT → 가공품 1종
+//
+//   투입원물원가합 = Σ(투입 원물 LOT 박스당 재고원가 × 투입박스)
+//   임가공비총액   = 임가공단가 × 기준량 (투입kg당 → 투입총kg / 산출kg당 → 산출총kg)
+//   가공원가총액   = 투입원물원가합 + 임가공비총액
+//   가공품 박스당 원가 = 가공원가총액 / 산출박스   ← 새 가공품 LOT.수매가(cost basis)
+//
+// 수율 손실은 분모(산출박스/산출kg)가 투입보다 작아 단위원가가 자동으로 올라간다.
+// 가공원가는 원물 재고원가(수매가+보관비)를 이미 흡수하므로, 새 가공품 LOT의
+// 이월비용(이월냉장료 등)은 0으로 둔다 (보관비 이중계상 방지). 가공품은 재입고
+// 시점(완료일)부터 새 보관처 보관비를 새로 적산한다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ProcessingCostInput = {
+  /** 각 투입 원물 LOT: 박스당 재고원가(오늘 기준, calculateLotCostBasis.totalPerBox)와 투입박스 */
+  inputs: { perBoxCost: number; boxes: number }[];
+  /** 임가공단가 (원, '기준' 단위당) — 가공비 단가 마스터 스냅샷 */
+  processingFeeUnit: number;
+  /** 임가공비 청구 기준 */
+  basis: "투입kg당" | "산출kg당";
+  /** 투입 총중량(kg) — basis="투입kg당"일 때 임가공비 분량 */
+  inputTotalKg: number;
+  /** 산출 총중량(kg) — basis="산출kg당"일 때 임가공비 분량 + kg당 환산 분모 */
+  outputTotalKg: number;
+  /** 산출 박스 수 — 박스당 원가 분모 */
+  outputBoxes: number;
+};
+
+export type ProcessingCost = {
+  /** 투입원물원가합 (원) = Σ(박스당 재고원가 × 투입박스) */
+  inputMaterialTotal: number;
+  /** 임가공비총액 (원) = 임가공단가 × 기준량(투입/산출 kg) */
+  processingFeeTotal: number;
+  /** 가공원가총액 (원) = 투입원물원가합 + 임가공비총액 */
+  processingCostTotal: number;
+  /** 가공품 박스당 원가 (원/박스) = 가공원가총액 / 산출박스 */
+  costPerBox: number;
+  /** 가공품 kg당 원가 (원/kg) = 가공원가총액 / 산출총중량kg — 참조용 */
+  costPerKg: number;
+};
+
+/** 가공 완료 시점 가공원가 롤업. 모든 총액은 원, Math.round로 정수화. */
+export function calculateProcessingCost(input: ProcessingCostInput): ProcessingCost {
+  const inputMaterialTotal = Math.round(
+    input.inputs.reduce((sum, x) => sum + x.perBoxCost * x.boxes, 0),
+  );
+  const feeBaseKg = input.basis === "투입kg당" ? input.inputTotalKg : input.outputTotalKg;
+  const processingFeeTotal = Math.round(input.processingFeeUnit * feeBaseKg);
+  const processingCostTotal = inputMaterialTotal + processingFeeTotal;
+  const costPerBox =
+    input.outputBoxes > 0 ? Math.round(processingCostTotal / input.outputBoxes) : 0;
+  const costPerKg = input.outputTotalKg > 0 ? processingCostTotal / input.outputTotalKg : 0;
+  return { inputMaterialTotal, processingFeeTotal, processingCostTotal, costPerBox, costPerKg };
+}

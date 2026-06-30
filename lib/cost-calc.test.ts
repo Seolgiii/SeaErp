@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   calculateLotCostBasis,
   calculateOutboundCost,
+  calculateProcessingCost,
   calculateTransferPricing,
   daysBetween,
 } from "./cost-calc";
@@ -420,5 +421,70 @@ describe("calculateLotCostBasis", () => {
     expect(r.daysHeld).toBe(0);
     expect(r.refrigerationPerBox).toBe(0);
     expect(r.totalPerBox).toBe(10_540); // 10000+0+300+140+100
+  });
+});
+
+describe("calculateProcessingCost (가공원가 롤업)", () => {
+  // 투입: 고등어 원물 2 LOT (박스당 50,000 ×30 + 52,000 ×20) = 2,540,000원, 50박스=500kg
+  // 산출: 고등어필렛 35박스 = 350kg (수율 70%)
+  const baseInputs = [
+    { perBoxCost: 50_000, boxes: 30 },
+    { perBoxCost: 52_000, boxes: 20 },
+  ];
+
+  test("ONE-Frozen — 임가공비 투입kg당 (투입 500kg × 1,000원)", () => {
+    const r = calculateProcessingCost({
+      inputs: baseInputs,
+      processingFeeUnit: 1_000,
+      basis: "투입kg당",
+      inputTotalKg: 500,
+      outputTotalKg: 350,
+      outputBoxes: 35,
+    });
+    expect(r.inputMaterialTotal).toBe(2_540_000);
+    expect(r.processingFeeTotal).toBe(500_000); // 1000 × 500
+    expect(r.processingCostTotal).toBe(3_040_000);
+    expect(r.costPerBox).toBe(86_857); // round(3,040,000 / 35)
+    expect(r.costPerKg).toBeCloseTo(8_685.71, 1);
+  });
+
+  test("TWO-Frozen — 임가공비 산출kg당 (산출 350kg × 1,000원) — ONE보다 저렴", () => {
+    const r = calculateProcessingCost({
+      inputs: baseInputs,
+      processingFeeUnit: 1_000,
+      basis: "산출kg당",
+      inputTotalKg: 500,
+      outputTotalKg: 350,
+      outputBoxes: 35,
+    });
+    expect(r.processingFeeTotal).toBe(350_000); // 1000 × 350
+    expect(r.processingCostTotal).toBe(2_890_000);
+    expect(r.costPerBox).toBe(82_571); // round(2,890,000 / 35)
+  });
+
+  test("수율 손실 — 산출 박스가 투입보다 적어 박스당 원가가 투입 평균보다 높다", () => {
+    const r = calculateProcessingCost({
+      inputs: baseInputs, // 투입 50박스, 평균 박스당 50,800원
+      processingFeeUnit: 0, // 가공비 0 → 순수 수율 효과
+      basis: "투입kg당",
+      inputTotalKg: 500,
+      outputTotalKg: 350,
+      outputBoxes: 35,
+    });
+    expect(r.costPerBox).toBe(72_571); // round(2,540,000 / 35)
+    expect(r.costPerBox).toBeGreaterThan(2_540_000 / 50); // > 투입 평균 50,800
+  });
+
+  test("산출 박스 0 → 박스당 원가 0 (0 나눗셈 가드)", () => {
+    const r = calculateProcessingCost({
+      inputs: baseInputs,
+      processingFeeUnit: 1_000,
+      basis: "투입kg당",
+      inputTotalKg: 500,
+      outputTotalKg: 0,
+      outputBoxes: 0,
+    });
+    expect(r.costPerBox).toBe(0);
+    expect(r.costPerKg).toBe(0);
   });
 });

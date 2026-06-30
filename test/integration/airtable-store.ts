@@ -15,7 +15,10 @@ export type Tables =
   | "재고 이동"
   | "보관처 마스터"
   | "보관처 비용 이력"
-  | "매입처 마스터";
+  | "매입처 마스터"
+  | "가공비 단가"
+  | "가공 거래"
+  | "가공 투입";
 
 export type AirtableRecord = {
   id: string;

@@ -45,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/admin/master/transactions/outbound', label: '출고 이력', enabled: true },
       { href: '/admin/master/transactions/transfer', label: '이동 이력', enabled: true },
       { href: '/admin/master/transactions/expense', label: '지출 이력', enabled: true },
+      { href: '/admin/master/processing', label: '가공 거래', enabled: true },
       { href: '/admin/master/transactions/pdf-reissue', label: 'PDF 재발행', enabled: false },
     ],
   },
