@@ -80,6 +80,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/admin/master/ops/integrity-log', label: 'INTEGRITY 로그', enabled: false },
       { href: '/admin/master/ops/cron-history', label: 'cron 실행 이력', enabled: false },
       { href: '/admin/master/ops/schema-sync', label: 'SCHEMA 동기화', enabled: false },
+      // 제일 아래 — 용어·개념 위키(누구나 검색·학습용). 살아있는 문서 docs/업무프로세스.md와 동기화.
+      { href: '/admin/master/ops/wiki', label: '용어 위키', enabled: true },
     ],
   },
 ];
