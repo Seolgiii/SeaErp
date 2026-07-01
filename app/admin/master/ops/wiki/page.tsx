@@ -218,7 +218,7 @@ export default function WikiPage() {
 
       {nothing && (
         <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-[14px] text-gray-400">
-          "{q}" 에 해당하는 용어가 없어요.
+          &quot;{q}&quot; 에 해당하는 용어가 없어요.
         </div>
       )}
 
