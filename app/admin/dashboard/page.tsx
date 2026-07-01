@@ -107,7 +107,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (authorized) loadData();
-  }, [authorized]);
+  }, [authorized, loadData]);
 
   const isDoneTab = activeTab === "DONE";
 

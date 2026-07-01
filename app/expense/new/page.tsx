@@ -11,7 +11,7 @@ import { toast } from '@/lib/toast';
 
 export default function NewExpensePage() {
   const router = useRouter();
-  const [workerId, setWorkerId] = useState('');
+  const [, setWorkerId] = useState('');
 
   const [formData, setFormData] = useState({
     date: '',

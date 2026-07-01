@@ -168,8 +168,10 @@ export default function ProfitTrendPage() {
   );
 
   const totals = data?.totals;
-  const breakdown: ProfitBreakdownRow[] =
-    tab === 'product' ? data?.byProduct ?? [] : data?.byBuyer ?? [];
+  const breakdown: ProfitBreakdownRow[] = useMemo(
+    () => (tab === 'product' ? data?.byProduct ?? [] : data?.byBuyer ?? []),
+    [tab, data],
+  );
   const shownBreakdown = useMemo(() => {
     const q = breakdownSearch.trim().toLowerCase();
     return q ? breakdown.filter((r) => r.name.toLowerCase().includes(q)) : breakdown;

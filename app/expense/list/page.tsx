@@ -24,7 +24,7 @@ async function getExpenses() {
     if (!res.ok) return [];
     const data = await res.json();
     return data.records || [];
-  } catch (error) {
+  } catch {
     return [];
   }
 }

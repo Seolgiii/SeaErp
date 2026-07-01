@@ -1,5 +1,5 @@
 "use server";
-import { log, logError, logWarn } from '@/lib/logger';
+import { log, logError } from '@/lib/logger';
 import { fetchAirtable } from "@/lib/airtable";
 
 import { unstable_cache } from "next/cache";

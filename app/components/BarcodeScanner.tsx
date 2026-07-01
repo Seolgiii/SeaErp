@@ -210,7 +210,7 @@ export default function BarcodeScanner({ onDetected }: Props) {
       tick();
     };
 
-    run().catch((err) => {
+    run().catch(() => {
       if (!cancelled) {
         setErrorMsg('카메라를 시작할 수 없습니다. 다시 시도해 주세요.');
         setStatus('error');

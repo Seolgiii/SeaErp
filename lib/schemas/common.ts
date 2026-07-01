@@ -93,7 +93,6 @@ export function reportSchemaIssue(
   });
   // 운영자 grep용 prefix
   // 실제 import는 호출자가 함 (logger 의존성 순환 방지를 위해 console 사용)
-  // eslint-disable-next-line no-console
   console.warn(
     `[SCHEMA-MISMATCH] ${context}${recordId ? ` (${recordId})` : ""}:`,
     issues.join(" | "),

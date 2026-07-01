@@ -281,7 +281,6 @@ export function WorkerPinLoginDesktop() {
             <PinView
               worker={activeWorker}
               colorIndex={activeIndex}
-              pin={pin}
               authError={authError}
               submitting={submitting}
               dotBg={dotBg}
@@ -370,7 +369,6 @@ function ListView({
 function PinView({
   worker,
   colorIndex,
-  pin,
   authError,
   submitting,
   dotBg,
@@ -381,7 +379,6 @@ function PinView({
 }: {
   worker: Worker;
   colorIndex: number;
-  pin: string;
   authError: string | null;
   submitting: boolean;
   dotBg: (i: number) => string;

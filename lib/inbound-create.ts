@@ -4,10 +4,8 @@ import {
   LOT_FIELDS,
   PRODUCT_FIELDS,
 } from "@/lib/airtable-schema";
-import { asNumber } from "@/lib/lot-inventory";
 import { generateUniqueLotNumber } from "@/lib/lot-sequence";
 import {
-  DEFAULT_TXN_TABLE,
   TXN,
   sanitizeSingleSelectValue,
   txnStatusInbound,

@@ -3,7 +3,7 @@
 // 용어 위키 — 수산물 ERP 도메인 용어·개념 레퍼런스.
 // 목적: 1인 개발 프로젝트라, 나중에 합류할 사람이 용어를 검색·학습할 수 있게.
 // 살아있는 문서 docs/업무프로세스.md 와 같은 내용을 화면으로 옮긴 것.
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
@@ -173,12 +173,15 @@ export default function WikiPage() {
   }, [router]);
 
   const query = q.trim().toLowerCase();
-  const match = (...texts: (string | undefined)[]) =>
-    !query || texts.some((t) => (t ?? '').toLowerCase().includes(query));
+  const match = useCallback(
+    (...texts: (string | undefined)[]) =>
+      !query || texts.some((t) => (t ?? '').toLowerCase().includes(query)),
+    [query],
+  );
 
   const visibleEntries = useMemo(
     () => GLOSSARY.filter((e) => match(e.term, e.aka, e.def, e.cat)),
-    [query],
+    [match],
   );
 
   const showChain = match(

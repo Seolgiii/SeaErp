@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useSyncQueryParams } from "@/lib/use-sync-query-params";
 import { getMyRequests, cancelMyRequest } from "@/app/actions/my-requests";
 import type { RequestItem } from "@/app/actions/my-requests";
@@ -45,7 +45,6 @@ function formatSubmittedAt(iso?: string): string | null {
 }
 
 export default function MyRequestsPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const confirm = useConfirm();
   // URL 쿼리에서 초기 탭 복원 — 잘못된 값은 ALL로 fallback

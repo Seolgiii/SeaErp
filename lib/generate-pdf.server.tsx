@@ -261,6 +261,7 @@ function InboundPDF({ data, qrDataUrl }: { data: InboundPdfData; qrDataUrl?: str
 
         {qrDataUrl && (
           <View style={[s.divider, { alignItems: "center" }]}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image에는 alt prop이 없음 */}
             <Image src={qrDataUrl} style={{ width: 90, height: 90 }} />
             <Text style={{ marginTop: 4, fontSize: 8, color: "#999" }}>
               QR코드를 스캔하면 LOT 정보를 확인할 수 있습니다
@@ -357,6 +358,7 @@ function OutboundPDF({
 
         {qrDataUrl && (
           <View style={[s.divider, { alignItems: "center" }]}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image에는 alt prop이 없음 */}
             <Image src={qrDataUrl} style={{ width: 90, height: 90 }} />
             <Text style={{ marginTop: 4, fontSize: 8, color: "#999" }}>
               QR코드를 스캔하면 LOT 정보를 확인할 수 있습니다
