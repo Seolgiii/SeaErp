@@ -1,18 +1,23 @@
 'use client';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 출고 PC 일괄 등록 (관리자 전용)
+// 출고 PC 일괄 등록 (관리자 전용) — 노션풍 데이터 화면 규칙 적용(가공 투입과 동일 룩)
+//   공통 프리미티브는 ../../../_lot-table
 //
-// 입고와 달리 새로 만드는 게 아니라 "기존 LOT을 골라 내보내는" 구조라 워크리스트 방식:
-//   ① LOT 검색(LOT번호·품목) → ② 결과 클릭해 작업목록에 담기 →
-//   ③ 행마다 출고수량·판매처·판매가 입력 → ④ 전체 등록+승인
-// 각 행은 createOutboundDirect(생성→승인) 단건 호출을 순회. 부분 실패해도 나머지 진행,
-// 실패 행만 목록에 남겨 재시도 가능. 신규 도메인 로직 없음.
+// 기존 LOT을 골라 내보내는 워크리스트: ① 출고 정보(설정) → ② LOT 검색(도구) →
+//   ③ 작업목록(결과물·앵커): 행마다 출고수량·판매처·판매가 → 전체 등록+승인.
+// 각 행은 createOutboundDirect(생성→승인) 단건 순회. 부분 실패해도 나머지 진행, 실패 행만 잔류.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeftIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowLeftIcon,
+  ClipboardDocumentListIcon,
+  Cog6ToothIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import {
   getSeoulTodayISO,
   getSeoulTodaySlash,
@@ -28,6 +33,15 @@ import { readSession, isSessionExpired, isAdminRole } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { createOutboundDirect } from '@/app/actions/admin/master-transactions';
 import { searchLotByKeyword } from '@/app/actions/inventory/outbound';
+import {
+  softField,
+  numCellInput,
+  cellField,
+  labelClass,
+  NumBox,
+  NumInputHeader,
+  SectionTitle,
+} from '../../../_lot-table';
 
 type SearchHit = {
   lotRecordId: string;
@@ -45,12 +59,6 @@ type Row = SearchHit & {
   price: string;
   error?: string;
 };
-
-const labelClass = 'text-xs font-semibold text-gray-500';
-const inputClass =
-  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-[#3182F6]';
-const cellInput =
-  'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-[#3182F6]';
 
 const str = (v: unknown) => (Array.isArray(v) ? String(v[0] ?? '') : String(v ?? '')).trim();
 const numOf = (v: unknown) => Number(Array.isArray(v) ? v[0] : v) || 0;
@@ -121,8 +129,7 @@ export default function OutboundCreatePage() {
   const patchRow = (id: string, patch: Partial<Row>) =>
     setRows((prev) => prev.map((r) => (r.lotRecordId === id ? { ...r, ...patch } : r)));
 
-  const removeRow = (id: string) =>
-    setRows((prev) => prev.filter((r) => r.lotRecordId !== id));
+  const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.lotRecordId !== id));
 
   const submit = async () => {
     const session = readSession();
@@ -208,7 +215,7 @@ export default function OutboundCreatePage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-5 p-6">
+    <div className="max-w-5xl space-y-7 p-6">
       {/* 헤더 */}
       <div>
         <Link
@@ -219,46 +226,49 @@ export default function OutboundCreatePage() {
           출고 이력
         </Link>
         <h1 className="mt-2 text-xl font-bold text-[#191F28]">출고 등록</h1>
-        <p className="mt-0.5 text-sm text-gray-500">
-          LOT을 검색해 작업목록에 담고, 행마다 수량·판매처·판매가를 입력한 뒤 한 번에
-          등록합니다. ‘바로 승인’이 켜져 있으면 즉시 잔여재고가 차감되고 출고증이 발행됩니다.
+        <p className="mt-1 text-sm leading-relaxed text-gray-500">
+          LOT을 검색해 작업목록에 담고, 행마다 수량·판매처·판매가를 입력한 뒤 한 번에 등록합니다. ‘바로
+          승인’이 켜져 있으면 즉시 잔여재고가 차감되고 출고증이 발행됩니다.
         </p>
       </div>
 
-      {/* 공통 컨트롤 */}
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border border-gray-200 bg-white p-4">
-        <label className="flex flex-col gap-1">
-          <span className={labelClass}>출고일</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            placeholder="YYYY/MM/DD"
-            className={`${inputClass} w-40`}
-            value={bizDate}
-            onChange={(e) => setBizDate(e.target.value)}
-            autoComplete="off"
-          />
-        </label>
-        <label className="mb-2 inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-[#3182F6]"
-            checked={commit}
-            onChange={(e) => setCommit(e.target.checked)}
-          />
-          바로 승인 (끄면 ‘승인 대기’로만 저장)
-        </label>
-      </div>
+      {/* 출고 정보 (설정) */}
+      <section>
+        <SectionTitle icon={Cog6ToothIcon}>출고 정보</SectionTitle>
+        <div className="mt-3 flex flex-wrap items-end gap-4">
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>출고일</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="YYYY/MM/DD"
+              className={`${softField} w-40 text-center`}
+              value={bizDate}
+              onChange={(e) => setBizDate(e.target.value)}
+              autoComplete="off"
+            />
+          </label>
+          <label className="mb-1 inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[#3182F6]"
+              checked={commit}
+              onChange={(e) => setCommit(e.target.checked)}
+            />
+            바로 승인 (끄면 ‘승인 대기’로만 저장)
+          </label>
+        </div>
+      </section>
 
-      {/* LOT 검색 */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
-        <span className={labelClass}>LOT 검색</span>
-        <div className="mt-1 flex gap-2">
+      {/* LOT 검색 (도구) */}
+      <section>
+        <SectionTitle icon={MagnifyingGlassIcon}>LOT 검색</SectionTitle>
+        <div className="mt-3 flex gap-2">
           <div className="relative flex-1">
             <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              className={`${inputClass} pl-9`}
+              className={`${softField} pl-9`}
               placeholder="LOT번호 끝자리 또는 품목명"
               value={query}
               disabled={!ready}
@@ -272,14 +282,14 @@ export default function OutboundCreatePage() {
             type="button"
             onClick={() => void runSearch()}
             disabled={!ready || searching}
-            className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-40"
+            className="shrink-0 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 transition-colors hover:bg-gray-50 disabled:opacity-40"
           >
             {searching ? '검색 중…' : '검색'}
           </button>
         </div>
 
         {hits.length > 0 && (
-          <ul className="mt-2 max-h-60 divide-y divide-gray-100 overflow-auto rounded-lg border border-gray-100">
+          <ul className="mt-3 max-h-60 divide-y divide-gray-100 overflow-auto rounded-xl border border-gray-100 bg-white">
             {hits.map((h) => {
               const added = rows.some((r) => r.lotRecordId === h.lotRecordId);
               return (
@@ -288,10 +298,10 @@ export default function OutboundCreatePage() {
                     type="button"
                     onClick={() => addRow(h)}
                     disabled={added}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-50/70 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <span className="flex-1">
-                      <span className="font-mono text-[13px] text-gray-800">{h.lotNumber}</span>
+                      <span className="text-[13px] text-gray-800">{h.lotNumber}</span>
                       <span className="ml-2 text-gray-600">
                         {h.product || '(미상)'} {formatSpec(h.spec)} {formatMisu(h.misu)}
                       </span>
@@ -308,123 +318,139 @@ export default function OutboundCreatePage() {
             })}
           </ul>
         )}
-      </div>
+      </section>
 
-      {/* 작업목록 */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
-              <th className="px-3 py-2.5">LOT번호</th>
-              <th className="px-3 py-2.5">품목</th>
-              <th className="whitespace-nowrap px-3 py-2.5">규격</th>
-              <th className="whitespace-nowrap px-3 py-2.5">미수</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-right">재고</th>
-              <th className="w-28 px-3 py-2.5">출고수량</th>
-              <th className="w-40 px-3 py-2.5">판매처</th>
-              <th className="w-32 px-3 py-2.5">판매가</th>
-              <th className="w-10 px-3 py-2.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-3 py-12 text-center text-sm text-gray-400">
-                  위에서 LOT을 검색해 담으세요.
-                </td>
+      {/* 작업목록 (결과물 · 앵커) */}
+      <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+          <SectionTitle icon={ClipboardDocumentListIcon} anchor>
+            작업목록<span className="font-medium text-gray-400">{rows.length}건</span>
+          </SectionTitle>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={submitting || !ready || rows.length === 0}
+            className="shrink-0 rounded-lg bg-[#3182F6] px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-600 disabled:opacity-40"
+          >
+            {submitting
+              ? '처리 중…'
+              : commit
+                ? `전체 등록 + 승인 (${rows.length})`
+                : `전체 승인 대기로 저장 (${rows.length})`}
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-gray-100 text-left text-[12px] font-semibold text-gray-400">
+                <th className="px-3 py-2.5">LOT번호</th>
+                <th className="px-3 py-2.5">품목</th>
+                <th className="whitespace-nowrap px-3 py-2.5">규격</th>
+                <th className="whitespace-nowrap px-3 py-2.5">미수</th>
+                <th className="px-3 py-2.5">
+                  <NumBox>재고</NumBox>
+                </th>
+                <th className="w-32 px-3 py-2.5">
+                  <NumInputHeader>출고수량</NumInputHeader>
+                </th>
+                <th className="w-40 px-3 py-2.5">판매처</th>
+                <th className="w-32 px-3 py-2.5">
+                  <NumInputHeader>판매가</NumInputHeader>
+                </th>
+                <th className="w-10 px-3 py-2.5" />
               </tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r.lotRecordId} className="border-b border-gray-50">
-                  <td className="px-3 py-2 font-mono text-[12px] text-gray-800">{r.lotNumber}</td>
-                  <td className="px-3 py-2 text-gray-700">{r.product || '(미상)'}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-gray-600">{formatSpec(r.spec)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-gray-600">{formatMisu(r.misu)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-600">
-                    {formatIntKo(r.available)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className={cellInput}
-                      placeholder={`≤ ${r.available}`}
-                      value={r.qty}
-                      onChange={(e) => {
-                        const { value } = fromGroupedIntegerInput(e.target.value);
-                        const clamped = Number.isFinite(value)
-                          ? Math.min(value, r.available)
-                          : value;
-                        patchRow(r.lotRecordId, {
-                          qty: clamped > 0 ? formatIntKo(clamped) : '',
-                        });
-                      }}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      className={cellInput}
-                      placeholder="판매처"
-                      value={r.seller}
-                      onChange={(e) => patchRow(r.lotRecordId, { seller: e.target.value })}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className={cellInput}
-                      placeholder="박스당"
-                      value={r.price}
-                      onChange={(e) =>
-                        patchRow(r.lotRecordId, {
-                          price: fromGroupedOptionalIntInput(e.target.value).display,
-                        })
-                      }
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => removeRow(r.lotRecordId)}
-                      className="text-gray-400 hover:text-red-500"
-                      title="삭제"
-                    >
-                      <XMarkIcon className="h-4 w-4" />
-                    </button>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-3 py-12 text-center text-sm text-gray-400">
+                    위 LOT 검색에서 LOT을 담으세요.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-        {rows.some((r) => r.error) && (
-          <div className="border-t border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            {rows
-              .filter((r) => r.error)
-              .map((r) => `${r.lotNumber}: ${r.error}`)
-              .join(' / ')}
-          </div>
-        )}
-      </div>
-
-      {/* 액션 */}
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-gray-500">작업목록 {rows.length}건</span>
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={submitting || !ready || rows.length === 0}
-          className="rounded-lg bg-[#3182F6] px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-600 disabled:opacity-40"
-        >
-          {submitting
-            ? '처리 중…'
-            : commit
-              ? `전체 등록 + 승인 (${rows.length})`
-              : `전체 승인 대기로 저장 (${rows.length})`}
-        </button>
-      </div>
+              ) : (
+                rows.map((r) => (
+                  <tr
+                    key={r.lotRecordId}
+                    className="group border-b border-gray-50 transition-colors last:border-0 hover:bg-gray-50/70"
+                  >
+                    <td className="px-3 py-2 text-gray-800">{r.lotNumber}</td>
+                    <td className="px-3 py-2 text-gray-700">{r.product || '(미상)'}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-gray-600">
+                      {formatSpec(r.spec)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-gray-600">
+                      {formatMisu(r.misu)}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      <NumBox>{formatIntKo(r.available)}</NumBox>
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className={numCellInput}
+                        placeholder={`최대 ${r.available}`}
+                        value={r.qty}
+                        onChange={(e) => {
+                          const { value } = fromGroupedIntegerInput(e.target.value);
+                          const clamped = Number.isFinite(value)
+                            ? Math.min(value, r.available)
+                            : value;
+                          patchRow(r.lotRecordId, {
+                            qty: clamped > 0 ? formatIntKo(clamped) : '',
+                          });
+                        }}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        className={cellField}
+                        placeholder="판매처"
+                        value={r.seller}
+                        onChange={(e) => patchRow(r.lotRecordId, { seller: e.target.value })}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className={numCellInput}
+                        placeholder="박스당"
+                        value={r.price}
+                        onChange={(e) =>
+                          patchRow(r.lotRecordId, {
+                            price: fromGroupedOptionalIntInput(e.target.value).display,
+                          })
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => removeRow(r.lotRecordId)}
+                        className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-red-500"
+                        title="삭제"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          {rows.some((r) => r.error) && (
+            <div className="border-t border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              {rows
+                .filter((r) => r.error)
+                .map((r) => `${r.lotNumber}: ${r.error}`)
+                .join(' / ')}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
