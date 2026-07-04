@@ -303,9 +303,23 @@ export default function InboundHistoryPage() {
             </div>
           </div>
 
-          {/* 원장 표 */}
+          {/* 원장 표 — table-fixed + colgroup으로 컬럼 폭 고정(검색·필터로 행이 바뀌어도 흔들림 없음) */}
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full text-[13px]">
+            <table className="w-full table-fixed text-[13px]" style={{ minWidth: 1276 }}>
+              <colgroup>
+                <col style={{ width: 104 }} />{/* 입고일 */}
+                <col style={{ width: 184 }} />{/* LOT번호 */}
+                <col style={{ width: 132 }} />{/* 품목 */}
+                <col style={{ width: 72 }} />{/* 규격 */}
+                <col style={{ width: 80 }} />{/* 미수 */}
+                <col style={{ width: 76 }} />{/* 수량 */}
+                <col style={{ width: 104 }} />{/* 수매가 */}
+                <col style={{ width: 124 }} />{/* 매입액 */}
+                <col style={{ width: 140 }} />{/* 매입처 */}
+                <col style={{ width: 120 }} />{/* 보관처 */}
+                <col style={{ width: 96 }} />{/* 작업자 */}
+                <col style={{ width: 92 }} />{/* 상태 */}
+              </colgroup>
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
                   <th className="whitespace-nowrap px-4 py-3">입고일</th>
@@ -350,7 +364,7 @@ export default function InboundHistoryPage() {
                           <span className="text-[#191F28]">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-[#191F28]">{r.product}</td>
+                      <td className="truncate px-4 py-3 text-[#191F28]" title={r.product}>{r.product}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-500">{formatSpec(r.spec)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-500">{formatMisu(r.misu)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-gray-700">
@@ -362,9 +376,9 @@ export default function InboundHistoryPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-[#191F28]">
                         {r.purchaseTotal > 0 ? won(r.purchaseTotal) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-gray-700">{r.supplier || '—'}</td>
-                      <td className="px-4 py-3 text-gray-700">{r.storage || '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-700">{r.worker || '—'}</td>
+                      <td className="truncate px-4 py-3 text-gray-700" title={r.supplier}>{r.supplier || '—'}</td>
+                      <td className="truncate px-4 py-3 text-gray-700" title={r.storage}>{r.storage || '—'}</td>
+                      <td className="truncate px-4 py-3 text-gray-700" title={r.worker}>{r.worker || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className={`rounded-md px-2 py-0.5 text-[12px] font-medium ${statusBadgeClass(r.approvalStatus)}`}>
                           {r.approvalStatus}

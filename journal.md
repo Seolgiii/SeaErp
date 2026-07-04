@@ -1220,6 +1220,29 @@ UX (3건):
 
 ---
 
+### 2026-07-04
+
+**완료한 작업**
+- `git pull origin main` 충돌 해소 — 로컬 미커밋(입고 이력 콜그룹 컬럼폭 고정 WIP)을 stash → origin 27커밋(v0.9.0 작업자 컬럼 ~ v0.10.0 입고 PC등록·거래이력·가공·원가 묶음) fast-forward → `inbound/page.tsx` 병합: 콜그룹에 작업자 col 추가(11→12열·minWidth 1180→1276) + 매입처/보관처/작업자 셀 truncate 통합. tsc 통과.
+- Turbopack 워크스페이스 루트 오인식 fix — 홈의 고아 `/Users/ma/package-lock.json`(81B 빈 lockfile)이 루트를 `/Users/ma`로 잡아 Tailwind CSS가 부분 누락 → 맥에서 CSS 깨져 보이던 원인. `next.config.ts`에 `turbopack:{root:process.cwd()}` 추가 + `.next` 캐시 정리·재시작(멀티 lockfile 경고 소멸 확인).
+- 로그인 모바일/PC 기기 판별 기준 교체 — 창 폭(`min-width:1024px`) → 입력 장치(`any-pointer:fine`=마우스·트랙패드→PC / 터치만→모바일). `LoginShell.tsx`. 노트북 zoom·작은 창에서 모바일로 오판하던 문제 제거. tsc 통과.
+
+**결정 사항**
+- 모바일/PC 분기는 창 폭이 아니라 포인터 종류로 — 폭은 zoom·창 크기에 취약(맥북 실사례). iPad+트랙패드·마우스 없는 터치 데스크톱 같은 경계 기기는 극소수라 수동 토글 없이 순수 자동 유지(사용자 확인).
+- Turbopack 루트는 stray lockfile 유무와 무관하게 프로젝트로 명시 고정(config). 홈 고아 lockfile은 삭제 보류(프로젝트 밖 파일·config 고정으로 무력화).
+
+**미해결 이슈**
+- 코드 3파일 미커밋 — `inbound/page.tsx`·`next.config.ts`·`LoginShell.tsx` (이번 docs 정리 커밋과 별개).
+- 포인터 기반 기기 판별 실물 검증 — 맥북·폰 외 터치겸용 윈도우 노트북은 실물 육안 확인 필요(기기 판별 테스트 없음).
+- (이월) 이동/출고 노션풍 육안 미검증, 가공 거래 실데이터 도그푸딩, #4 원가 계산 화면.
+
+**다음 작업 후보**
+- 미커밋 3파일 커밋 + 맥북 PC 로그인·CSS 정상 육안 확인.
+- (이월) 파일럿 3화면 노션풍 도그푸딩 → 스펙 확정.
+- (이월) 가공 거래 실데이터 도그푸딩(㉠→㉡) + #4 원가 계산 화면.
+
+---
+
 ## 누적 통계 (2026-05-18 기준)
 
 - 단위 테스트: 5 files / **110 pass** (변동 없음)
