@@ -1,4 +1,4 @@
-const CACHE_NAME = 'seaerp-v2';
+const CACHE_NAME = 'seaerp-v3';
 
 // 앱 셸: 오프라인에서도 보여줄 최소 리소스
 const PRECACHE_URLS = [
