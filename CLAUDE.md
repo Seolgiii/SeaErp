@@ -5,7 +5,7 @@
 
 ■ 최근 변경 (2026-07-14)
 - **작업 정산 등록 실제 구현** — Airtable 3테이블(작업 정산/생산내역/작업비) + 원가함수 `calculateWorkSettlementCost`(작업단가=작업비÷총박스·실단가=수매+작업단가)·rate(`work-settlement-rates` A안 하드코딩)·서버액션 `master-work-settlement`(save/confirm/cancel + getWorkSettlementDetail + saveWorkSettlementHeader). **확정 시 생산내역 1줄→입고관리 1행+LOT 1개**(입고관리.수매가=수매단가/LOT.수매가=실단가·동결비 등=0 이중계상 방지). 설계 `docs/작업정산등록-설계.md`. 단위+통합(3) 그린. 미결 3종 확정(작업비 전부 원가·확정때만 LOT·공동배분 스코프아웃).
-- **UI = v17 목업 구조로 구축**(2단계: 사전기입 헤더→임시저장 / 생산내역+작업비→확정 / 이력 이어서작성). 5행 스크롤 콤보(document.body 포털·키보드 ↑↓Enter). **동결비·입출고비는 생산내역(행선지×구분×수량)에서 자동 산출**(행선지마다 단가 다름 반영). 스타일=플레인 `<style>`+`.ws-page` 접두사(styled-jsx/Tailwind `.fixed` 충돌 교훈). **전량 미커밋(도그푸딩 대기).**
+- **UI = v17 목업 구조로 구축**(2단계: 사전기입 헤더→임시저장 / 생산내역+작업비→확정 / 이력 이어서작성). 5행 스크롤 콤보(document.body 포털·키보드 ↑↓Enter). **동결비·입출고비는 생산내역(행선지×구분×수량)에서 자동 산출**(행선지마다 단가 다름 반영). 스타일=플레인 `<style>`+`.ws-page` 접두사(styled-jsx/Tailwind `.fixed` 충돌 교훈). 사이드바 IA에 **'재고 작업'** 카테고리 신설(작업 정산·가공 거래를 거래 이력에서 분리, 거래 이력=읽기전용 원장만). **전량 미커밋(도그푸딩 대기).**
 - 발견: `storage-cost.ts`가 옛 단일 `동결비` 필드 참조(라이브는 박스종류별 3열)→기존 입고 동결비 null 가능(memo `freeze-fee-split-mismatch`, 별도 상의).
 
 ■ 최근 변경 (2026-07-13)
