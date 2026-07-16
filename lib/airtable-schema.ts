@@ -19,6 +19,10 @@ export const AIRTABLE_TABLE = {
   processingRates: "가공비 단가",
   processingBatch: "가공 거래",
   processingInput: "가공 투입",
+  /** 작업 정산 등록 (원물 동결 정산서형 매입·원가 폼) — 헤더/생산내역/작업비 3종 */
+  workSettlement: "작업 정산",
+  workSettlementLine: "작업 정산 생산내역",
+  workSettlementCost: "작업 정산 작업비",
 } as const;
 
 /** 작업자 테이블 필드 */
@@ -93,7 +97,15 @@ export const STORAGE_COST_FIELDS = {
   refrigerationFee: "냉장료",
   inOutFee: "입출고비",
   unionFee: "노조비",
+  /** ⚠ 라이브 '보관처 비용 이력'엔 단일 "동결비"가 없고 박스종류별 3열로 분리돼 있음.
+   *  동결비는 아래 박스종류별 3키로 읽어야 정확(작업 정산: 구분→해당 열). 이 단일 키는
+   *  storage-cost.ts:getStorageCostForLot가 여전히 참조 중 → 해당 보관처는 null로 빠질 수 있어
+   *  별도 확인 필요(2026-07-14 발견). */
   freezeFee: "동결비",
+  /** 박스종류별 동결비 (보관처×기간별 단가) — 작업 정산 구분(사료팬/베이트大/베이트小)과 매핑 */
+  freezeFeePan: "동결비 (팬)",
+  freezeFeeBaitLarge: "동결비 (베이트大)",
+  freezeFeeBaitSmall: "동결비 (베이트小)",
 } as const;
 
 /** 승인상태 필드값 — 이 문구일 때 화면에 승인 대기 표시 */
@@ -218,4 +230,87 @@ export const STORAGE_FIELDS = {
 /** 매입처 마스터 테이블 필드 */
 export const SUPPLIER_FIELDS = {
   name: "매입처명",
+} as const;
+
+/** 작업 정산 (헤더) 테이블 필드 — 설계: docs/작업정산등록-설계.md */
+export const WORK_SETTLEMENT_FIELDS = {
+  /** WS-YYMMDD-#### (primary) */
+  no: "정산번호",
+  date: "작업일",
+  /** 작업 장소 (보관처 마스터 link) */
+  workplace: "작업장",
+  fishingArea: "조업해구",
+  /** 먹이유무 singleSelect: O / X */
+  hasFeed: "먹이유무",
+  freshness: "선도",
+  /** 선박 정보 마스터 link */
+  ship: "선박명",
+  /** 매입처 마스터 link (정산 주체) */
+  supplier: "매입처",
+  startTime: "시작시각",
+  endTime: "종료시각",
+  /** 원물 통짜 catch 총액 (수수료 3.3% 기준·검산) */
+  catchAmount: "어대금",
+  /** singleSelect: 임시저장 / 확정 / 취소 */
+  status: "상태",
+  worker: "작업자",
+  memo: "비고",
+} as const;
+
+/** 작업 정산 생산내역 (라인) 테이블 필드 — 1줄 → 입고관리+LOT 스포너 */
+export const WORK_SETTLEMENT_LINE_FIELDS = {
+  /** 정산번호-N (primary) */
+  lineId: "라인ID",
+  /** 헤더 link */
+  settlement: "작업 정산",
+  /** 헤더 record ID 텍스트 (결정적 조회 키) */
+  settlementId: "정산ID",
+  /** 품목마스터 link */
+  productLink: "품목",
+  productName: "품목명",
+  /** singleSelect: 사료팬 / 베이트大 / 베이트小 (동결비 3열 대응) */
+  boxType: "구분",
+  /** 지방도 % (값어치 어종만) */
+  fatRatio: "지방도",
+  spec: "규격",
+  detailSpec: "미수",
+  weightKg: "중량kg",
+  /** 박스수 — 작업단가 분모 */
+  quantity: "수량",
+  /** 박스당 순수 매입가 → 입고관리.수매가 */
+  purchaseUnitPrice: "수매단가",
+  /** 수매단가 × 수량 */
+  amount: "금액",
+  /** 수매단가 + 작업단가 (확정 스냅샷) → LOT.수매가 */
+  actualUnitPrice: "실단가",
+  /** 실단가 × 수량 */
+  actualAmount: "실금액",
+  /** singleSelect: 원물동결 / 원프로즌 가공 / 생물 (매입 통계 세그먼트) */
+  usage: "용도",
+  /** 용도별 보관처/가공공장/판매처 (보관처 마스터 link) → LOT.보관처 */
+  destination: "행선지",
+  memo: "비고",
+  /** 확정 시 생성된 입고 관리 link */
+  inboundLink: "입고관리",
+  /** 확정 시 생성된 LOT별 재고 link */
+  lotLink: "LOT",
+} as const;
+
+/** 작업 정산 작업비 (라인) 테이블 필드 — Σ금액 ÷ 총박스수 = 작업단가 */
+export const WORK_SETTLEMENT_COST_FIELDS = {
+  /** primary */
+  itemId: "항목ID",
+  /** 헤더 link */
+  settlement: "작업 정산",
+  /** 헤더 record ID 텍스트 (결정적 조회 키) */
+  settlementId: "정산ID",
+  /** singleSelect: 수수료/노임/운임/동결비/입출고비/박스/내피/탈펜료/기타 */
+  group: "그룹",
+  itemName: "항목명",
+  count: "회수",
+  unitPrice: "단가",
+  /** 회수 × 단가 (또는 수동) */
+  amount: "금액",
+  payee: "지급처",
+  memo: "비고",
 } as const;

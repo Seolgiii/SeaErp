@@ -4,6 +4,7 @@ import {
   calculateOutboundCost,
   calculateProcessingCost,
   calculateTransferPricing,
+  calculateWorkSettlementCost,
   daysBetween,
 } from "./cost-calc";
 
@@ -486,5 +487,81 @@ describe("calculateProcessingCost (가공원가 롤업)", () => {
     });
     expect(r.costPerBox).toBe(0);
     expect(r.costPerKg).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 작업 정산 원가 롤업
+//   작업단가 = 작업비총액 ÷ 총박스수 / 실단가 = 수매단가 + 작업단가
+// ─────────────────────────────────────────────────────────────────────────────
+describe("calculateWorkSettlementCost", () => {
+  test("기본 — 균등 배부(나누어떨어짐)", () => {
+    const r = calculateWorkSettlementCost({
+      lines: [
+        { boxes: 30, purchaseUnitPrice: 10_000 },
+        { boxes: 20, purchaseUnitPrice: 8_000 },
+      ],
+      workCostAmounts: [300_000, 200_000], // 작업비총액 500,000
+    });
+    expect(r.totalBoxes).toBe(50);
+    expect(r.workCostTotal).toBe(500_000);
+    expect(r.workUnitPrice).toBe(10_000); // 500,000 / 50
+    // 실단가 = 수매단가 + 작업단가
+    expect(r.lines[0].actualUnitPrice).toBe(20_000);
+    expect(r.lines[1].actualUnitPrice).toBe(18_000);
+    expect(r.lines[0].actualAmount).toBe(600_000);
+    expect(r.lines[1].actualAmount).toBe(360_000);
+    expect(r.purchaseTotal).toBe(460_000); // 300,000 + 160,000
+    expect(r.actualTotal).toBe(960_000);
+    // 나누어떨어질 땐 잔차 0: actualTotal == purchaseTotal + workCostTotal
+    expect(r.actualTotal).toBe(r.purchaseTotal + r.workCostTotal);
+  });
+
+  test("반올림 잔차 — 작업단가 정수화, 잔차 < 총박스수 원", () => {
+    const r = calculateWorkSettlementCost({
+      lines: [{ boxes: 3, purchaseUnitPrice: 1_000 }],
+      workCostAmounts: [1_000], // 1,000 / 3 = 333.33 → 333
+    });
+    expect(r.workUnitPrice).toBe(333);
+    expect(r.lines[0].actualUnitPrice).toBe(1_333);
+    expect(r.lines[0].actualAmount).toBe(3_999);
+    const residual = r.purchaseTotal + r.workCostTotal - r.actualTotal; // 4000 - 3999 = 1
+    expect(residual).toBe(1);
+    expect(Math.abs(residual)).toBeLessThan(r.totalBoxes);
+  });
+
+  test("작업비 없음 → 작업단가 0, 실단가 = 수매단가", () => {
+    const r = calculateWorkSettlementCost({
+      lines: [{ boxes: 10, purchaseUnitPrice: 5_000 }],
+      workCostAmounts: [],
+    });
+    expect(r.workUnitPrice).toBe(0);
+    expect(r.lines[0].actualUnitPrice).toBe(5_000);
+    expect(r.actualTotal).toBe(50_000);
+  });
+
+  test("총박스수 0 → 작업단가 0 (0 나눗셈 가드)", () => {
+    const r = calculateWorkSettlementCost({
+      lines: [],
+      workCostAmounts: [5_000],
+    });
+    expect(r.totalBoxes).toBe(0);
+    expect(r.workUnitPrice).toBe(0);
+    expect(r.actualTotal).toBe(0);
+  });
+
+  test("음수 박스·단가 → 0으로 클램프", () => {
+    const r = calculateWorkSettlementCost({
+      lines: [
+        { boxes: -5, purchaseUnitPrice: 1_000 },
+        { boxes: 10, purchaseUnitPrice: -200 },
+      ],
+      workCostAmounts: [10_000],
+    });
+    expect(r.totalBoxes).toBe(10); // -5 클램프
+    expect(r.workUnitPrice).toBe(1_000); // 10,000 / 10
+    expect(r.lines[0].actualAmount).toBe(0); // 박스 0
+    expect(r.lines[1].purchaseUnitPrice).toBe(0); // 음수 단가 클램프
+    expect(r.lines[1].actualUnitPrice).toBe(1_000); // 0 + 작업단가
   });
 });

@@ -348,3 +348,88 @@ export function calculateProcessingCost(input: ProcessingCostInput): ProcessingC
   const costPerKg = input.outputTotalKg > 0 ? processingCostTotal / input.outputTotalKg : 0;
   return { inputMaterialTotal, processingFeeTotal, processingCostTotal, costPerBox, costPerKg };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 작업 정산 원가 롤업 — 사이즈별 생산내역 + 작업비 풀 → 실단가(재고원가)
+//
+//   작업비총액        = Σ 작업비.금액        (v1: 전부 원가 포함 — 원가반영 토글 없음)
+//   총박스수          = Σ 생산내역.수량(박스)
+//   작업단가(원/박스) = 작업비총액 ÷ 총박스수  ← 정산 1건당 산출(고정 아님), 정수 반올림
+//   실단가(line)      = 수매단가 + 작업단가    ← 전 라인 균등 가산(박스당)
+//     → LOT.수매가 = 실단가(재고원가) / 입고관리.수매가 = 수매단가(순수 매입, 매입통계)
+//
+// 설계: docs/작업정산등록-설계.md §4-A. 순수함수(Airtable I/O 분리, 단위 테스트).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type WorkSettlementLineInput = {
+  /** 생산내역 수량(박스) */
+  boxes: number;
+  /** 생산내역 수매단가(원/박스) — 순수 매입가 */
+  purchaseUnitPrice: number;
+};
+
+export type WorkSettlementCostInput = {
+  lines: WorkSettlementLineInput[];
+  /** 작업비 각 라인 금액(원) 배열. v1은 전부 원가 풀 포함. */
+  workCostAmounts: number[];
+};
+
+export type WorkSettlementLineCost = {
+  boxes: number;
+  purchaseUnitPrice: number;
+  /** 수매단가 × 박스 (순수 매입액) */
+  purchaseAmount: number;
+  /** 실단가 = 수매단가 + 작업단가 (박스당 재고원가) → LOT.수매가 */
+  actualUnitPrice: number;
+  /** 실단가 × 박스 (재고원가 총액) */
+  actualAmount: number;
+};
+
+export type WorkSettlementCost = {
+  /** Σ 박스수 */
+  totalBoxes: number;
+  /** Σ 작업비 금액 */
+  workCostTotal: number;
+  /** 작업단가(원/박스) = 작업비총액 ÷ 총박스수 (정수 반올림) */
+  workUnitPrice: number;
+  /** Σ 수매단가 × 박스 (순수 매입액) */
+  purchaseTotal: number;
+  /** Σ 실단가 × 박스 (재고원가 합) */
+  actualTotal: number;
+  lines: WorkSettlementLineCost[];
+};
+
+/**
+ * 작업 정산 확정 시 원가 롤업.
+ *
+ * 작업단가는 원/박스 정수로 반올림한다(정산서 박스당 단가 표기와 일치). 그 결과
+ * actualTotal(Σ 실금액)은 purchaseTotal + workCostTotal과 반올림 잔차(< 총박스수 원)만큼
+ * 다를 수 있다 — 박스당 원가 정확도를 우선한 의도된 트레이드오프(§10 사각지대).
+ */
+export function calculateWorkSettlementCost(
+  input: WorkSettlementCostInput,
+): WorkSettlementCost {
+  const totalBoxes = input.lines.reduce((s, l) => s + (l.boxes > 0 ? l.boxes : 0), 0);
+  const workCostTotal = Math.round(
+    input.workCostAmounts.reduce((s, a) => s + (Number.isFinite(a) ? a : 0), 0),
+  );
+  const workUnitPrice = totalBoxes > 0 ? Math.round(workCostTotal / totalBoxes) : 0;
+
+  const lines: WorkSettlementLineCost[] = input.lines.map((l) => {
+    const boxes = l.boxes > 0 ? l.boxes : 0;
+    const purchaseUnitPrice = l.purchaseUnitPrice > 0 ? l.purchaseUnitPrice : 0;
+    const actualUnitPrice = purchaseUnitPrice + workUnitPrice;
+    return {
+      boxes,
+      purchaseUnitPrice,
+      purchaseAmount: Math.round(purchaseUnitPrice * boxes),
+      actualUnitPrice,
+      actualAmount: Math.round(actualUnitPrice * boxes),
+    };
+  });
+
+  const purchaseTotal = lines.reduce((s, l) => s + l.purchaseAmount, 0);
+  const actualTotal = lines.reduce((s, l) => s + l.actualAmount, 0);
+
+  return { totalBoxes, workCostTotal, workUnitPrice, purchaseTotal, actualTotal, lines };
+}

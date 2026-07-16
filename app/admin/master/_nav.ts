@@ -39,13 +39,21 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    // 재고를 생성·변환하는 등록 작업 — 거래 이력(읽기 전용 원장)과 성격이 다르다.
+    // 작업 정산=원물 매입 정산→LOT 생성 / 가공 거래=원물→가공품 변환.
+    title: '재고 작업',
+    items: [
+      { href: '/admin/master/work-settlement', label: '작업 정산', enabled: true },
+      { href: '/admin/master/processing', label: '가공 거래', enabled: true },
+    ],
+  },
+  {
     title: '거래 이력',
     items: [
       { href: '/admin/master/transactions/inbound', label: '입고 이력', enabled: true },
       { href: '/admin/master/transactions/outbound', label: '출고 이력', enabled: true },
       { href: '/admin/master/transactions/transfer', label: '이동 이력', enabled: true },
       { href: '/admin/master/transactions/expense', label: '지출 이력', enabled: true },
-      { href: '/admin/master/processing', label: '가공 거래', enabled: true },
       { href: '/admin/master/transactions/pdf-reissue', label: 'PDF 재발행', enabled: false },
     ],
   },

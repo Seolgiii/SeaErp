@@ -18,7 +18,10 @@ export type Tables =
   | "매입처 마스터"
   | "가공비 단가"
   | "가공 거래"
-  | "가공 투입";
+  | "가공 투입"
+  | "작업 정산"
+  | "작업 정산 생산내역"
+  | "작업 정산 작업비";
 
 export type AirtableRecord = {
   id: string;
