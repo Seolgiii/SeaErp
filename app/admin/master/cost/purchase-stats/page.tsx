@@ -172,6 +172,31 @@ function bucketToPeriods(days: PurchaseDayBucket[], g: Granularity): PeriodRow[]
   return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
 
+/**
+ * 조회 기간(from~to)에 걸친 모든 달을 오름차순으로 나열 — 매입 없는 달도 축에 남긴다.
+ * 라벨: 같은 해면 `N월`, 여러 해에 걸치면 첫 달·매년 1월에만 연도를 붙여 어느 해인지 명확히.
+ * (사이즈별 단가 추이 차트에서 축을 품목과 무관하게 고정 + 계절 공백을 눈에 보이게)
+ */
+function enumerateMonths(from: string, to: string): { key: string; label: string }[] {
+  const [fy, fm] = from.split('-').map(Number);
+  const [ty, tm] = to.split('-').map(Number);
+  const multiYear = fy !== ty;
+  const out: { key: string; label: string }[] = [];
+  let y = fy;
+  let m = fm;
+  while (y < ty || (y === ty && m <= tm)) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    const showYear = multiYear && (m === 1 || (y === fy && m === fm));
+    out.push({ key, label: showYear ? `${y} ${m}월` : `${m}월` });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return out;
+}
+
 // ── 사이즈별 단가 추이 차트 (품목 탭) ──
 const CHART_COLORS = ['#3182F6', '#00C471', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'];
 
@@ -316,7 +341,7 @@ export default function PurchaseStatsPage() {
   const sizeTrend = useMemo<SizeTrend | null>(() => {
     if (tab !== 'product' || !isDetail || !matchedPds.length) return null;
 
-    const periodKeys: string[] = [];
+    const dataPeriodKeys: string[] = [];
     const periodLabels = new Map<string, string>();
     const cells = new Map<string, { total: number; qty: number }>();
     const variantAgg = new Map<string, { spec: string; misu: string; total: number }>();
@@ -324,7 +349,7 @@ export default function PurchaseStatsPage() {
       const { key, label } = periodKeyLabel(pd.date, granularity);
       if (!periodLabels.has(key)) {
         periodLabels.set(key, label);
-        periodKeys.push(key);
+        dataPeriodKeys.push(key);
       }
       const vKey = `${pd.spec}|${pd.misu}`;
       let v = variantAgg.get(vKey);
@@ -342,7 +367,17 @@ export default function PurchaseStatsPage() {
       c.total += pd.purchaseTotal;
       c.qty += pd.qty;
     }
-    periodKeys.sort();
+    // 월 단위: 조회 기간 내 모든 달을 축에 깔아 빈 달도 간격으로 남긴다(품목 간 축 고정 + 계절 공백 노출).
+    // 그 외(일·주): 기존대로 데이터가 있는 기간만.
+    let periodKeys: string[];
+    if (granularity === 'month') {
+      const axis = enumerateMonths(from, to);
+      periodKeys = axis.map((a) => a.key);
+      for (const a of axis) periodLabels.set(a.key, a.label); // 연속 축 라벨(N월/연도 규칙)로 덮어씀
+    } else {
+      dataPeriodKeys.sort();
+      periodKeys = dataPeriodKeys;
+    }
 
     const sorted = [...variantAgg.entries()].sort((a, b) => b[1].total - a[1].total);
     const top = sorted.slice(0, CHART_COLORS.length);
@@ -372,7 +407,7 @@ export default function PurchaseStatsPage() {
       max,
       droppedCount: Math.max(0, sorted.length - CHART_COLORS.length),
     };
-  }, [tab, isDetail, matchedPds, granularity]);
+  }, [tab, isDetail, matchedPds, granularity, from, to]);
 
   // 추이 표 합계 — 현재 스코프 기준.
   const trendTotals = useMemo(

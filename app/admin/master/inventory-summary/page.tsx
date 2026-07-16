@@ -36,7 +36,11 @@ type Row = {
 };
 
 const VIEW_OPTIONS: { value: ViewMode; label: string; desc: string }[] = [
-  { value: 'storage-product', label: '보관처 × 품목', desc: '보관처마다 어떤 품목이 몇 박스 있는지' },
+  // 비활성화 (2026-07-09) — '보관처 × 품목' 교차표. 특정 (보관처,품목) 조합은 '재고 조회'의
+  // 보관처+품목 필터로 대체됨(LOT 단위라 실사·피킹엔 오히려 더 상세). 두 합계만 남김.
+  // 되살리려면: 아래 줄 주석 해제 + 뷰 선택 grid를 grid-cols-3으로 + (원하면) 기본 뷰를 복원.
+  // 관련 코드(storage-product 분기·swap·pairW 측정)는 그대로 dormant 상태로 남겨둠.
+  // { value: 'storage-product', label: '보관처 × 품목', desc: '보관처마다 어떤 품목이 몇 박스 있는지' },
   { value: 'storage-only', label: '보관처 합계', desc: '보관처별 총 박스·LOT 수' },
   { value: 'product-only', label: '품목 합계', desc: '품목별 총 박스·LOT 수 (보관처 무관)' },
 ];
@@ -46,7 +50,7 @@ export default function InventorySummaryPage() {
   const [workerId, setWorkerId] = useState<string | null>(null);
   const [lots, setLots] = useState<Lot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [view, setView] = useState<ViewMode>('storage-product');
+  const [view, setView] = useState<ViewMode>('storage-only'); // 교차표 비활성화로 기본 뷰 변경
   const [includeDepleted, setIncludeDepleted] = useState(false);
   const [search, setSearch] = useState('');
   const [storageFilter, setStorageFilter] = useState<string>('ALL');
@@ -232,7 +236,8 @@ export default function InventorySummaryPage() {
       </div>
 
       {/* 뷰 선택 */}
-      <div className="mb-4 grid grid-cols-3 gap-2">
+      {/* w-fit: 버튼이 전체 폭을 반씩 채워 길어지던 걸 내용 폭으로 축소(두 칸 동일 폭·좌측 정렬). */}
+      <div className="mb-4 grid grid-cols-2 gap-2 w-fit">
         {VIEW_OPTIONS.map((opt) => {
           const selected = view === opt.value;
           return (
@@ -287,7 +292,9 @@ export default function InventorySummaryPage() {
         </label>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* w-fit: 카드를 표 내용 폭에 맞춰 오른쪽 빈 흰 여백 제거. max-w-full로 넘치면 안쪽에서 가로 스크롤,
+          min-w는 로딩/빈 상태에서 카드가 너무 쪼그라들지 않게. */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-fit max-w-full min-w-[360px]">
         {isLoading ? (
           <div className="py-20 flex justify-center items-center">
             <div className="w-8 h-8 border-4 border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
@@ -300,7 +307,9 @@ export default function InventorySummaryPage() {
           <div className="overflow-x-auto">
             <table
               ref={tableRef}
-              className={`text-[13px] ${view === 'storage-product' ? '' : 'w-full table-fixed'}`}
+              // 콤팩트(table-auto·내용폭) — 이름 컬럼이 남는 폭을 흡수해 벌어지던 여백 제거.
+              // 남는 가로 폭은 표 오른쪽 바깥으로 밀리고, 컬럼 사이는 셀 패딩만큼만.
+              className="text-[13px]"
             >
               {/* 보관처/품목 너비는 pairW(측정값)로 동기화 — 둘 중 더 긴 내용에 맞춘
                   최소 너비로 통일. table-auto + 비-w-full이라 내용만큼만 차지(콤팩트),
