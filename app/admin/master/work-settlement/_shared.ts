@@ -11,6 +11,11 @@ export const USES = ['원물동결', '원프로즌 가공', '생물'];
 // 표시 라벨(저장값은 그대로) — '원프로즌 가공'이 칸에서 너무 길어 축약
 export const USE_LABEL: Record<string, string> = { 원물동결: '원물동결', '원프로즌 가공': '원프로즌', 생물: '생물' };
 // 단가에 ' 원' 표기하는 그룹(노임·기타 제외) — 스크롤 시 단가 칸 식별
+// ⚠ 그룹명은 Airtable '작업 정산 작업비'.그룹 singleSelect 옵션과 **정확히** 일치해야 한다.
+//    안 맞으면 저장이 422(INVALID_MULTIPLE_CHOICE_OPTIONS)로 죽는다 — 새 옵션 생성 권한이 없어서.
+//    2026-07-16: Airtable 옵션이 '탈팬료'(팬) 오타여서 임시저장이 전부 실패하고 있었다.
+//    '탈펜료'(펜)가 올바른 표기(사용자 확인) → Airtable 옵션명을 UI에서 rename해 맞췄다.
+//    (Airtable Update field API는 name·description만 지원 — select choices는 코드로 못 고침.)
 export const DANGA_WON_GROUPS = ['수수료', '운임', '동결비', '입출고비', '박스', '내피', '탈펜료'];
 export const COMMISSION_RATE = 0.033;
 export const TIMES: string[] = [];
@@ -37,8 +42,10 @@ export type CostRow = {
   noRateCells?: boolean;
   /** 생산내역(행선지×구분×수량)에서 자동 산출 — 읽기전용(동결비·입출고비). */
   auto?: boolean;
+  /** 금액 = 회수 × 단가 × 작업시간(여노임). 회수는 인원수라 작업시간은 비고에만 표기한다. */
+  hourly?: boolean;
 };
-export type CostGroup = { name: string; noauto?: boolean; rows: CostRow[] };
+export type CostGroup = { name: string; rows: CostRow[] };
 export type ProdRow = {
   id: string;
   name: string; // 품목명(입력 텍스트)
@@ -59,12 +66,14 @@ export function defaultGroups(): CostGroup[] {
   const box = (bt: string, danga: string, dogam: string, bigo = ''): CostRow => ({
     id: nid(), fixed: true, boxType: bt, name: BOX_LABEL[bt], cells: ['', danga, '', dogam, bigo],
   });
-  const fx = (name: string, danga = '', dogam = '', bigo = '', noRate = false): CostRow => ({
-    id: nid(), fixed: true, name, cells: ['', danga, '', dogam, bigo], ...(noRate && { noRateCells: true }),
+  const fx = (name: string, danga = '', dogam = '', bigo = '', noRate = false, hourly = false): CostRow => ({
+    id: nid(), fixed: true, name, cells: ['', danga, '', dogam, bigo],
+    ...(noRate && { noRateCells: true }), ...(hourly && { hourly: true }),
   });
   return [
     { name: '수수료', rows: [fx('수수료', '', '', '총 매입액의 3.3%', true), fx('작업장수수료', '2,000 원', '센터', '박스당 2,000원')] },
-    { name: '노임', noauto: true, rows: [fx('남', '150,000/일'), fx('여', '15,000/시간'), fx('현장노임', '150,000/일')] },
+    // 회수 칸 = 작업 인원수(사용자 입력). 남·현장은 인원×단가, 여는 인원×단가×작업시간(hourly).
+    { name: '노임', rows: [fx('남', '150,000/일'), fx('여', '15,000/시간', '', '', false, true), fx('현장노임', '150,000/일')] },
     { name: '운임', rows: [{ id: nid(), fixed: false, name: '', cells: ['', '', '', '', ''] }] },
     // 동결비·입출고비: 생산내역(행선지×구분×수량)에서 자동 산출 → buildFreezeRows/buildInoutRows
     { name: '동결비', rows: [] },
@@ -76,6 +85,45 @@ export function defaultGroups(): CostGroup[] {
   ];
 }
 export const emptyProd = (): ProdRow => ({ id: nid(), name: '', productId: '', gubun: '', fat: '', spec: '', weight: '', qty: '', price: '', use: '원물동결', dest: '', memo: '' });
+
+/** 박스종류(구분)별 박스수 합. 넘기는 rows를 걸러 '전 용도' / '원프로즌 제외' 두 벌을 만든다. */
+export function sumByBoxType(rows: ProdRow[]): Record<string, number> {
+  const m: Record<string, number> = Object.fromEntries(BOX_INTERNAL.map((b) => [b, 0]));
+  for (const r of rows) if (r.gubun in m) m[r.gubun] += pn(r.qty);
+  return m;
+}
+
+// ── 화주 배분 (3단계) ────────────────────────────────────────────────────────
+/**
+ * 이번 정산의 화주(재고 소유자) 목록.
+ *
+ * ⚠ 임시 상수. 화주 조합은 작업마다 바뀐다(정산서 시절 한라·태봉·대경·J.P → 현재 한라·대경·FPC).
+ * 그래서 3단계 화면은 **이 배열 길이만큼 컬럼을 만든다** — 셋으로 박아두지 않는다.
+ * 차후 '화주 마스터' 신설 후 이번 참여자를 골라 넣는 것으로 교체(화면 구조는 그대로 재사용).
+ */
+export const OWNERS_TEMP: readonly string[] = ['한라에스앤에프', '대경트레이딩', 'FPC'];
+
+/** 배분 비율 기본값(참고). **고정 아님** — 매 정산 그 자리서 조정("더 끊어준다"). */
+export const OWNER_DEFAULT_RATIO: readonly number[] = [40, 40, 20];
+
+/**
+ * 총 박스를 비율대로 **정수** 배분. 최대잉여법(소수부 큰 쪽부터 1박스씩).
+ * 단순 반올림은 합이 어긋난다(49를 40:40:20 → 19.6/19.6/9.8 → 반올림 20/20/10 = 50박스).
+ * 이 함수는 **합계가 항상 total과 같음**을 보장한다 → 49 → 20/19/10.
+ */
+export function allocateByRatio(total: number, ratios: readonly number[]): number[] {
+  const pos = ratios.map((r) => (r > 0 ? r : 0));
+  const sum = pos.reduce((a, b) => a + b, 0);
+  if (!(total > 0) || !(sum > 0)) return ratios.map(() => 0);
+  const raw = pos.map((r) => (total * r) / sum);
+  const out = raw.map((v) => Math.floor(v));
+  let rest = total - out.reduce((a, b) => a + b, 0);
+  const order = raw
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (let k = 0; rest > 0 && k < order.length; k++, rest--) out[order[k].i] += 1;
+  return out;
+}
 
 /** 종료−시작 시간(시간, 소수 1자리). */
 export function computeWorkHours(start: string, end: string): number {
@@ -146,6 +194,20 @@ export function groupsFromCosts(costs: DetailCost[]): CostGroup[] {
 // ── 동결비·입출고비 자동 산출 (행선지 보관처 기준) ─────────────────────────────
 export type StorageFee = { name: string; inOutFee: number; freeze: Record<string, number> };
 
+/**
+ * 동결비·입출고비·탈펜료를 걷지 않는 용도.
+ *
+ * 원프로즌 가공 = 냉동되지 않은 선어를 **통에 담아** 가공공장으로 바로 보내 거기서 가공·동결한다.
+ * - 동결비: 그 동결비는 '가공비 단가'에 이미 포함돼 가공 거래가 가공원가로 반영한다
+ *   (4단 사다리: 작업 정산=재고원가 / 가공 거래=가공원가) → 여기서 또 걷으면 이중계상.
+ * - 입출고비: 창고를 거치지 않는다.
+ * - 탈펜료: 팬에 담기지 않으니 팬에서 뺄 일이 없다. (2026-07-16 추가)
+ *
+ * ※ **박스는 제외 대상이 아니다** — 박스·탈펜료 중 박스만 전 용도 그대로 걷는다(사용자 확정).
+ */
+const FEE_EXEMPT_USES: readonly string[] = ['원프로즌 가공'];
+export const isFeeExemptUse = (use: string) => FEE_EXEMPT_USES.includes(use);
+
 /** 생산내역 → 동결비 자동 행. (행선지, 구분) 조합마다 1행: 회수=박스합, 단가=행선지 동결비(구분). */
 export function buildFreezeRows(
   prod: ProdRow[],
@@ -154,6 +216,7 @@ export function buildFreezeRows(
 ): CostRow[] {
   const agg = new Map<string, { destId: string; gubun: string; boxes: number }>();
   for (const r of prod) {
+    if (isFeeExemptUse(r.use)) continue;
     if (!(BOX_INTERNAL as readonly string[]).includes(r.gubun)) continue;
     const destId = resolveId(r.dest);
     const boxes = pn(r.qty);
@@ -190,6 +253,7 @@ export function buildInoutRows(
 ): CostRow[] {
   const agg = new Map<string, number>();
   for (const r of prod) {
+    if (isFeeExemptUse(r.use)) continue;
     const destId = resolveId(r.dest);
     const boxes = pn(r.qty);
     if (!destId || boxes <= 0) continue;
@@ -335,6 +399,8 @@ export const WS_CSS = `
 .ws-page .steps{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600;color:var(--faint);margin:10px 0 0;}
 .ws-page .steps .on{color:var(--accent);}
 .ws-page .steps .sep{color:var(--line-2);}
+.ws-page .steps a{color:var(--accent);text-decoration:underline;text-underline-offset:3px;}
+.ws-page .steps a:hover{opacity:.7;}
 .ws-page .combo{position:relative;width:100%;}
 .ws-page .combo > input{border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:600;padding:3px 2px;border-radius:5px;width:100%;outline:none;transition:background .1s;}
 .ws-page .combo > input:hover{background:var(--hover);}

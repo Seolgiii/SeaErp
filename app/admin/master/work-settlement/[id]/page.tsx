@@ -26,7 +26,7 @@ import {
   WS_CSS, BOX_INTERNAL, BOX_LABEL, USES, USE_LABEL, DANGA_WON_GROUPS, COMMISSION_RATE,
   pn, fmt, nid, dangaWon, computeWorkHours,
   defaultGroups, emptyProd, prodRowsFromLines, groupsFromCosts,
-  buildFreezeRows, buildInoutRows,
+  buildFreezeRows, buildInoutRows, sumByBoxType, isFeeExemptUse,
   type CostRow, type CostGroup, type ProdRow, type StorageFee,
 } from '../_shared';
 import { Combo } from '../_combo';
@@ -91,12 +91,11 @@ export default function WorkSettlementStep2Page() {
 
   const editable = status === '임시저장' || status === '';
 
-  // 구분(포장)별 박스수 합
-  const boxSums = useMemo(() => {
-    const m: Record<string, number> = { 사료팬: 0, 베이트大: 0, 베이트小: 0 };
-    for (const r of prod) if (r.gubun in m) m[r.gubun] += pn(r.qty);
-    return m;
-  }, [prod]);
+  // 구분(포장)별 박스수 합 — 두 벌.
+  //   boxSums       = 전 용도 → 박스(포장재는 용도 무관하게 든다)
+  //   boxSumsExempt = 원프로즌 제외 → 탈펜료(원프로즌은 통에 담겨 가니 팬에서 뺄 일이 없음)
+  const boxSums = useMemo(() => sumByBoxType(prod), [prod]);
+  const boxSumsExempt = useMemo(() => sumByBoxType(prod.filter((r) => !isFeeExemptUse(r.use))), [prod]);
 
   const costTotal = useMemo(() => groups.reduce((s, g) => s + g.rows.reduce((a, r) => a + pn(r.cells[2]), 0), 0), [groups]);
   const groupTotals = useMemo(() => Object.fromEntries(groups.map((g) => [g.name, g.rows.reduce((a, r) => a + pn(r.cells[2]), 0)])), [groups]);
@@ -142,7 +141,7 @@ export default function WorkSettlementStep2Page() {
         ...g,
         rows: g.rows.map((r) => {
           if (['박스', '탈펜료'].includes(g.name) && r.boxType && r.boxType in boxSums) {
-            const cnt = boxSums[r.boxType];
+            const cnt = (g.name === '탈펜료' ? boxSumsExempt : boxSums)[r.boxType];
             const c = [...r.cells] as CostRow['cells'];
             c[0] = cnt ? fmt(cnt) : '';
             if (c[0] && c[1]) c[2] = fmt(pn(c[0]) * pn(c[1]));
@@ -163,18 +162,19 @@ export default function WorkSettlementStep2Page() {
         }),
       };
     }));
-  }, [prod, fees, boxSums, boxTotal, buyTotal, storages, loaded]);
+  }, [prod, fees, boxSums, boxSumsExempt, boxTotal, buyTotal, storages, loaded]);
 
-  // 노임 여 회수 = 종료 − 시작
+  const workHours = useMemo(() => (hdr ? computeWorkHours(hdr.startTime, hdr.endTime) : 0), [hdr]);
+
+  // 여노임 — 작업시간은 비고에만 표기한다. 회수 칸은 사용자가 작업 인원수를 적는 곳이라 건드리지 않는다.
+  // (작업시간은 금액 계산에만 곱해진다 → patchCost)
   useEffect(() => {
-    if (!loaded || !hdr) return;
-    const hours = computeWorkHours(hdr.startTime, hdr.endTime);
-    if (!hours) return;
-    setGroups((prev) => prev.map((g) => g.name !== '노임' ? g : {
-      ...g, rows: g.rows.map((r) => r.name === '여'
-        ? { ...r, cells: [`${hours}시간`, r.cells[1], r.cells[2], r.cells[3], r.cells[4]] as CostRow['cells'] } : r),
+    if (!loaded || !workHours) return;
+    setGroups((prev) => prev.map((g) => !g.rows.some((r) => r.hourly) ? g : {
+      ...g, rows: g.rows.map((r) => r.hourly
+        ? { ...r, cells: [r.cells[0], r.cells[1], r.cells[2], r.cells[3], `${workHours}시간 작업`] as CostRow['cells'] } : r),
     }));
-  }, [loaded, hdr]);
+  }, [loaded, workHours]);
 
   const patchCost = (gi: number, ri: number, ci: number, val: string) => {
     setGroups((prev) => prev.map((g, gx) => gx !== gi ? g : {
@@ -182,7 +182,10 @@ export default function WorkSettlementStep2Page() {
         if (rx !== ri) return r;
         const c = [...r.cells] as CostRow['cells'];
         c[ci] = val;
-        if ((ci === 0 || ci === 1) && !g.noauto && c[0] && c[1]) c[2] = fmt(pn(c[0]) * pn(c[1]));
+        // 금액 = 회수 × 단가 (여노임은 × 작업시간). 단가를 직접 고쳐도 pn이 숫자만 읽어 그 값으로 재계산.
+        // 여노임인데 작업시간이 없으면(mult=0) 자동 계산을 걸지 않는다 — 0원을 써 넣지 않기 위함.
+        const mult = r.hourly ? workHours : 1;
+        if ((ci === 0 || ci === 1) && c[0] && c[1] && mult) c[2] = fmt(pn(c[0]) * pn(c[1]) * mult);
         return { ...r, cells: c };
       }),
     }));
@@ -278,7 +281,11 @@ export default function WorkSettlementStep2Page() {
         <header>
           <Link href="/admin/master/work-settlement" className="backlink">← 작업 정산</Link>
           <div className="title-row"><h1>작업 정산 등록 {no ? `· ${no}` : ''}</h1></div>
-          <div className="steps"><span>① 사전기입</span><span className="sep">→</span><span className="on">② 작업비 · 생산내역</span></div>
+          <div className="steps">
+            <span>① 사전기입</span><span className="sep">→</span>
+            <span className="on">② 작업비 · 생산내역</span><span className="sep">→</span>
+            <Link href={`/admin/master/work-settlement/${settlementId}/split`}>③ 배분</Link>
+          </div>
           <p className="lede">정산서 나온 뒤 <b>생산내역</b>과 <b>작업비</b>를 채웁니다. 생산내역 <b>구분</b>을 고르면 작업비 수량이 자동 합산되고, <b>지급처</b> 선택 시 동결비·입출고비 단가가 자동 채워집니다. <b>확정</b> 시 생산내역별 재고(LOT)가 생성됩니다.</p>
         </header>
 
