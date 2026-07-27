@@ -3,6 +3,11 @@
 기술 스택: Next.js 15 + Airtable + Vercel + zod + Vitest + Resend
 개발 방식: 1인 기획/개발 + Claude Code
 
+■ 최근 변경 (2026-07-27)
+- **어황일보 번역 봇 배포·라이브 가동 (v0.12.0→0.12.1)** — 어획 조업보고서 사진→일본어 안내문(바이어용). `app/api/telegram/route.ts` 웹훅 + `lib/eohwang/*`(translate=claude-opus-4-8 비전·adaptive thinking / dictionary=Airtable 사전 어댑터 / telegram=헬퍼) + `@anthropic-ai/sdk`. Vercel env 4개 등록→push 자동배포→setWebhook(secret_token) 등록·검증, 실사진 2건(7/26·7/27) 라이브 번역 성공. **프로덕션 도메인=`seafood-erp.vercel.app`(seaerp 아님).**
+- **번역 출력 개선** — 각 행 순번(1.2.3…)+바이어용 일본어 안내(`行番号でお知らせください`), 하단 손글씨 `c/s`(위판장 24kg박스 실입하)를 60kg 표 합계와의 '불일치 오류'로 경고하던 것→단위 명시 참고치로만(허위 경보 제거). `sendMessage` 4096자 분할. 사전 등록 기능 검증(봇에 `등록 매가리=小アジ`).
+- **미완**: 노출됐던 토큰·키 재발급(BotFather·Anthropic) 권장 대기. tmp 임시파일 삭제 + `.gitignore tmp-*`.
+
 ■ 최근 변경 (2026-07-25)
 - **LOT 생애주기 이동 3덩어리→1카드 병합(A+C)** — 이동 출고·구분선·이동 입고 3줄을 한 '이동' 카드로(원본→신규 LOT·보관처 전이·수량+양쪽 잔여). 서버 잔여계산 무손상, 화면 `foldTransfers`로 recordId 짝 접기. `작업자:`→`신청자:` 라벨. 승인자(결정자)는 이벤트 레코드 부재로 별도 작업(A안) 연기.
 - **재고 조회 컬럼 재정렬** — 최초입고일을 정체성 묶음 앞→보관처·보관일수 사이로(품목명 자동 2번째). LOT-우선 원장 원칙 유지, 품목명만 절충으로 앞당김. tfoot colSpan 보정.
