@@ -13,6 +13,9 @@ node_modules
 !.claude/commands/
 tsconfig.tsbuildinfo
 .DS_Store
+
+# 임시 분석·백업 산출물 (일회성)
+tmp-*
 ._*.env*.local
 
 # Obsidian (개인 작업 캐시 - 동기화 충돌 방지)
