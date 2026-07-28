@@ -73,12 +73,12 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/admin/master/products', label: '제품', enabled: true },
       { href: '/admin/master/suppliers', label: '매입처', enabled: true },
       { href: '/admin/master/storage', label: '보관처', enabled: true },
-      // 보관처 비용 이력 = 단가 시점 이력(기준정보) → 원가·손익에서 마스터로 이동.
-      { href: '/admin/master/cost/storage-history', label: '보관처 비용 이력', enabled: false },
+      // 2026-07-28: 보관처 비용 이력·가공비 단가는 별도 화면을 두지 않고
+      //   보관처 마스터 안으로 흡수했다(구분 덩어리별 우측 표).
+      //   비용 이력은 보관처의 속성이고 가공비 단가는 가공공장의 속성이라 그쪽이 제자리다.
       { href: '/admin/master/workers', label: '작업자', enabled: true },
       { href: '/admin/master/ships', label: '선박', enabled: true },
       { href: '/admin/master/materials', label: '부자재·경비', enabled: true },
-      { href: '/admin/master/processing-rates', label: '가공비 단가', enabled: true },
     ],
   },
   {

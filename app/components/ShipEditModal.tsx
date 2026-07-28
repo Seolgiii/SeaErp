@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useRef, useState } from 'react';
+import { TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/app/components/ui/Button';
+import { Modal } from '@/app/components/ui/Modal';
 import { toast } from '@/lib/toast';
 import { useConfirm } from '@/app/components/ConfirmBottomSheet';
 import {
@@ -42,13 +43,6 @@ export default function ShipEditModal({
   const [nameError, setNameError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
 
   const validateName = (v: string): string | null =>
     v.trim() ? null : '선박명을 입력하세요.';
@@ -110,122 +104,109 @@ export default function ShipEditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-scrim animate-fade-in motion-reduce:animate-none" onClick={onClose} />
-      <div className="relative flex max-h-[90vh] w-full max-w-md flex-col rounded-sheet bg-surface shadow-overlay animate-slide-up motion-reduce:animate-none">
-        {/* 헤더 — 상하 20px + 아래 구분선 (§6-5) */}
-        <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
-          <h3 className="text-section text-text">
-            {mode === 'create' ? '선박 추가' : '선박 수정'}
-          </h3>
-          <Button variant="ghost" icon={XMarkIcon} onClick={onClose} aria-label="닫기" />
-        </div>
-
-        {/* 본문 — 상하 24px, 필드 그룹 간격 20px (§6-5) */}
-        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
-          <Field label="선박명" required error={nameError} htmlFor="ship-name">
-            <input
-              id="ship-name"
-              ref={nameRef}
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (nameError) setNameError(validateName(e.target.value));
-              }}
-              onBlur={(e) => setNameError(validateName(e.target.value))}
-              placeholder="예: 제101해성호"
-              aria-invalid={nameError ? true : undefined}
-              aria-describedby={nameError ? 'ship-name-error' : undefined}
-              className={fieldClass(Boolean(nameError))}
-              autoFocus
-            />
-          </Field>
-          <Field label="선박회사명">
-            <input
-              type="text"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              placeholder="예: 해성수산"
-              className={fieldClass(false)}
-            />
-          </Field>
-          <Field label="선장명">
-            <input
-              type="text"
-              value={captain}
-              onChange={(e) => setCaptain(e.target.value)}
-              placeholder="예: 김선장"
-              className={fieldClass(false)}
-            />
-          </Field>
-          <Field label="어업허가번호">
-            <input
-              type="text"
-              value={licenseNo}
-              onChange={(e) => setLicenseNo(e.target.value)}
-              placeholder="예: 1-2024-0001"
-              className={fieldClass(false)}
-            />
-          </Field>
-          <Field label="선적항">
-            <input
-              type="text"
-              value={homePort}
-              onChange={(e) => setHomePort(e.target.value)}
-              placeholder="예: 통영항"
-              className={fieldClass(false)}
-            />
-          </Field>
-          <Field label="연락처">
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="예: 010-0000-0000"
-              className={fieldClass(false)}
-            />
-          </Field>
-          <Field label="이메일">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="예: ship@example.com"
-              className={fieldClass(false)}
-            />
-          </Field>
-          <Field label="비고">
-            <textarea
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              placeholder="자유 메모"
-              rows={3}
-              className={`${fieldClass(false)} h-auto resize-none py-2`}
-            />
-          </Field>
-        </div>
-
-        {/* 푸터 — 상하 16px + 위 구분선. 삭제는 좌측, 취소·저장은 우측 (§6-5) */}
-        <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
-          {mode === 'edit' ? (
-            <Button variant="ghost" tone="danger" icon={TrashIcon} onClick={handleDelete} disabled={isSaving}>
-              삭제
-            </Button>
-          ) : (
-            <div />
-          )}
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onClose} disabled={isSaving}>
-              취소
-            </Button>
-            <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? '저장 중…' : '저장'}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Modal
+      title={mode === 'create' ? '선박 추가' : '선박 수정'}
+      onClose={onClose}
+      destructiveAction={
+        mode === 'edit' ? (
+          <Button variant="ghost" tone="danger" icon={TrashIcon} onClick={handleDelete} disabled={isSaving}>
+            삭제
+          </Button>
+        ) : undefined
+      }
+      actions={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={isSaving}>
+            취소
+          </Button>
+          <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? '저장 중…' : '저장'}
+          </Button>
+        </>
+      }
+    >
+      <Field label="선박명" required error={nameError} htmlFor="ship-name">
+        <input
+          id="ship-name"
+          ref={nameRef}
+          type="text"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (nameError) setNameError(validateName(e.target.value));
+          }}
+          onBlur={(e) => setNameError(validateName(e.target.value))}
+          placeholder="예: 제101해성호"
+          aria-invalid={nameError ? true : undefined}
+          aria-describedby={nameError ? 'ship-name-error' : undefined}
+          className={fieldClass(Boolean(nameError))}
+          autoFocus
+        />
+      </Field>
+      <Field label="선박회사명">
+        <input
+          type="text"
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+          placeholder="예: 해성수산"
+          className={fieldClass(false)}
+        />
+      </Field>
+      <Field label="선장명">
+        <input
+          type="text"
+          value={captain}
+          onChange={(e) => setCaptain(e.target.value)}
+          placeholder="예: 김선장"
+          className={fieldClass(false)}
+        />
+      </Field>
+      <Field label="어업허가번호">
+        <input
+          type="text"
+          value={licenseNo}
+          onChange={(e) => setLicenseNo(e.target.value)}
+          placeholder="예: 1-2024-0001"
+          className={fieldClass(false)}
+        />
+      </Field>
+      <Field label="선적항">
+        <input
+          type="text"
+          value={homePort}
+          onChange={(e) => setHomePort(e.target.value)}
+          placeholder="예: 통영항"
+          className={fieldClass(false)}
+        />
+      </Field>
+      <Field label="연락처">
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="예: 010-0000-0000"
+          className={fieldClass(false)}
+        />
+      </Field>
+      <Field label="이메일">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="예: ship@example.com"
+          className={fieldClass(false)}
+        />
+      </Field>
+      <Field label="비고">
+        <textarea
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          placeholder="자유 메모"
+          rows={3}
+          className={`${fieldClass(false)} h-auto resize-none py-2`}
+        />
+      </Field>
+    </Modal>
   );
 }
 

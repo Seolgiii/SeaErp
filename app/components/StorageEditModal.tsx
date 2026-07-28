@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useRef, useState } from 'react';
+import { TrashIcon } from '@heroicons/react/24/outline';
 import { toast } from '@/lib/toast';
 import { useConfirm } from '@/app/components/ConfirmBottomSheet';
 import { Button } from '@/app/components/ui/Button';
+import { Modal } from '@/app/components/ui/Modal';
 import {
   createStorage,
   deleteStorage,
@@ -51,29 +52,31 @@ export default function StorageEditModal({
   const [isSaving, setIsSaving] = useState(false);
   /** 필드 귀속 오류 — 토스트가 아니라 필드 바로 아래에 띄운다 (§6-3). */
   const [nameError, setNameError] = useState<string | null>(null);
+  const [kindError, setKindError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
+  const kindRef = useRef<HTMLSelectElement>(null);
 
   const validateName = (v: string): string | null =>
     v.trim() ? null : '보관처명을 입력하세요.';
+  /**
+   * 구분은 필수다(2026-07-28). 비면 입출고증 발행 분기(isOwnStorage)가 '미분류 → 자사창고'
+   * 기본값으로 떨어져 외부 시설에 우리 이름으로 PDF가 나간다. 화면에서 막는다.
+   */
+  const validateKind = (v: string): string | null =>
+    v ? null : '구분을 선택하세요.';
 
   const handleSave = async () => {
-    const err = validateName(name);
-    setNameError(err);
-    if (err) {
-      // 오류가 난 필드로 포커스를 되돌린다 — 어디를 고쳐야 하는지 손이 바로 간다.
-      nameRef.current?.focus();
+    const nErr = validateName(name);
+    const kErr = validateKind(kind);
+    setNameError(nErr);
+    setKindError(kErr);
+    if (nErr || kErr) {
+      // 저장 실패 후 첫 오류 필드로 포커스를 되돌린다 (§6-3).
+      (nErr ? nameRef : kindRef).current?.focus();
       return;
     }
     setIsSaving(true);
-    const input: StorageInput = { name, kind: kind || undefined };
+    const input: StorageInput = { name, kind };
     const result =
       mode === 'create'
         ? await createStorage(workerId, input)
@@ -112,87 +115,88 @@ export default function StorageEditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-scrim animate-fade-in motion-reduce:animate-none" onClick={onClose} />
-      <div className="relative flex max-h-[90vh] w-full max-w-md flex-col rounded-sheet bg-surface shadow-overlay animate-slide-up motion-reduce:animate-none">
-        {/* 헤더 — 상하 16px + 아래 구분선 (§6-5) */}
-        <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
-          <h3 className="text-section text-text">
-            {mode === 'create' ? '보관처 추가' : '보관처 수정'}
-          </h3>
-          <Button variant="ghost" icon={XMarkIcon} onClick={onClose} aria-label="닫기" />
-        </div>
-
-        {/* 본문 — 상하 24px, 필드 그룹 간격 24px (§6-5) */}
-        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
-          <div>
-            <label htmlFor="storage-name" className="mb-2 block text-label text-text-muted">
-              보관처명 <span className="text-danger-ink">*</span>
-            </label>
-            <input
-              id="storage-name"
-              ref={nameRef}
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (nameError) setNameError(validateName(e.target.value));
-              }}
-              onBlur={(e) => setNameError(validateName(e.target.value))}
-              placeholder="예: 한라에스앤에프"
-              aria-invalid={nameError ? true : undefined}
-              aria-describedby={nameError ? 'storage-name-error' : undefined}
-              className={fieldClass(Boolean(nameError))}
-              autoFocus
-            />
-            {nameError && (
-              <p id="storage-name-error" className="mt-2 text-caption text-danger-ink">
-                {nameError}
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="storage-kind" className="mb-2 block text-label text-text-muted">
-              구분
-            </label>
-            <select
-              id="storage-kind"
-              value={kind}
-              onChange={(e) => setKind(e.target.value as StorageKind | '')}
-              className={fieldClass(false)}
-            >
-              <option value="">(선택 안 함)</option>
-              {STORAGE_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {k}
-                </option>
-              ))}
-            </select>
-            <p className="mt-2 text-caption text-text-muted">
-              자사창고일 때만 우리(SEAERP) 입출고증이 발행됩니다.
-            </p>
-          </div>
-        </div>
-
-        {/* 푸터 — 상하 16px + 위 구분선. 삭제는 좌측, 취소·저장은 우측 (§6-5) */}
-        <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
-          {mode === 'edit' ? (
-            <Button variant="ghost" tone="danger" icon={TrashIcon} onClick={handleDelete} disabled={isSaving}>
-              삭제
-            </Button>
-          ) : (
-            <div />
-          )}
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onClose} disabled={isSaving}>
-              취소
-            </Button>
-            <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? '저장 중…' : '저장'}
-            </Button>
-          </div>
-        </div>
+    <Modal
+      title={mode === 'create' ? '보관처 추가' : '보관처 수정'}
+      onClose={onClose}
+      destructiveAction={
+        mode === 'edit' ? (
+          <Button variant="ghost" tone="danger" icon={TrashIcon} onClick={handleDelete} disabled={isSaving}>
+            삭제
+          </Button>
+        ) : undefined
+      }
+      actions={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={isSaving}>
+            취소
+          </Button>
+          <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? '저장 중…' : '저장'}
+          </Button>
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="storage-name" className="mb-2 block text-label text-text-muted">
+          보관처명 <span className="text-danger-ink">*</span>
+        </label>
+        <input
+          id="storage-name"
+          ref={nameRef}
+          type="text"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (nameError) setNameError(validateName(e.target.value));
+          }}
+          onBlur={(e) => setNameError(validateName(e.target.value))}
+          placeholder="예: 한라에스앤에프"
+          aria-invalid={nameError ? true : undefined}
+          aria-describedby={nameError ? 'storage-name-error' : undefined}
+          className={fieldClass(Boolean(nameError))}
+          autoFocus
+        />
+        {nameError && (
+          <p id="storage-name-error" className="mt-2 text-caption text-danger-ink">
+            {nameError}
+          </p>
+        )}
       </div>
-    </div>
+      <div>
+        <label htmlFor="storage-kind" className="mb-2 block text-label text-text-muted">
+          구분 <span className="text-danger-ink">*</span>
+        </label>
+        <select
+          id="storage-kind"
+          ref={kindRef}
+          value={kind}
+          onChange={(e) => {
+            const v = e.target.value as StorageKind | '';
+            setKind(v);
+            if (kindError) setKindError(validateKind(v));
+          }}
+          onBlur={(e) => setKindError(validateKind(e.target.value))}
+          aria-invalid={kindError ? true : undefined}
+          aria-describedby={kindError ? 'storage-kind-error' : undefined}
+          className={fieldClass(Boolean(kindError))}
+        >
+          <option value="">선택하세요</option>
+          {STORAGE_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+        {kindError ? (
+          <p id="storage-kind-error" className="mt-2 text-caption text-danger-ink">
+            {kindError}
+          </p>
+        ) : (
+          <p className="mt-2 text-caption text-text-muted">
+            자사창고일 때만 우리(SEAERP) 입출고증이 발행됩니다.
+          </p>
+        )}
+      </div>
+    </Modal>
   );
 }

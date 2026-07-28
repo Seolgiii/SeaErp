@@ -10,10 +10,7 @@ import SupplierEditModal from '@/app/components/SupplierEditModal';
 import { Button } from '@/app/components/ui/Button';
 import { EmptyState } from '@/app/components/ui/EmptyState';
 import { LoadingState } from '@/app/components/ui/LoadingState';
-import { SortIcon, ariaSort } from '@/app/components/ui/SortIcon';
 import { SpacerCell, TableColGroup, tableMinWidth, type TableCol } from '@/app/admin/_table-cols';
-
-type SortDir = 'asc' | 'desc';
 
 /**
  * 컬럼 폭 — §7-2. 실측(2026-07-28, 매입처 마스터 149건) 최댓값 + 여유 8 + 패딩 32.
@@ -33,7 +30,6 @@ export default function SuppliersMasterPage() {
   const [items, setItems] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [editing, setEditing] = useState<Supplier | 'new' | null>(null);
 
   useEffect(() => {
@@ -58,12 +54,12 @@ export default function SuppliersMasterPage() {
     if (workerId) void loadData();
   }, [workerId, loadData]);
 
+  // 이름 ㄱ→ㅎ 고정. 컬럼이 1개뿐이라 정렬 토글은 검색과 기능이 겹치고,
+  // 헤더가 클릭 가능해 보이는데 순서만 뒤집히는 건 오조작에 가까워 제거했다.
   const visible = (() => {
     const q = search.trim().toLowerCase();
-    let list = q ? items.filter((s) => s.name.toLowerCase().includes(q)) : items;
-    const dir = sortDir === 'asc' ? 1 : -1;
-    list = [...list].sort((a, b) => a.name.localeCompare(b.name, 'ko') * dir);
-    return list;
+    const list = q ? items.filter((s) => s.name.toLowerCase().includes(q)) : items;
+    return [...list].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   })();
 
   // 최초 진입 — 레이아웃이 아직 없어 골격을 그릴 수 없다(§6-4의 스피너 허용 예외).
@@ -74,9 +70,6 @@ export default function SuppliersMasterPage() {
       </div>
     );
   }
-
-  // 컬럼이 1개뿐이라 '정렬 안 됨' 상태가 없다 — 항상 asc 또는 desc다.
-  const sortIconState = sortDir;
 
   return (
     <div className="mx-auto max-w-[1200px] p-8 min-w-0">
@@ -131,19 +124,8 @@ export default function SuppliersMasterPage() {
               <TableColGroup cols={COLS} spacer />
               <thead className="sticky top-0 bg-surface-alt">
                 <tr className="text-left">
-                  {/* aria-sort는 columnheader(th)에. 패딩은 버튼이 가져간다 (§7-8). */}
-                  <th
-                    aria-sort={ariaSort(sortIconState)}
-                    className="whitespace-nowrap p-0 text-label text-text-muted"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                      className="group flex w-full cursor-pointer select-none items-center gap-1 px-4 py-2 text-left transition-colors hover:text-accent-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-fill motion-reduce:transition-none"
-                    >
-                      매입처명
-                      <SortIcon state={sortIconState} />
-                    </button>
+                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">
+                    매입처명
                   </th>
                   <SpacerCell as="th" />
                 </tr>

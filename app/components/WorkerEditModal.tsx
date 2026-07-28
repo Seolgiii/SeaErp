@@ -1,15 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import {
-  LockOpenIcon,
-  KeyIcon,
-  TrashIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
+import { useRef, useState } from 'react';
+import { KeyIcon, LockOpenIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { toast } from '@/lib/toast';
 import { useConfirm } from '@/app/components/ConfirmBottomSheet';
 import { Button } from '@/app/components/ui/Button';
+import { Modal } from '@/app/components/ui/Modal';
 import {
   createWorker,
   deleteWorker,
@@ -60,13 +56,6 @@ export default function WorkerEditModal({
   const nameRef = useRef<HTMLInputElement>(null);
   const pinRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
 
   const validateName = (v: string): string | null =>
     v.trim() ? null : '작업자명을 입력하세요.';
@@ -179,240 +168,227 @@ export default function WorkerEditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-scrim animate-fade-in motion-reduce:animate-none" onClick={onClose} />
-      <div className="relative flex max-h-[90vh] w-full max-w-md flex-col rounded-sheet bg-surface shadow-overlay animate-slide-up motion-reduce:animate-none">
-        {/* 헤더 */}
-        {/* 헤더 — 상하 20px + 아래 구분선 (§6-5) */}
-        <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <h3 className="text-section text-text">
-              {mode === 'create' ? '작업자 추가' : '작업자 수정'}
-            </h3>
-            {isSelf && (
-              <span className="rounded-pill bg-warn-bg px-2 text-caption text-warn-ink">
-                본인
+    <Modal
+      title={
+        <>
+          {mode === 'create' ? '작업자 추가' : '작업자 수정'}
+          {isSelf && (
+            <span className="rounded-pill bg-warn-bg px-2 text-caption text-warn-ink">본인</span>
+          )}
+        </>
+      }
+      onClose={onClose}
+      destructiveAction={
+        // 본인 계정은 삭제 버튼 자체를 노출하지 않는다(마지막 MASTER 보호와 별개의 1차 방어).
+        mode === 'edit' && !isSelf ? (
+          <Button variant="ghost" tone="danger" icon={TrashIcon} onClick={handleDelete} disabled={isSaving}>
+            삭제
+          </Button>
+        ) : undefined
+      }
+      actions={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={isSaving}>
+            취소
+          </Button>
+          <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? '저장 중…' : '저장'}
+          </Button>
+        </>
+      }
+    >
+      <Field label="작업자명" required error={nameError} htmlFor="worker-name">
+        <input
+          id="worker-name"
+          ref={nameRef}
+          type="text"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (nameError) setNameError(validateName(e.target.value));
+          }}
+          onBlur={(e) => setNameError(validateName(e.target.value))}
+          placeholder="예: 홍길동"
+          aria-invalid={nameError ? true : undefined}
+          aria-describedby={nameError ? 'worker-name-error' : undefined}
+          className={fieldClass(Boolean(nameError))}
+          autoFocus
+        />
+      </Field>
+
+      <Field label="권한">
+        <div className="space-y-2">
+          {ROLE_OPTIONS.map((opt) => {
+            const selected = role === opt.value;
+            const disabled = isSelf && opt.value !== role;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => !disabled && setRole(opt.value)}
+                disabled={disabled}
+                className={`w-full rounded-control border px-4 py-3 text-left transition-colors motion-reduce:transition-none ${
+                  selected
+                    ? 'border-accent-ink bg-accent-bg'
+                    : 'border-border hover:bg-surface-alt'
+                } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-body ${selected ? 'text-accent-ink' : 'text-text'}`}
+                  >
+                    {opt.label}
+                    <span className="ml-2 text-caption text-text-muted">
+                      {opt.value}
+                    </span>
+                  </span>
+                  {selected && (
+                    <span className="text-caption text-accent-ink">선택됨</span>
+                  )}
+                </div>
+                <p className="mt-1 text-label text-text-muted">{opt.desc}</p>
+              </button>
+            );
+          })}
+        </div>
+        {isSelf && (
+          <p className="mt-2 text-caption text-warn-ink">
+            본인 권한은 다른 마스터가 변경해야 합니다.
+          </p>
+        )}
+      </Field>
+
+      <Field label="활성">
+        <button
+          type="button"
+          onClick={() => !isSelf && setActive((a) => !a)}
+          disabled={isSelf}
+          className={`flex w-full items-center justify-between rounded-control border px-4 py-3 transition-colors motion-reduce:transition-none ${
+            active ? 'border-success-ink bg-success-bg' : 'border-border bg-surface-alt'
+          } ${isSelf ? 'cursor-not-allowed opacity-50' : 'hover:bg-surface-alt'}`}
+        >
+          <span
+            className={`text-body ${active ? 'text-success-ink' : 'text-text-muted'}`}
+          >
+            {active ? '활성 (로그인 가능)' : '비활성 (로그인 차단)'}
+          </span>
+          <span
+            className={`relative h-6 w-10 rounded-pill transition-colors motion-reduce:transition-none ${active ? 'bg-success-ink' : 'bg-border'}`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-pill bg-surface transition-all motion-reduce:transition-none ${active ? 'left-[18px]' : 'left-0.5'}`}
+            />
+          </span>
+        </button>
+        {isSelf && (
+          <p className="mt-2 text-caption text-warn-ink">
+            본인 계정은 비활성으로 바꿀 수 없습니다.
+          </p>
+        )}
+      </Field>
+
+      {mode === 'create' && (
+        <Field label="초기 PIN" required error={pinError} htmlFor="worker-pin">
+          <input
+            id="worker-pin"
+            ref={pinRef}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={4}
+            value={pin}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, '');
+              setPin(v);
+              if (pinError) setPinError(validatePin(v));
+            }}
+            onBlur={(e) => setPinError(validatePin(e.target.value))}
+            placeholder="숫자 4자리"
+            aria-invalid={pinError ? true : undefined}
+            aria-describedby={pinError ? 'worker-pin-error' : undefined}
+            className={fieldClass(Boolean(pinError))}
+          />
+          <p className="mt-2 text-caption text-text-muted">
+            입력 즉시 해시화되어 저장됩니다. 평문 PIN은 저장되지 않습니다.
+          </p>
+        </Field>
+      )}
+
+      {mode === 'edit' && worker && (
+        <div className="space-y-3 border-t border-border pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-label text-text-muted">PIN 보안 상태</p>
+              <p className="mt-1 text-body text-text">
+                {worker.hasHashedPin
+                  ? '해시 저장됨'
+                  : worker.hasPlainPin
+                    ? '평문 저장됨 (로그인 시 자동 해시화)'
+                    : 'PIN 미설정'}
+              </p>
+            </div>
+            {worker.isLocked && (
+              <span className="rounded-pill bg-danger-bg px-2 text-caption text-danger-ink">
+                잠금 중
               </span>
             )}
           </div>
-          <Button variant="ghost" icon={XMarkIcon} onClick={onClose} aria-label="닫기" />
-        </div>
 
-        {/* 본문 — 상하 24px, 필드 그룹 간격 20px (§6-5) */}
-        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
-          <Field label="작업자명" required error={nameError} htmlFor="worker-name">
-            <input
-              id="worker-name"
-              ref={nameRef}
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (nameError) setNameError(validateName(e.target.value));
-              }}
-              onBlur={(e) => setNameError(validateName(e.target.value))}
-              placeholder="예: 홍길동"
-              aria-invalid={nameError ? true : undefined}
-              aria-describedby={nameError ? 'worker-name-error' : undefined}
-              className={fieldClass(Boolean(nameError))}
-              autoFocus
-            />
-          </Field>
+          {worker.pinFailCount > 0 && (
+            <p className="text-label text-text-muted">
+              실패 횟수: <span className="text-text">{worker.pinFailCount}회</span>
+              {worker.isLocked && (
+                <>
+                  {' · '}
+                  잠금 해제:{' '}
+                  <span className="text-text">
+                    {new Date(worker.pinLockedUntil).toLocaleString('ko-KR')}
+                  </span>
+                </>
+              )}
+            </p>
+          )}
 
-          <Field label="권한">
-            <div className="space-y-2">
-              {ROLE_OPTIONS.map((opt) => {
-                const selected = role === opt.value;
-                const disabled = isSelf && opt.value !== role;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => !disabled && setRole(opt.value)}
-                    disabled={disabled}
-                    className={`w-full rounded-control border px-4 py-3 text-left transition-colors motion-reduce:transition-none ${
-                      selected
-                        ? 'border-accent-ink bg-accent-bg'
-                        : 'border-border hover:bg-surface-alt'
-                    } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`text-body ${selected ? 'text-accent-ink' : 'text-text'}`}
-                      >
-                        {opt.label}
-                        <span className="ml-2 text-caption text-text-muted">
-                          {opt.value}
-                        </span>
-                      </span>
-                      {selected && (
-                        <span className="text-caption text-accent-ink">선택됨</span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-label text-text-muted">{opt.desc}</p>
-                  </button>
-                );
-              })}
-            </div>
-            {isSelf && (
-              <p className="mt-2 text-caption text-warn-ink">
-                본인 권한은 다른 마스터가 변경해야 합니다.
-              </p>
+          <div className="flex gap-2 flex-wrap">
+            {worker.isLocked && (
+              <Button variant="secondary" icon={LockOpenIcon} onClick={handleUnlock} disabled={isSaving}>
+                잠금 해제
+              </Button>
             )}
-          </Field>
+            <Button variant="secondary" icon={KeyIcon} onClick={() => setShowPinReset((s) => !s)}>
+              {showPinReset ? '닫기' : 'PIN 재설정'}
+            </Button>
+          </div>
 
-          <Field label="활성">
-            <button
-              type="button"
-              onClick={() => !isSelf && setActive((a) => !a)}
-              disabled={isSelf}
-              className={`flex w-full items-center justify-between rounded-control border px-4 py-3 transition-colors motion-reduce:transition-none ${
-                active ? 'border-success-ink bg-success-bg' : 'border-border bg-surface-alt'
-              } ${isSelf ? 'cursor-not-allowed opacity-50' : 'hover:bg-surface-alt'}`}
-            >
-              <span
-                className={`text-body ${active ? 'text-success-ink' : 'text-text-muted'}`}
-              >
-                {active ? '활성 (로그인 가능)' : '비활성 (로그인 차단)'}
-              </span>
-              <span
-                className={`relative h-6 w-10 rounded-pill transition-colors motion-reduce:transition-none ${active ? 'bg-success-ink' : 'bg-border'}`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-pill bg-surface transition-all motion-reduce:transition-none ${active ? 'left-[18px]' : 'left-0.5'}`}
-                />
-              </span>
-            </button>
-            {isSelf && (
-              <p className="mt-2 text-caption text-warn-ink">
-                본인 계정은 비활성으로 바꿀 수 없습니다.
-              </p>
-            )}
-          </Field>
-
-          {mode === 'create' && (
-            <Field label="초기 PIN" required error={pinError} htmlFor="worker-pin">
+          {showPinReset && (
+            <div className="space-y-2 rounded-card bg-surface-alt p-4">
+              <label htmlFor="worker-new-pin" className="block text-label text-text-muted">
+                새 PIN (숫자 4자리)
+              </label>
               <input
-                id="worker-pin"
-                ref={pinRef}
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={4}
-                value={pin}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, '');
-                  setPin(v);
-                  if (pinError) setPinError(validatePin(v));
-                }}
-                onBlur={(e) => setPinError(validatePin(e.target.value))}
-                placeholder="숫자 4자리"
-                aria-invalid={pinError ? true : undefined}
-                aria-describedby={pinError ? 'worker-pin-error' : undefined}
-                className={fieldClass(Boolean(pinError))}
+                id="worker-new-pin"
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="예: 0000"
+                className={fieldClass(false)}
               />
-              <p className="mt-2 text-caption text-text-muted">
-                입력 즉시 해시화되어 저장됩니다. 평문 PIN은 저장되지 않습니다.
-              </p>
-            </Field>
-          )}
-
-          {mode === 'edit' && worker && (
-            <div className="space-y-3 border-t border-border pt-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-label text-text-muted">PIN 보안 상태</p>
-                  <p className="mt-1 text-body text-text">
-                    {worker.hasHashedPin
-                      ? '해시 저장됨'
-                      : worker.hasPlainPin
-                        ? '평문 저장됨 (로그인 시 자동 해시화)'
-                        : 'PIN 미설정'}
-                  </p>
-                </div>
-                {worker.isLocked && (
-                  <span className="rounded-pill bg-danger-bg px-2 text-caption text-danger-ink">
-                    잠금 중
-                  </span>
-                )}
-              </div>
-
-              {worker.pinFailCount > 0 && (
-                <p className="text-label text-text-muted">
-                  실패 횟수: <span className="text-text">{worker.pinFailCount}회</span>
-                  {worker.isLocked && (
-                    <>
-                      {' · '}
-                      잠금 해제:{' '}
-                      <span className="text-text">
-                        {new Date(worker.pinLockedUntil).toLocaleString('ko-KR')}
-                      </span>
-                    </>
-                  )}
-                </p>
-              )}
-
-              <div className="flex gap-2 flex-wrap">
-                {worker.isLocked && (
-                  <Button variant="secondary" icon={LockOpenIcon} onClick={handleUnlock} disabled={isSaving}>
-                    잠금 해제
-                  </Button>
-                )}
-                <Button variant="secondary" icon={KeyIcon} onClick={() => setShowPinReset((s) => !s)}>
-                  {showPinReset ? '닫기' : 'PIN 재설정'}
-                </Button>
-              </div>
-
-              {showPinReset && (
-                <div className="space-y-2 rounded-card bg-surface-alt p-4">
-                  <label htmlFor="worker-new-pin" className="block text-label text-text-muted">
-                    새 PIN (숫자 4자리)
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={4}
-                    id="worker-new-pin"
-                    value={newPin}
-                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-                    placeholder="예: 0000"
-                    className={fieldClass(false)}
-                  />
-                  <Button
-                    variant="secondary"
-                    fullWidth
-                    onClick={handlePinReset}
-                    disabled={isSaving || newPin.length !== 4}
-                  >
-                    {isSaving ? '재설정 중…' : '새 PIN으로 재설정'}
-                  </Button>
-                </div>
-              )}
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={handlePinReset}
+                disabled={isSaving || newPin.length !== 4}
+              >
+                {isSaving ? '재설정 중…' : '새 PIN으로 재설정'}
+              </Button>
             </div>
           )}
         </div>
-
-        {/* 푸터 — 상하 16px + 위 구분선. 삭제는 좌측, 취소·저장은 우측 (§6-5) */}
-        <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
-          {mode === 'edit' && !isSelf ? (
-            <Button variant="ghost" tone="danger" icon={TrashIcon} onClick={handleDelete} disabled={isSaving}>
-              삭제
-            </Button>
-          ) : (
-            <div />
-          )}
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onClose} disabled={isSaving}>
-              취소
-            </Button>
-            <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? '저장 중…' : '저장'}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }
 

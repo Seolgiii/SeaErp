@@ -31,8 +31,8 @@ body {
 
 [data-surface='admin'] {
   --r-control: 6px;
-  --r-card: 10px;
-  --r-sheet: 12px;
+  --r-card: 12px;
+  --r-sheet: 16px;
   --r-pill: 999px;
   --h-control: 32px; /* PC 컨트롤 높이 (§6-1) */
 }
