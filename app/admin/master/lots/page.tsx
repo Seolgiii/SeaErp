@@ -12,7 +12,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { formatIntKo } from '@/lib/number-format';
+import { formatNum } from '@/lib/number-format';
+import { NumCell, NUM_CELL } from '@/app/admin/_num-cell';
+import { makeCellClasses, tableMinWidth, TableColGroup, type TableCol } from '@/app/admin/_table-cols';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
 import { listLots, type Lot } from '@/app/actions/admin/master-lots';
 
@@ -282,7 +284,7 @@ export default function LotsMasterPage() {
             {visible.length}건{(search || statusFilter !== 'ALL') && ` / 전체 ${items.length}건`}
             {totalValuation > 0 && (
               <span className="ml-2 font-bold text-gray-700">
-                · 평가액 합계 {formatIntKo(totalValuation)}원
+                · 평가액 합계 {formatNum(totalValuation, '원')}
               </span>
             )}
             <span className="ml-2 text-gray-400">(행 클릭 → 생애주기·원가 · 조회 전용)</span>
@@ -405,7 +407,7 @@ export default function LotsMasterPage() {
           <span className="text-[13px] font-bold text-gray-800">
             {selectedVisible.length}건 선택
             {selectedValuation > 0 && (
-              <span className="ml-2 text-gray-500">· 평가액 {formatIntKo(selectedValuation)}원</span>
+              <span className="ml-2 text-gray-500">· 평가액 {formatNum(selectedValuation, '원')}</span>
             )}
           </span>
           <div className="flex items-center gap-2 ml-auto">
@@ -442,10 +444,16 @@ export default function LotsMasterPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            {/* 표준 구조(app/admin/_table-cols) — 잘림 없이 전부 표시하고 총폭을 넘으면 가로 스크롤.
+                창을 좁혀도 table-fixed + minWidth라 컬럼 폭이 줄지 않는다. */}
+            <table
+              className="w-full table-fixed text-[13px]"
+              style={{ minWidth: LOT_MIN_WIDTH }}
+            >
+              <TableColGroup cols={LOT_COLS} />
               <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr className="text-left font-bold text-gray-500 text-[12px]">
-                  <th className="px-4 py-3 w-10">
+                  <th className={lotCls.cell()}>
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
@@ -457,17 +465,17 @@ export default function LotsMasterPage() {
                   <Th label="LOT번호" field="lotNumber" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} thClassName="sticky left-0 z-30 bg-gray-50" />
                   <Th label="최초입고일" field="firstInboundDate" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="품목명" field="productName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <th className="px-4 py-3">규격</th>
-                  <th className="px-4 py-3">미수</th>
-                  <Th label="재고수량" field="stockQty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="총중량" field="stockWeight" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="수매가" field="purchasePrice" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="재고원가" field="costPerBox" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="평가액" field="valuation" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <th className={lotCls.cell()}>규격</th>
+                  <th className={lotCls.cell()}>미수</th>
+                  <Th numeric label="재고수량" field="stockQty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th numeric label="총중량" field="stockWeight" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th numeric label="수매가" field="purchasePrice" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th numeric label="재고원가" field="costPerBox" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th numeric label="평가액" field="valuation" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="보관처" field="storageName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="보관일수" field="daysHeld" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} title="최초 입고일 기준 총 보관기간 (이동해도 원본 입고일 유지). 냉장료는 현 보관처 입고일 기준이라 더 짧을 수 있음." />
-                  <th className="px-4 py-3">상태</th>
-                  <th className="px-4 py-3">비고</th>
+                  <Th numeric label="보관일수" field="daysHeld" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} title="최초 입고일 기준 총 보관기간 (이동해도 원본 입고일 유지). 냉장료는 현 보관처 입고일 기준이라 더 짧을 수 있음." />
+                  <th className={lotCls.cell()}>상태</th>
+                  <th className={lotCls.cell()}>비고</th>
                 </tr>
               </thead>
               <tbody>
@@ -486,7 +494,7 @@ export default function LotsMasterPage() {
                     className={`border-t border-gray-100 hover:bg-blue-50/40 transition-colors ${l.lotNumber ? 'cursor-pointer' : ''}`}
                   >
                     <td
-                      className="px-4 py-3 cursor-pointer select-none"
+                      className={lotCls.pad('cursor-pointer select-none')}
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => onSelectMouseDown(idx, l.id, e)}
                       onMouseEnter={() => {
@@ -501,31 +509,45 @@ export default function LotsMasterPage() {
                         className="w-4 h-4 accent-[#3182F6] cursor-pointer align-middle pointer-events-none"
                       />
                     </td>
-                    <td className="px-4 py-3 font-bold text-gray-900 whitespace-nowrap sticky left-0 z-10 bg-white">{l.lotNumber || '-'}</td>
-                    <td className="px-4 py-3 text-gray-500">{l.firstInboundDate || '-'}</td>
-                    <td className="px-4 py-3 font-bold text-gray-900">{l.productName || '-'}</td>
-                    <td className="px-4 py-3 text-gray-500">{formatSpec(l.spec)}</td>
-                    <td className="px-4 py-3 text-gray-500">{formatMisu(l.misu)}</td>
-                    <td className={`px-4 py-3 font-bold ${l.stockQty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`}>
-                      {formatIntKo(l.stockQty)}박스
+                    <td className={lotCls.cell('font-bold text-gray-900 sticky left-0 z-10 bg-white')}>
+                      {l.lotNumber || '-'}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 tabular-nums">
-                      {l.stockWeight > 0 ? `${formatIntKo(l.stockWeight)} kg` : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 tabular-nums">
-                      {l.purchasePrice > 0 ? `${formatIntKo(Math.round(l.purchasePrice))}원` : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 tabular-nums">
-                      {l.costPerBox > 0 ? `${formatIntKo(Math.round(l.costPerBox))}원` : '-'}
-                    </td>
-                    <td className="px-4 py-3 font-bold text-gray-900 tabular-nums">
-                      {l.costPerBox > 0 ? `${formatIntKo(l.valuation)}원` : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{l.storageName || '-'}</td>
-                    <td className="px-4 py-3 text-gray-500 tabular-nums">
-                      {l.firstInboundDate ? `${formatIntKo(l.daysHeld)}일` : '-'}
-                    </td>
-                    <td className="px-4 py-3">
+                    <td className={lotCls.cell('text-gray-500')}>{l.firstInboundDate || '-'}</td>
+                    <td className={lotCls.cell('font-bold text-gray-900')}>{l.productName || '-'}</td>
+                    <td className={lotCls.cell('text-gray-500')}>{formatSpec(l.spec)}</td>
+                    <td className={lotCls.cell('text-gray-500')}>{formatMisu(l.misu)}</td>
+                    <NumCell
+                      className={lotCls.pad(`font-bold ${l.stockQty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`)}
+                      value={l.stockQty}
+                      unit="박스"
+                    />
+                    <NumCell
+                      className={lotCls.pad('text-gray-600')}
+                      value={l.stockWeight > 0 ? l.stockWeight : null}
+                      unit="kg"
+                    />
+                    <NumCell
+                      className={lotCls.pad('text-gray-700')}
+                      value={l.purchasePrice > 0 ? l.purchasePrice : null}
+                      unit="원"
+                    />
+                    <NumCell
+                      className={lotCls.pad('text-gray-700')}
+                      value={l.costPerBox > 0 ? l.costPerBox : null}
+                      unit="원"
+                    />
+                    <NumCell
+                      className={lotCls.pad('font-bold text-gray-900')}
+                      value={l.costPerBox > 0 ? l.valuation : null}
+                      unit="원"
+                    />
+                    <td className={lotCls.cell('text-gray-600')}>{l.storageName || '-'}</td>
+                    <NumCell
+                      className={lotCls.pad('text-gray-500')}
+                      value={l.firstInboundDate ? l.daysHeld : null}
+                      unit="일"
+                    />
+                    <td className={lotCls.cell()}>
                       {!l.status ? (
                         <span className="text-gray-300">-</span>
                       ) : l.status === '승인 완료' ? (
@@ -539,39 +561,37 @@ export default function LotsMasterPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {l.memo ? (
-                        <span className="block max-w-[220px] truncate" title={l.memo}>
-                          {l.memo}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300">-</span>
-                      )}
+                    <td className={lotCls.cell('text-gray-500')}>
+                      {l.memo || <span className="text-gray-300">-</span>}
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-gray-200 bg-gray-50 font-black text-gray-800 text-[13px]">
-                  <td className="px-4 py-3" colSpan={6}>
+                  <td className={lotCls.pad()} colSpan={6}>
                     합계{' '}
                     <span className="text-gray-400 font-bold">
                       ({summaryIsSelection ? `선택 ${selectedVisible.length}건` : `${visible.length}건`})
                     </span>
                   </td>
-                  <td className="px-4 py-3 tabular-nums text-[#3182F6]">{formatIntKo(sumQty)}박스</td>
-                  <td className="px-4 py-3 tabular-nums text-gray-700">
-                    {sumWeight > 0 ? `${formatIntKo(sumWeight)} kg` : '-'}
-                  </td>
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3 tabular-nums text-gray-900">
-                    {sumVal > 0 ? `${formatIntKo(sumVal)}원` : '-'}
-                  </td>
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3" />
+                  <NumCell className={lotCls.pad('text-[#3182F6]')} value={sumQty} unit="박스" />
+                  <NumCell
+                    className={lotCls.pad('text-gray-700')}
+                    value={sumWeight > 0 ? sumWeight : null}
+                    unit="kg"
+                  />
+                  <td className={lotCls.pad()} />
+                  <td className={lotCls.pad()} />
+                  <NumCell
+                    className={lotCls.pad('text-gray-900')}
+                    value={sumVal > 0 ? sumVal : null}
+                    unit="원"
+                  />
+                  <td className={lotCls.pad()} />
+                  <td className={lotCls.pad()} />
+                  <td className={lotCls.pad()} />
+                  <td className={lotCls.pad()} />
                 </tr>
               </tfoot>
             </table>
@@ -581,6 +601,30 @@ export default function LotsMasterPage() {
     </div>
   );
 }
+
+// ── 컬럼 폭 (표준: app/admin/_table-cols — 잘림 없이 전부 표시 + 넘치면 가로 스크롤)
+// px = 실측 내용 최댓값 + 여유 8 + 좌우 패딩 32(px-4).
+// 실측 근거: 2026-07-28 Airtable `LOT별 재고` 200건 전량의 표시 문자열.
+// 정렬 헤더(Th)는 ↕ 아이콘 18px이 더 붙으므로 그 하한도 함께 반영.
+const LOT_COLS: TableCol[] = [
+  { key: 'check', label: '', px: 48 },
+  { key: 'lotNumber', label: 'LOT번호', px: 248 },      // max 206 `251002-MA1-21.5/22-점70/80-0008`
+  { key: 'firstInboundDate', label: '최초입고일', px: 124 }, // 헤더(65+18)가 하한
+  { key: 'productName', label: '품목명', px: 152 },      // max 111 `사료 (BOAR FISH)`
+  { key: 'spec', label: '규격', px: 100 },               // max 59 `11.5~12kg`
+  { key: 'misu', label: '미수', px: 104 },               // max 62 `70/120G미`
+  { key: 'stockQty', label: '재고수량', px: 112, numeric: true },  // max 59 `1,000박스`
+  { key: 'stockWeight', label: '총중량', px: 100, numeric: true }, // max 55 `11,245kg`
+  { key: 'purchasePrice', label: '수매가', px: 100, numeric: true }, // max 60 `104,000원`
+  { key: 'costPerBox', label: '재고원가', px: 112, numeric: true },  // 헤더(52+18)가 하한
+  { key: 'valuation', label: '평가액', px: 128, numeric: true },     // max 86 `156,307,899원`
+  { key: 'storageName', label: '보관처', px: 140 },      // max 98 `신우농수산2공장`
+  { key: 'daysHeld', label: '보관일수', px: 112, numeric: true },    // 헤더(52+18)가 하한
+  { key: 'status', label: '상태', px: 112 },             // 상태사유 배지 `이동 입고` 등
+  { key: 'memo', label: '비고', px: 308 },               // max 265 — 자유 텍스트, 주기 재측정 필요
+];
+const LOT_MIN_WIDTH = tableMinWidth(LOT_COLS);
+const lotCls = makeCellClasses('px-4');
 
 // 색은 라이프사이클 상태에 매핑: 승인 완료(녹색)/소진(회색)/반려(빨강)/취소(연빨강)
 function statusColor(status: string): string {
@@ -659,6 +703,7 @@ function Th({
   sortDir,
   onToggle,
   title,
+  numeric = false,
   thClassName = '',
 }: {
   label: string;
@@ -667,6 +712,8 @@ function Th({
   sortDir: SortDir;
   onToggle: (f: SortField) => void;
   title?: string;
+  /** 수량·중량·금액·단가 컬럼 — 값 셀(NumCell)과 우측 끝을 맞춘다. */
+  numeric?: boolean;
   thClassName?: string;
 }) {
   const Icon =
@@ -679,7 +726,9 @@ function Th({
     <th
       onClick={() => onToggle(field)}
       title={title}
-      className={`px-4 py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors ${thClassName}`}
+      className={`whitespace-nowrap px-4 py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors ${
+        numeric ? NUM_CELL : ''
+      } ${thClassName}`}
     >
       <span className="inline-flex items-center gap-1">
         {label}

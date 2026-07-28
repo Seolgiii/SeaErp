@@ -28,6 +28,7 @@ import {
   fromGroupedOptionalIntInput,
   formatIntKo,
 } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
 import { readSession, isSessionExpired, isAdminRole } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -38,7 +39,6 @@ import {
   numCellInput,
   cellField,
   labelClass,
-  NumBox,
   NumInputHeader,
   SectionTitle,
 } from '../../../_lot-table';
@@ -347,9 +347,7 @@ export default function OutboundCreatePage() {
                 <th className="px-3 py-2.5">품목</th>
                 <th className="whitespace-nowrap px-3 py-2.5">규격</th>
                 <th className="whitespace-nowrap px-3 py-2.5">미수</th>
-                <th className="px-3 py-2.5">
-                  <NumBox>재고</NumBox>
-                </th>
+                <NumHead className="px-3 py-2.5">재고</NumHead>
                 <th className="w-32 px-3 py-2.5">
                   <NumInputHeader>출고수량</NumInputHeader>
                 </th>
@@ -381,9 +379,7 @@ export default function OutboundCreatePage() {
                     <td className="whitespace-nowrap px-3 py-2 text-gray-600">
                       {formatMisu(r.misu)}
                     </td>
-                    <td className="px-3 py-2 text-gray-600">
-                      <NumBox>{formatIntKo(r.available)}</NumBox>
-                    </td>
+                    <NumCell className="px-3 py-2 text-gray-600" value={r.available} unit="박스" />
                     <td className="px-3 py-2">
                       <input
                         type="text"

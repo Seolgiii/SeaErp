@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { formatIntKo } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import {
   listWorkSettlements,
   cancelWorkSettlement,
@@ -155,8 +155,8 @@ function SettlementTable({
             <th className="px-5 py-2.5">정산번호</th>
             <th className="px-5 py-2.5">작업일</th>
             <th className="px-5 py-2.5">매입처</th>
-            <th className="px-5 py-2.5 text-right">생산내역</th>
-            <th className="px-5 py-2.5 text-right">어대금</th>
+            <NumHead className="px-5 py-2.5">생산내역</NumHead>
+            <NumHead className="px-5 py-2.5">어대금</NumHead>
             <th className="px-5 py-2.5">상태</th>
             <th className="px-5 py-2.5" />
           </tr>
@@ -167,10 +167,13 @@ function SettlementTable({
               <td className="px-5 py-2.5 font-medium tabular-nums text-gray-900">{r.no || '—'}</td>
               <td className="px-5 py-2.5 tabular-nums text-gray-700">{r.date || '—'}</td>
               <td className="px-5 py-2.5 text-gray-800">{supplierName(r.supplierId)}</td>
-              <td className="px-5 py-2.5 text-right tabular-nums text-gray-700">{r.lineCount}줄</td>
-              <td className="px-5 py-2.5 text-right tabular-nums text-gray-700">
-                {r.catchAmount > 0 ? `${formatIntKo(r.catchAmount)}원` : '—'}
-              </td>
+              <NumCell className="px-5 py-2.5 text-gray-700" value={r.lineCount} unit="줄" />
+              <NumCell
+                className="px-5 py-2.5 text-gray-700"
+                value={r.catchAmount > 0 ? r.catchAmount : null}
+                unit="원"
+                empty="—"
+              />
               <td className="px-5 py-2.5">
                 <StatusBadge status={r.status} />
               </td>

@@ -11,7 +11,16 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { formatIntKo } from '@/lib/number-format';
+import { formatNum } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
+import {
+  CELL_X,
+  LEDGER_COL,
+  LedgerColGroup,
+  ledgerCell,
+  ledgerMinWidth,
+  ledgerPad,
+} from '../_ledger-cols';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
 import {
   getInboundHistory,
@@ -47,7 +56,27 @@ function presetRange(preset: Preset): { from: string; to: string } {
   return { from: `${t.slice(0, 4)}-01-01`, to: t };
 }
 
-const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
+// 컬럼 — 폭·패딩·말줄임은 공유 모듈(_ledger-cols)에서 오고, 라벨만 입고 이력에 맞춘다.
+const C = {
+  date: { ...LEDGER_COL.date, label: '입고일' },
+  lotNumber: LEDGER_COL.lotNumber,
+  product: LEDGER_COL.product,
+  spec: LEDGER_COL.spec,
+  misu: LEDGER_COL.misu,
+  qty: { ...LEDGER_COL.qty, label: '수량' },
+  unitPrice: { ...LEDGER_COL.unitPrice, label: '수매가' },
+  amount: { ...LEDGER_COL.amount, label: '매입액' },
+  partner: { ...LEDGER_COL.partner, label: '매입처' },
+  storage: LEDGER_COL.storage,
+  worker: LEDGER_COL.worker,
+  status: LEDGER_COL.status,
+};
+// 순서 = 화면 컬럼 순서. colgroup·헤더·minWidth가 전부 이 배열에서 나온다.
+const COLS = [
+  C.date, C.lotNumber, C.product, C.spec, C.misu,
+  C.qty, C.unitPrice, C.amount,
+  C.partner, C.storage, C.worker, C.status,
+];
 
 // 승인상태 필터 — 전체 + 베이스 표준 3종.
 type StatusFilter = '전체' | '승인 완료' | '승인 대기' | '반려';
@@ -303,51 +332,41 @@ export default function InboundHistoryPage() {
             </div>
           </div>
 
-          {/* 원장 표 — table-fixed + colgroup으로 컬럼 폭 고정(검색·필터로 행이 바뀌어도 흔들림 없음) */}
+          {/* 원장 표 — 표준 구조(app/admin/_table-cols): 잘림 없이 전부 표시 + 넘치면 가로 스크롤.
+              폭·패딩은 공유 컬럼 정의(_ledger-cols)에서만 온다. */}
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full table-fixed text-[13px]" style={{ minWidth: 1276 }}>
-              <colgroup>
-                <col style={{ width: 104 }} />{/* 입고일 */}
-                <col style={{ width: 184 }} />{/* LOT번호 */}
-                <col style={{ width: 132 }} />{/* 품목 */}
-                <col style={{ width: 72 }} />{/* 규격 */}
-                <col style={{ width: 80 }} />{/* 미수 */}
-                <col style={{ width: 76 }} />{/* 수량 */}
-                <col style={{ width: 104 }} />{/* 수매가 */}
-                <col style={{ width: 124 }} />{/* 매입액 */}
-                <col style={{ width: 140 }} />{/* 매입처 */}
-                <col style={{ width: 120 }} />{/* 보관처 */}
-                <col style={{ width: 96 }} />{/* 작업자 */}
-                <col style={{ width: 92 }} />{/* 상태 */}
-              </colgroup>
+            <table
+              className="w-full table-fixed text-[13px]"
+              style={{ minWidth: ledgerMinWidth(COLS) }}
+            >
+              <LedgerColGroup cols={COLS} />
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
-                  <th className="whitespace-nowrap px-4 py-3">입고일</th>
-                  <th className="whitespace-nowrap px-4 py-3">LOT번호</th>
-                  <th className="px-4 py-3">품목</th>
-                  <th className="whitespace-nowrap px-4 py-3">규격</th>
-                  <th className="whitespace-nowrap px-4 py-3">미수</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">수량</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">수매가</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">매입액</th>
-                  <th className="px-4 py-3">매입처</th>
-                  <th className="px-4 py-3">보관처</th>
-                  <th className="whitespace-nowrap px-4 py-3">작업자</th>
-                  <th className="whitespace-nowrap px-4 py-3">상태</th>
+                  {COLS.map((c) =>
+                    c.numeric ? (
+                      <NumHead key={c.key} className={ledgerCell()}>
+                        {c.label}
+                      </NumHead>
+                    ) : (
+                      <th key={c.key} className={ledgerCell()}>
+                        {c.label}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-12 text-center text-sm text-gray-400">
+                    <td colSpan={12} className={`${CELL_X} py-12 text-center text-sm text-gray-400`}>
                       조건에 맞는 입고 건이 없습니다.
                     </td>
                   </tr>
                 ) : (
                   rows.map((r) => (
                     <tr key={r.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-500">{r.date}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium">
+                      <td className={ledgerCell('text-gray-500')}>{r.date}</td>
+                      <td className={ledgerCell('font-medium')}>
                         {r.lotNumber ? (
                           <button
                             onClick={() =>
@@ -364,22 +383,26 @@ export default function InboundHistoryPage() {
                           <span className="text-[#191F28]">—</span>
                         )}
                       </td>
-                      <td className="truncate px-4 py-3 text-[#191F28]" title={r.product}>{r.product}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-500">{formatSpec(r.spec)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-500">{formatMisu(r.misu)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-gray-700">
-                        {formatIntKo(r.qty)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-gray-700">
-                        {r.purchasePrice > 0 ? won(r.purchasePrice) : '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-[#191F28]">
-                        {r.purchaseTotal > 0 ? won(r.purchaseTotal) : '—'}
-                      </td>
-                      <td className="truncate px-4 py-3 text-gray-700" title={r.supplier}>{r.supplier || '—'}</td>
-                      <td className="truncate px-4 py-3 text-gray-700" title={r.storage}>{r.storage || '—'}</td>
-                      <td className="truncate px-4 py-3 text-gray-700" title={r.worker}>{r.worker || '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
+                      <td className={ledgerCell('text-[#191F28]')}>{r.product}</td>
+                      <td className={ledgerCell('text-gray-500')}>{formatSpec(r.spec)}</td>
+                      <td className={ledgerCell('text-gray-500')}>{formatMisu(r.misu)}</td>
+                      <NumCell className={ledgerPad('text-gray-700')} value={r.qty} unit="박스" />
+                      <NumCell
+                        className={ledgerPad('text-gray-700')}
+                        value={r.purchasePrice > 0 ? r.purchasePrice : null}
+                        unit="원"
+                        empty="—"
+                      />
+                      <NumCell
+                        className={ledgerPad('text-[#191F28]')}
+                        value={r.purchaseTotal > 0 ? r.purchaseTotal : null}
+                        unit="원"
+                        empty="—"
+                      />
+                      <td className={ledgerCell('text-gray-700')}>{r.supplier || '—'}</td>
+                      <td className={ledgerCell('text-gray-700')}>{r.storage || '—'}</td>
+                      <td className={ledgerCell('text-gray-700')}>{r.worker || '—'}</td>
+                      <td className={ledgerCell()}>
                         <span className={`rounded-md px-2 py-0.5 text-[12px] font-medium ${statusBadgeClass(r.approvalStatus)}`}>
                           {r.approvalStatus}
                         </span>
@@ -391,17 +414,13 @@ export default function InboundHistoryPage() {
               {rows.length > 0 && (
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold text-[#191F28]">
-                    <td className="px-4 py-3" colSpan={5}>
-                      합계 {formatIntKo(rows.length)}건
+                    <td className={ledgerPad()} colSpan={5}>
+                      합계 {formatNum(rows.length, '건')}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-                      {formatIntKo(shown.qty)}
-                    </td>
-                    <td className="px-4 py-3" />
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-                      {won(shown.purchaseTotal)}
-                    </td>
-                    <td className="px-4 py-3" colSpan={4} />
+                    <NumCell className={ledgerPad()} value={shown.qty} unit="박스" />
+                    <td className={ledgerPad()} />
+                    <NumCell className={ledgerPad()} value={shown.purchaseTotal} unit="원" />
+                    <td className={ledgerPad()} colSpan={4} />
                   </tr>
                 </tfoot>
               )}

@@ -25,6 +25,7 @@ import {
   tryParseInboundDateInput,
 } from '@/lib/inbound-date-input';
 import { fromGroupedIntegerInput, formatIntKo } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
 import { readSession, isSessionExpired, isAdminRole } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -36,7 +37,6 @@ import {
   softField,
   numCellInput,
   labelClass,
-  NumBox,
   NumInputHeader,
   SectionTitle,
 } from '../../_lot-table';
@@ -62,8 +62,8 @@ function LotCols() {
       <col />
       <col className="w-20" />
       <col className="w-20" />
-      <col className="w-24" />
       <col />
+      <col className="w-24" />
       <col className="w-32" />
       <col className="w-10" />
     </colgroup>
@@ -77,11 +77,8 @@ function LotHead({ last }: { last: string }) {
         <th className="px-3 py-2.5">품목</th>
         <th className="px-3 py-2.5">규격</th>
         <th className="px-3 py-2.5">미수</th>
-        {/* 표시숫자: 헤더도 같은 폭 상자로 감싸 우측 끝을 숫자와 맞춤 */}
-        <th className="px-3 py-2.5">
-          <NumBox>재고</NumBox>
-        </th>
         <th className="px-3 py-2.5">보관처</th>
+        <NumHead className="px-3 py-2.5">재고</NumHead>
         {/* 입력칸: 헤더는 입력칸 폭 상자에 중앙정렬 */}
         <th className="px-3 py-2.5">{last ? <NumInputHeader>{last}</NumInputHeader> : null}</th>
         <th className="px-3 py-2.5" />
@@ -96,11 +93,8 @@ function LotInfoCells({ h }: { h: SearchHit }) {
       <td className="px-3 py-2 text-gray-700">{h.product || '(미상)'}</td>
       <td className="whitespace-nowrap px-3 py-2 text-gray-600">{formatSpec(h.spec)}</td>
       <td className="whitespace-nowrap px-3 py-2 text-gray-600">{formatMisu(h.misu)}</td>
-      {/* 표시숫자: 값은 셀 왼쪽 고정폭 상자 안에서 우측정렬 */}
-      <td className="px-3 py-2 text-gray-600">
-        <NumBox>{formatIntKo(h.available)}</NumBox>
-      </td>
       <td className="px-3 py-2 text-gray-500">{h.storage || '—'}</td>
+      <NumCell className="px-3 py-2 text-gray-600" value={h.available} unit="박스" />
     </>
   );
 }
@@ -364,7 +358,8 @@ export default function ProcessingCreatePage() {
         <p className="mt-1.5 text-[11px] text-gray-400">‘사료’ 품목은 가공 대상에서 제외됩니다.</p>
 
         {hits.length > 0 && (
-          <div className="mt-3 max-h-72 overflow-auto rounded-xl border border-gray-100 bg-white">
+          <div className="mt-3 max-h-[336px] overflow-auto rounded-xl border border-gray-100 bg-white">
+            {/* max-h = 헤더 1행 + 본문 8행 (행당 ≈37px) → 8건 노출 */}
             <table className="w-full text-[13px]">
               <LotCols />
               <LotHead last="" />

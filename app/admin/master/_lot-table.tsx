@@ -23,19 +23,8 @@ export const numCellInput =
 export const cellField =
   'w-full rounded-md bg-white px-2 py-1.5 text-sm text-gray-800 outline-none ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-[#3182F6]';
 
-// 표시숫자 상자 폭 — 헤더/셀 공유. min-width는 인라인 스타일로 확실히 적용
-// (Tailwind v3 임의 rem값 min-w-[3.5rem]가 dev HMR에서 CSS로 안 뽑히던 문제 회피). 최대 자릿수+여유 기준.
-const NUM_BOX_STYLE = { minWidth: '3.5rem' };
-
-// 표시숫자 — 셀 왼쪽의 고정폭 상자 안에서 우측정렬(자릿수 세로 정렬). 셀 전체 우측정렬 아님.
-// 헤더("재고")와 값 셀 모두 같은 컴포넌트로 감싸 우측 끝을 맞춘다.
-export function NumBox({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-block text-right tabular-nums" style={NUM_BOX_STYLE}>
-      {children}
-    </span>
-  );
-}
+// 표시숫자(수량·중량·금액·단가)는 app/admin/_num-cell.tsx 의 NumCell / NumHead 를 쓴다.
+// (옛 NumBox = 셀 왼쪽 고정폭 상자 안 우측정렬 → 앱 전체 표를 '셀 전체 우측정렬'로 통일하며 폐지)
 
 // 입력칸 헤더 — 입력칸 폭(w-24) 상자에 중앙정렬 (경계 있는 상자 위 라벨은 중앙이 정석)
 export function NumInputHeader({ children }: { children: ReactNode }) {

@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { getSeoulTodayISO, tryParseInboundDateInput } from '@/lib/inbound-date-input';
 import { readSession, isSessionExpired, isAdminRole } from '@/lib/session';
+import { formatNum } from '@/lib/number-format';
 import { toast } from '@/lib/toast';
 import {
   saveWorkSettlement,
@@ -331,9 +332,9 @@ export default function WorkSettlementStep2Page() {
                       <td className="n"><input value={r.weight} onChange={(e) => patchProd(r.id, { weight: e.target.value })} placeholder="—" /></td>
                       <td className="n"><input value={r.qty} onChange={(e) => patchProd(r.id, { qty: e.target.value })} onBlur={(e) => { const v = pn(e.target.value); if (v) patchProd(r.id, { qty: fmt(v) }); }} placeholder="0" /></td>
                       <td className="n"><input value={r.price} onChange={(e) => patchProd(r.id, { price: e.target.value })} onBlur={(e) => { const v = pn(e.target.value); if (v) patchProd(r.id, { price: fmt(v) }); }} placeholder="0" /></td>
-                      <td className="auto">{r.price ? fmt(amt) : ''}</td>
-                      <td className="auto">{r.price ? fmt(real) : ''}</td>
-                      <td className="auto em">{r.price ? fmt(ramt) : ''}</td>
+                      <td className="auto">{r.price ? formatNum(amt, '원') : ''}</td>
+                      <td className="auto">{r.price ? formatNum(real, '원') : ''}</td>
+                      <td className="auto em">{r.price ? formatNum(ramt, '원') : ''}</td>
                       <td className="use"><select className={`p-use ${usageCls(r.use)}`} value={r.use} onChange={(e) => patchProd(r.id, { use: e.target.value, dest: '' })}>
                         <option value="">—</option>{USES.map((u) => <option key={u} value={u}>{USE_LABEL[u]}</option>)}
                       </select></td>
@@ -360,7 +361,7 @@ export default function WorkSettlementStep2Page() {
                 {groups.flatMap((g, gi) => {
                   const isAuto = g.name === '동결비' || g.name === '입출고비';
                   return [
-                    <tr className="grp" key={`grp-${g.name}`}><td colSpan={7}><div className="grp-bar"><span className="grp-name">{g.name}{isAuto ? <span className="autotag"> · 자동</span> : null}</span><span className="grp-sub">계 <b>{fmt(groupTotals[g.name] || 0)}</b></span></div></td></tr>,
+                    <tr className="grp" key={`grp-${g.name}`}><td colSpan={7}><div className="grp-bar"><span className="grp-name">{g.name}{isAuto ? <span className="autotag"> · 자동</span> : null}</span><span className="grp-sub">계 <b>{formatNum(groupTotals[g.name] || 0, '원')}</b></span></div></td></tr>,
                     ...(isAuto && g.rows.length === 0
                       ? [<tr className="c-row" key={`ph-${g.name}`}><td className="phcell" colSpan={7}>생산내역의 <b>행선지·구분·수량</b>을 입력하면 자동 계산됩니다.</td></tr>]
                       : g.rows.map((r, ri) => r.auto ? (

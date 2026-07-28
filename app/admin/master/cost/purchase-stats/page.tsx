@@ -10,7 +10,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { formatIntKo } from '@/lib/number-format';
+import { formatNum } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import { formatSpec, formatMisu, parseSpecKg } from '@/lib/spec-display';
 import { useSyncQueryParams } from '@/lib/use-sync-query-params';
 import {
@@ -73,12 +74,14 @@ function presetRange(preset: Preset): { from: string; to: string } {
   return { from: `${t.slice(0, 4)}-01-01`, to: t };
 }
 
-const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
-const kg = (n: number) => `${formatIntKo(Math.round(n))}kg`;
+const won = (n: number) => formatNum(n, '원');
+const kg = (n: number) => formatNum(n, 'kg');
+/** 비중(%) — 분모 0이면 계산 불가(null → '—'). */
+const shareValue = (part: number, whole: number) => (whole > 0 ? (part / whole) * 100 : null);
 const share = (part: number, whole: number) =>
-  whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : '—';
-/** 박스당 평균 수매가. */
-const avgUnit = (total: number, qty: number) => (qty > 0 ? won(total / qty) : '—');
+  formatNum(shareValue(part, whole), { unit: '%', decimals: 1, empty: '—' });
+/** 박스당 평균 수매가. 수량 0이면 계산 불가(null → '—'). */
+const avgUnitValue = (total: number, qty: number) => (qty > 0 ? total / qty : null);
 
 /** 검색 스코프 매칭 — 품목별: 품목명+규격+미수 / 매입처별: 매입처명 / 선박별: 선박명. */
 const matchesScope = (pd: PurchaseProductDay, tab: BreakdownTab, q: string) =>
@@ -815,13 +818,13 @@ export default function PurchaseStatsPage() {
                         <th className="px-4 py-3">미수</th>
                       </>
                     )}
-                    <th className="px-4 py-3">매입액</th>
-                    <th className="px-4 py-3">수량</th>
-                    <th className="px-4 py-3" title="규격(kg) × 박스 수 — 규격 미상 건 제외">
+                    <NumHead className="px-4 py-3">매입액</NumHead>
+                    <NumHead className="px-4 py-3">수량</NumHead>
+                    <NumHead className="px-4 py-3" title="규격(kg) × 박스 수 — 규격 미상 건 제외">
                       총중량
-                    </th>
-                    <th className="px-4 py-3">평균단가(박스)</th>
-                    <th
+                    </NumHead>
+                    <NumHead className="px-4 py-3">평균단가(박스)</NumHead>
+                    <NumHead
                       className="px-4 py-3"
                       title={
                         isDetail
@@ -830,8 +833,8 @@ export default function PurchaseStatsPage() {
                       }
                     >
                       비중
-                    </th>
-                    <th className="px-4 py-3">건</th>
+                    </NumHead>
+                    <NumHead className="px-4 py-3">건</NumHead>
                   </tr>
                 </thead>
                 <tbody>
@@ -861,24 +864,32 @@ export default function PurchaseStatsPage() {
                             <td className="px-4 py-3 text-gray-500">{formatMisu(r.misu)}</td>
                           </>
                         )}
-                        <td className="px-4 py-3 tabular-nums font-bold text-gray-700">
-                          {won(r.purchaseTotal)}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-gray-500">
-                          {formatIntKo(r.qty)}박스
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-gray-500">
-                          {r.weightKg > 0 ? kg(r.weightKg) : '—'}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-gray-500">
-                          {avgUnit(r.purchaseTotal, r.qty)}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-gray-500">
-                          {share(r.purchaseTotal, shareBase)}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-gray-400">
-                          {formatIntKo(r.count)}
-                        </td>
+                        <NumCell
+                          className="px-4 py-3 font-bold text-gray-700"
+                          value={r.purchaseTotal}
+                          unit="원"
+                        />
+                        <NumCell className="px-4 py-3 text-gray-500" value={r.qty} unit="박스" />
+                        <NumCell
+                          className="px-4 py-3 text-gray-500"
+                          value={r.weightKg > 0 ? r.weightKg : null}
+                          unit="kg"
+                          empty="—"
+                        />
+                        <NumCell
+                          className="px-4 py-3 text-gray-500"
+                          value={avgUnitValue(r.purchaseTotal, r.qty)}
+                          unit="원"
+                          empty="—"
+                        />
+                        <NumCell
+                          className="px-4 py-3 text-gray-500"
+                          value={shareValue(r.purchaseTotal, shareBase)}
+                          unit="%"
+                          decimals={1}
+                          empty="—"
+                        />
+                        <NumCell className="px-4 py-3 text-gray-400" value={r.count} unit="건" />
                       </tr>
                     ))
                   )}
@@ -893,20 +904,28 @@ export default function PurchaseStatsPage() {
                           <td className="px-4 py-3" />
                         </>
                       )}
-                      <td className="px-4 py-3 tabular-nums">{won(shownTotals.purchaseTotal)}</td>
-                      <td className="px-4 py-3 tabular-nums">
-                        {formatIntKo(shownTotals.qty)}박스
-                      </td>
-                      <td className="px-4 py-3 tabular-nums">
-                        {shownTotals.weightKg > 0 ? kg(shownTotals.weightKg) : '—'}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums">
-                        {avgUnit(shownTotals.purchaseTotal, shownTotals.qty)}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums">
-                        {share(shownTotals.purchaseTotal, shareBase)}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums">{formatIntKo(shownTotals.count)}</td>
+                      <NumCell className="px-4 py-3" value={shownTotals.purchaseTotal} unit="원" />
+                      <NumCell className="px-4 py-3" value={shownTotals.qty} unit="박스" />
+                      <NumCell
+                        className="px-4 py-3"
+                        value={shownTotals.weightKg > 0 ? shownTotals.weightKg : null}
+                        unit="kg"
+                        empty="—"
+                      />
+                      <NumCell
+                        className="px-4 py-3"
+                        value={avgUnitValue(shownTotals.purchaseTotal, shownTotals.qty)}
+                        unit="원"
+                        empty="—"
+                      />
+                      <NumCell
+                        className="px-4 py-3"
+                        value={shareValue(shownTotals.purchaseTotal, shareBase)}
+                        unit="%"
+                        decimals={1}
+                        empty="—"
+                      />
+                      <NumCell className="px-4 py-3" value={shownTotals.count} unit="건" />
                     </tr>
                   </tfoot>
                 )}
@@ -1008,11 +1027,11 @@ export default function PurchaseStatsPage() {
                       ({GRAN_LABEL[granularity]})
                     </span>
                   </th>
-                  <th className="px-4 py-3">매입액</th>
-                  <th className="px-4 py-3">수량</th>
-                  <th className="px-4 py-3">평균단가(박스)</th>
+                  <NumHead className="px-4 py-3">매입액</NumHead>
+                  <NumHead className="px-4 py-3">수량</NumHead>
+                  <NumHead className="px-4 py-3">평균단가(박스)</NumHead>
                   <th className="py-3 pl-0 pr-[46px]">매입 추이</th>
-                  <th className="px-4 py-3">건</th>
+                  <NumHead className="px-4 py-3">건</NumHead>
                 </tr>
               </thead>
               <tbody>
@@ -1023,15 +1042,18 @@ export default function PurchaseStatsPage() {
                       <td className="whitespace-nowrap px-4 py-3 font-bold text-gray-900">
                         {p.label}
                       </td>
-                      <td className="px-4 py-3 tabular-nums font-bold text-gray-700">
-                        {won(p.purchaseTotal)}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums text-gray-500">
-                        {formatIntKo(p.qty)}박스
-                      </td>
-                      <td className="px-4 py-3 tabular-nums text-gray-500">
-                        {avgUnit(p.purchaseTotal, p.qty)}
-                      </td>
+                      <NumCell
+                        className="px-4 py-3 font-bold text-gray-700"
+                        value={p.purchaseTotal}
+                        unit="원"
+                      />
+                      <NumCell className="px-4 py-3 text-gray-500" value={p.qty} unit="박스" />
+                      <NumCell
+                        className="px-4 py-3 text-gray-500"
+                        value={avgUnitValue(p.purchaseTotal, p.qty)}
+                        unit="원"
+                        empty="—"
+                      />
                       <td className="py-3 pl-0 pr-[46px]">
                         {/* 트랙 폭 2/3 — 막대가 셀을 꽉 채우지 않게 */}
                         <div className="h-2.5 w-2/3 rounded-full bg-gray-100">
@@ -1041,9 +1063,7 @@ export default function PurchaseStatsPage() {
                           />
                         </div>
                       </td>
-                      <td className="px-4 py-3 tabular-nums text-gray-400">
-                        {formatIntKo(p.count)}
-                      </td>
+                      <NumCell className="px-4 py-3 text-gray-400" value={p.count} unit="건" />
                     </tr>
                   );
                 })}
@@ -1051,13 +1071,16 @@ export default function PurchaseStatsPage() {
               <tfoot>
                 <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold text-[#191F28]">
                   <td className="px-4 py-3">합계</td>
-                  <td className="px-4 py-3 tabular-nums">{won(trendTotals.purchaseTotal)}</td>
-                  <td className="px-4 py-3 tabular-nums">{formatIntKo(trendTotals.qty)}박스</td>
-                  <td className="px-4 py-3 tabular-nums">
-                    {avgUnit(trendTotals.purchaseTotal, trendTotals.qty)}
-                  </td>
+                  <NumCell className="px-4 py-3" value={trendTotals.purchaseTotal} unit="원" />
+                  <NumCell className="px-4 py-3" value={trendTotals.qty} unit="박스" />
+                  <NumCell
+                    className="px-4 py-3"
+                    value={avgUnitValue(trendTotals.purchaseTotal, trendTotals.qty)}
+                    unit="원"
+                    empty="—"
+                  />
                   <td className="px-4 py-3" />
-                  <td className="px-4 py-3 tabular-nums">{formatIntKo(trendTotals.count)}</td>
+                  <NumCell className="px-4 py-3" value={trendTotals.count} unit="건" />
                 </tr>
               </tfoot>
             </table>
@@ -1214,7 +1237,7 @@ function SizePriceChart({ trend }: { trend: SizeTrend }) {
           <g key={t}>
             <line x1={PL} y1={gy} x2={W - PR} y2={gy} stroke="#f3f4f6" strokeWidth={1} />
             <text x={PL - 8} y={gy + 3.5} textAnchor="end" fontSize={11} fill="#9ca3af">
-              {formatIntKo(Math.round(value))}원
+              {formatNum(value, '원')}
             </text>
           </g>
         );
@@ -1255,7 +1278,7 @@ function SizePriceChart({ trend }: { trend: SizeTrend }) {
             {v.points.map((p, i) =>
               p == null ? null : (
                 <circle key={i} cx={x(i)} cy={y(p)} r={3} fill={v.color}>
-                  <title>{`${v.label} · ${trend.labels[i]} — ${formatIntKo(Math.round(p))}원/박스`}</title>
+                  <title>{`${v.label} · ${trend.labels[i]} — ${formatNum(p, '원')}/박스`}</title>
                 </circle>
               ),
             )}

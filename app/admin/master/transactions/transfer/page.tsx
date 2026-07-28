@@ -11,7 +11,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { formatIntKo } from '@/lib/number-format';
+import { formatNum } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
 import {
   getTransferHistory,
@@ -302,7 +303,7 @@ export default function TransferHistoryPage() {
                   <th className="px-4 py-3">품목</th>
                   <th className="whitespace-nowrap px-4 py-3">규격</th>
                   <th className="whitespace-nowrap px-4 py-3">미수</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">이동수량</th>
+                  <NumHead className="px-4 py-3">이동수량</NumHead>
                   <th className="px-4 py-3">이동 전 보관처</th>
                   <th className="px-4 py-3">이동 후 보관처</th>
                   <th className="whitespace-nowrap px-4 py-3">작업자</th>
@@ -340,9 +341,7 @@ export default function TransferHistoryPage() {
                       <td className="px-4 py-3 text-[#191F28]">{r.product}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-500">{formatSpec(r.spec)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-500">{formatMisu(r.misu)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-gray-700">
-                        {formatIntKo(r.qty)}
-                      </td>
+                      <NumCell className="px-4 py-3 text-gray-700" value={r.qty} unit="박스" />
                       <td className="px-4 py-3 text-gray-700">{r.fromStorage || '—'}</td>
                       <td className="px-4 py-3 text-gray-700">{r.toStorage || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-700">{r.worker || '—'}</td>
@@ -359,11 +358,9 @@ export default function TransferHistoryPage() {
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold text-[#191F28]">
                     <td className="px-4 py-3" colSpan={5}>
-                      합계 {formatIntKo(rows.length)}건
+                      합계 {formatNum(rows.length, '건')}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-                      {formatIntKo(shown.qty)}
-                    </td>
+                    <NumCell className="px-4 py-3" value={shown.qty} unit="박스" />
                     <td className="px-4 py-3" colSpan={4} />
                   </tr>
                 </tfoot>

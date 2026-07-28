@@ -10,7 +10,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { formatIntKo } from '@/lib/number-format';
+import { formatNum } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import {
   getProfitTrend,
   type ProfitTrend,
@@ -44,11 +45,12 @@ function presetRange(preset: Preset): { from: string; to: string } {
   return { from: `${t.slice(0, 4)}-01-01`, to: t };
 }
 
-const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
-const signedWon = (n: number) =>
-  n < 0 ? `-${formatIntKo(Math.abs(Math.round(n)))}원` : `${formatIntKo(Math.round(n))}원`;
+const won = (n: number) => formatNum(n, '원');
+/** 마진율 — 분모가 0이면 계산 불가(null → 표시는 '—'). */
+const pctValue = (g: number, base: number) => (base > 0 ? (g / base) * 100 : null);
+/** 표 밖(KPI 카드·CSV)에서 쓰는 문자열 버전 — 표기는 표 셀과 동일. */
 const pct = (g: number, base: number) =>
-  base > 0 ? `${((g / base) * 100).toFixed(1)}%` : '—';
+  formatNum(pctValue(g, base), { unit: '%', decimals: 1, empty: '—' });
 
 /** 일별 버킷을 기간 단위(일/주/월)로 집계. */
 type PeriodRow = {
@@ -364,7 +366,7 @@ export default function ProfitTrendPage() {
             <SummaryCard
               label="매출"
               value={won(totals.revenue)}
-              sub={`출고 ${formatIntKo(totals.outboundCount)}건 · ${formatIntKo(totals.outboundQty)}박스`}
+              sub={`출고 ${formatNum(totals.outboundCount, '건')} · ${formatNum(totals.outboundQty, '박스')}`}
             />
             <SummaryCard
               label="매출원가"
@@ -373,15 +375,15 @@ export default function ProfitTrendPage() {
             />
             <SummaryCard
               label="매출총이익"
-              value={signedWon(totals.grossProfit)}
+              value={won(totals.grossProfit)}
               valueClass={totals.grossProfit >= 0 ? 'text-[#00C471]' : 'text-[#ef4444]'}
               sub={`마진율 ${pct(totals.grossProfit, totals.marginRevenue)}`}
             />
             <SummaryCard
               label="현금흐름"
-              value={signedWon(totals.cashFlow)}
+              value={won(totals.cashFlow)}
               valueClass={totals.cashFlow >= 0 ? 'text-[#00C471]' : 'text-[#ef4444]'}
-              sub={`수매 ${signedWon(-totals.purchaseTotal)} · 지출 ${signedWon(-totals.expenseTotal)}`}
+              sub={`수매 ${won(-totals.purchaseTotal)} · 지출 ${won(-totals.expenseTotal)}`}
             />
           </div>
 
@@ -437,12 +439,12 @@ export default function ProfitTrendPage() {
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
                     <th className="px-4 py-3">{tab === 'product' ? '품목' : '판매처'}</th>
-                    <th className="px-4 py-3">매출</th>
-                    <th className="px-4 py-3">매출원가</th>
-                    <th className="px-4 py-3">매출총이익</th>
-                    <th className="px-4 py-3">마진율</th>
-                    <th className="px-4 py-3">수량</th>
-                    <th className="px-4 py-3">건</th>
+                    <NumHead className="px-4 py-3">매출</NumHead>
+                    <NumHead className="px-4 py-3">매출원가</NumHead>
+                    <NumHead className="px-4 py-3">매출총이익</NumHead>
+                    <NumHead className="px-4 py-3">마진율</NumHead>
+                    <NumHead className="px-4 py-3">수량</NumHead>
+                    <NumHead className="px-4 py-3">건</NumHead>
                   </tr>
                 </thead>
                 <tbody>
@@ -456,26 +458,24 @@ export default function ProfitTrendPage() {
                     shownBreakdown.map((r) => (
                       <tr key={r.name} className="border-t border-gray-100">
                         <td className="px-4 py-3 font-bold text-gray-900">{r.name}</td>
-                        <td className="px-4 py-3 tabular-nums text-gray-700">
-                          {won(r.revenue)}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-gray-500">{won(r.cogs)}</td>
-                        <td
-                          className={`px-4 py-3 tabular-nums font-bold ${
+                        <NumCell className="px-4 py-3 text-gray-700" value={r.revenue} unit="원" />
+                        <NumCell className="px-4 py-3 text-gray-500" value={r.cogs} unit="원" />
+                        <NumCell
+                          className={`px-4 py-3 font-bold ${
                             r.grossProfit >= 0 ? 'text-[#00C471]' : 'text-[#ef4444]'
                           }`}
-                        >
-                          {signedWon(r.grossProfit)}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-gray-500">
-                          {pct(r.grossProfit, r.marginRevenue)}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-gray-500">
-                          {formatIntKo(r.qty)}박스
-                        </td>
-                        <td className="px-4 py-3 tabular-nums text-gray-400">
-                          {formatIntKo(r.count)}
-                        </td>
+                          value={r.grossProfit}
+                          unit="원"
+                        />
+                        <NumCell
+                          className="px-4 py-3 text-gray-500"
+                          value={pctValue(r.grossProfit, r.marginRevenue)}
+                          unit="%"
+                          decimals={1}
+                          empty="—"
+                        />
+                        <NumCell className="px-4 py-3 text-gray-500" value={r.qty} unit="박스" />
+                        <NumCell className="px-4 py-3 text-gray-400" value={r.count} unit="건" />
                       </tr>
                     ))
                   )}
@@ -500,12 +500,12 @@ export default function ProfitTrendPage() {
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
                   <th className="px-4 py-3">기간</th>
-                  <th className="px-4 py-3">매출</th>
-                  <th className="px-4 py-3">매출원가</th>
-                  <th className="px-4 py-3">매출총이익</th>
-                  <th className="px-4 py-3">마진율</th>
+                  <NumHead className="px-4 py-3">매출</NumHead>
+                  <NumHead className="px-4 py-3">매출원가</NumHead>
+                  <NumHead className="px-4 py-3">매출총이익</NumHead>
+                  <NumHead className="px-4 py-3">마진율</NumHead>
                   <th className="px-4 py-3">이익 추이</th>
-                  <th className="px-4 py-3">현금흐름</th>
+                  <NumHead className="px-4 py-3">현금흐름</NumHead>
                 </tr>
               </thead>
               <tbody>
@@ -517,18 +517,22 @@ export default function ProfitTrendPage() {
                       <td className="whitespace-nowrap px-4 py-3 font-bold text-gray-900">
                         {p.label}
                       </td>
-                      <td className="px-4 py-3 tabular-nums text-gray-700">{won(p.revenue)}</td>
-                      <td className="px-4 py-3 tabular-nums text-gray-500">{won(p.cogs)}</td>
-                      <td
-                        className={`px-4 py-3 tabular-nums font-bold ${
+                      <NumCell className="px-4 py-3 text-gray-700" value={p.revenue} unit="원" />
+                      <NumCell className="px-4 py-3 text-gray-500" value={p.cogs} unit="원" />
+                      <NumCell
+                        className={`px-4 py-3 font-bold ${
                           positive ? 'text-[#00C471]' : 'text-[#ef4444]'
                         }`}
-                      >
-                        {signedWon(p.grossProfit)}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums text-gray-500">
-                        {pct(p.grossProfit, p.marginRevenue)}
-                      </td>
+                        value={p.grossProfit}
+                        unit="원"
+                      />
+                      <NumCell
+                        className="px-4 py-3 text-gray-500"
+                        value={pctValue(p.grossProfit, p.marginRevenue)}
+                        unit="%"
+                        decimals={1}
+                        empty="—"
+                      />
                       <td className="px-4 py-3">
                         <div className="h-2.5 w-full rounded-full bg-gray-100">
                           <div
@@ -539,13 +543,13 @@ export default function ProfitTrendPage() {
                           />
                         </div>
                       </td>
-                      <td
-                        className={`px-4 py-3 tabular-nums ${
+                      <NumCell
+                        className={`px-4 py-3 ${
                           p.cashFlow >= 0 ? 'text-gray-700' : 'text-[#ef4444]'
                         }`}
-                      >
-                        {signedWon(p.cashFlow)}
-                      </td>
+                        value={p.cashFlow}
+                        unit="원"
+                      />
                     </tr>
                   );
                 })}
@@ -553,26 +557,28 @@ export default function ProfitTrendPage() {
               <tfoot>
                 <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold text-[#191F28]">
                   <td className="px-4 py-3">합계</td>
-                  <td className="px-4 py-3 tabular-nums">{won(totals.revenue)}</td>
-                  <td className="px-4 py-3 tabular-nums">{won(totals.cogs)}</td>
-                  <td
-                    className={`px-4 py-3 tabular-nums ${
+                  <NumCell className="px-4 py-3" value={totals.revenue} unit="원" />
+                  <NumCell className="px-4 py-3" value={totals.cogs} unit="원" />
+                  <NumCell
+                    className={`px-4 py-3 ${
                       totals.grossProfit >= 0 ? 'text-[#00C471]' : 'text-[#ef4444]'
                     }`}
-                  >
-                    {signedWon(totals.grossProfit)}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums">
-                    {pct(totals.grossProfit, totals.marginRevenue)}
-                  </td>
+                    value={totals.grossProfit}
+                    unit="원"
+                  />
+                  <NumCell
+                    className="px-4 py-3"
+                    value={pctValue(totals.grossProfit, totals.marginRevenue)}
+                    unit="%"
+                    decimals={1}
+                    empty="—"
+                  />
                   <td className="px-4 py-3" />
-                  <td
-                    className={`px-4 py-3 tabular-nums ${
-                      totals.cashFlow >= 0 ? '' : 'text-[#ef4444]'
-                    }`}
-                  >
-                    {signedWon(totals.cashFlow)}
-                  </td>
+                  <NumCell
+                    className={`px-4 py-3 ${totals.cashFlow >= 0 ? '' : 'text-[#ef4444]'}`}
+                    value={totals.cashFlow}
+                    unit="원"
+                  />
                 </tr>
               </tfoot>
             </table>

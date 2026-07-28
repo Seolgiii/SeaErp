@@ -10,7 +10,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { formatIntKo } from '@/lib/number-format';
+import { formatNum } from '@/lib/number-format';
+import { NumCell, NumHead, NUM_CELL } from '@/app/admin/_num-cell';
 import { formatSpec, formatMisu, formatSize } from '@/lib/spec-display';
 import { listLots, type Lot } from '@/app/actions/admin/master-lots';
 
@@ -229,7 +230,7 @@ export default function InventorySummaryPage() {
         <div>
           <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고 집계</h1>
           <p className="text-[13px] text-gray-500 mt-1">
-            {isLoading ? '집계 중...' : `${rows.length}행 · 총 ${formatIntKo(totals.qty)}박스 · ${totals.lots}LOT`}
+            {isLoading ? '집계 중...' : `${rows.length}행 · 총 ${formatNum(totals.qty, '박스')} · ${totals.lots}LOT`}
             <span className="ml-2 text-gray-400">(승인 완료·소진 LOT 기준)</span>
           </p>
         </div>
@@ -375,20 +376,20 @@ export default function InventorySummaryPage() {
                       <th className="px-4 py-3">사이즈</th>
                     </>
                   )}
-                  <Th label="LOT 수" field="lots" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="재고 합계" field="qty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <th className="px-4 py-3" title="현재 재고 총중량(kg) = 박스당 무게 × 재고수량">총중량</th>
+                  <Th numeric label="LOT 수" field="lots" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <Th numeric label="재고 합계" field="qty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <NumHead className="px-4 py-3" title="현재 재고 총중량(kg) = 박스당 무게 × 재고수량">총중량</NumHead>
                   {view === 'storage-only' && (
                     <>
-                      <th
+                      <NumHead
                         className="px-4 py-3"
                         title="현재고에 묶인 누적 보관비 (오늘 기준 · 냉장료+입출고비+노조비+동결비+이월). 기간별 발생액은 추후 추가 예정."
                       >
                         보관비
-                      </th>
-                      <th className="px-4 py-3" title="현재고 평가액 = 박스당 재고원가 × 재고수량">
+                      </NumHead>
+                      <NumHead className="px-4 py-3" title="현재고 평가액 = 박스당 재고원가 × 재고수량">
                         평가액
-                      </th>
+                      </NumHead>
                     </>
                   )}
                 </tr>
@@ -420,21 +421,29 @@ export default function InventorySummaryPage() {
                         <td className="px-4 py-3 text-gray-500">{formatSize(r.spec, r.misu)}</td>
                       </>
                     )}
-                    <td className="px-4 py-3 text-gray-600">{r.lots}</td>
-                    <td className={`px-4 py-3 font-bold ${r.qty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`}>
-                      {formatIntKo(r.qty)}박스
-                    </td>
-                    <td className="px-4 py-3 tabular-nums text-gray-600">
-                      {r.weight > 0 ? `${formatIntKo(r.weight)} kg` : '-'}
-                    </td>
+                    <NumCell className="px-4 py-3 text-gray-600" value={r.lots} />
+                    <NumCell
+                      className={`px-4 py-3 font-bold ${r.qty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`}
+                      value={r.qty}
+                      unit="박스"
+                    />
+                    <NumCell
+                      className="px-4 py-3 text-gray-600"
+                      value={r.weight > 0 ? r.weight : null}
+                      unit="kg"
+                    />
                     {view === 'storage-only' && (
                       <>
-                        <td className="px-4 py-3 tabular-nums text-gray-700">
-                          {r.storageCost > 0 ? `${formatIntKo(Math.round(r.storageCost))}원` : '-'}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums font-bold text-gray-900">
-                          {r.valuation > 0 ? `${formatIntKo(Math.round(r.valuation))}원` : '-'}
-                        </td>
+                        <NumCell
+                          className="px-4 py-3 text-gray-700"
+                          value={r.storageCost > 0 ? r.storageCost : null}
+                          unit="원"
+                        />
+                        <NumCell
+                          className="px-4 py-3 font-bold text-gray-900"
+                          value={r.valuation > 0 ? r.valuation : null}
+                          unit="원"
+                        />
                       </>
                     )}
                   </tr>
@@ -448,19 +457,25 @@ export default function InventorySummaryPage() {
                   >
                     합계
                   </td>
-                  <td className="px-4 py-3">{totals.lots}</td>
-                  <td className="px-4 py-3 text-[#3182F6]">{formatIntKo(totals.qty)}박스</td>
-                  <td className="px-4 py-3 tabular-nums text-gray-700">
-                    {totals.weight > 0 ? `${formatIntKo(totals.weight)} kg` : '-'}
-                  </td>
+                  <NumCell className="px-4 py-3" value={totals.lots} />
+                  <NumCell className="px-4 py-3 text-[#3182F6]" value={totals.qty} unit="박스" />
+                  <NumCell
+                    className="px-4 py-3 text-gray-700"
+                    value={totals.weight > 0 ? totals.weight : null}
+                    unit="kg"
+                  />
                   {view === 'storage-only' && (
                     <>
-                      <td className="px-4 py-3 tabular-nums text-gray-700">
-                        {totals.storageCost > 0 ? `${formatIntKo(Math.round(totals.storageCost))}원` : '-'}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums text-gray-900">
-                        {totals.valuation > 0 ? `${formatIntKo(Math.round(totals.valuation))}원` : '-'}
-                      </td>
+                      <NumCell
+                        className="px-4 py-3 text-gray-700"
+                        value={totals.storageCost > 0 ? totals.storageCost : null}
+                        unit="원"
+                      />
+                      <NumCell
+                        className="px-4 py-3 text-gray-900"
+                        value={totals.valuation > 0 ? totals.valuation : null}
+                        unit="원"
+                      />
                     </>
                   )}
                 </tr>
@@ -512,6 +527,7 @@ function Th({
   sortField,
   sortDir,
   onToggle,
+  numeric = false,
   paddingX = 'px-4',
 }: {
   label: string;
@@ -519,6 +535,8 @@ function Th({
   sortField: SortField;
   sortDir: SortDir;
   onToggle: (f: SortField) => void;
+  /** 수량·중량·금액 컬럼 — 값 셀(NumCell)과 우측 끝을 맞춘다. */
+  numeric?: boolean;
   paddingX?: string;
 }) {
   const Icon =
@@ -530,7 +548,9 @@ function Th({
   return (
     <th
       onClick={() => onToggle(field)}
-      className={`${paddingX} py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors`}
+      className={`${paddingX} py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors ${
+        numeric ? NUM_CELL : ''
+      }`}
     >
       <span className="inline-flex items-center gap-1">
         {label}

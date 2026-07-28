@@ -12,7 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { formatIntKo } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import {
   getHealthSummary,
   getInvalidRemainingInbounds,
@@ -242,7 +242,7 @@ function NegativeStockTable({ items }: { items: NegativeStockLot[] }) {
             <th className="px-4 py-3">LOT번호</th>
             <th className="px-4 py-3">품목</th>
             <th className="px-4 py-3">보관처</th>
-            <th className="px-4 py-3">재고수량</th>
+            <NumHead className="px-4 py-3">재고수량</NumHead>
             <th className="px-4 py-3">승인상태</th>
           </tr>
         </thead>
@@ -252,9 +252,7 @@ function NegativeStockTable({ items }: { items: NegativeStockLot[] }) {
               <td className="px-4 py-3 font-bold text-blue-700">{it.lotNumber || '-'}</td>
               <td className="px-4 py-3 font-bold text-gray-900">{it.productName || '-'}</td>
               <td className="px-4 py-3 text-gray-600">{it.storageName || '-'}</td>
-              <td className="px-4 py-3 font-bold text-red-600">
-                {formatIntKo(it.stockQty)}박스
-              </td>
+              <NumCell className="px-4 py-3 font-bold text-red-600" value={it.stockQty} unit="박스" />
               <td className="px-4 py-3 text-gray-600">{it.approvalStatus || '-'}</td>
             </tr>
           ))}
@@ -273,8 +271,8 @@ function InvalidRemainingTable({ items }: { items: InvalidRemainingInbound[] }) 
           <tr className="text-left font-bold text-gray-500 text-[12px]">
             <th className="px-4 py-3">입고일</th>
             <th className="px-4 py-3">품목</th>
-            <th className="px-4 py-3">입고수량</th>
-            <th className="px-4 py-3">잔여수량</th>
+            <NumHead className="px-4 py-3">입고수량</NumHead>
+            <NumHead className="px-4 py-3">잔여수량</NumHead>
             <th className="px-4 py-3">승인상태</th>
           </tr>
         </thead>
@@ -283,8 +281,8 @@ function InvalidRemainingTable({ items }: { items: InvalidRemainingInbound[] }) 
             <tr key={it.id} className="border-t border-gray-100">
               <td className="px-4 py-3 text-gray-700">{it.inboundDate || '-'}</td>
               <td className="px-4 py-3 font-bold text-gray-900">{it.productName || '-'}</td>
-              <td className="px-4 py-3 text-gray-600">{formatIntKo(it.inboundQty)}</td>
-              <td className="px-4 py-3 font-bold text-red-600">{formatIntKo(it.remaining)}</td>
+              <NumCell className="px-4 py-3 text-gray-600" value={it.inboundQty} unit="박스" />
+              <NumCell className="px-4 py-3 font-bold text-red-600" value={it.remaining} unit="박스" />
               <td className="px-4 py-3 text-gray-600">{it.approvalStatus || '-'}</td>
             </tr>
           ))}
@@ -304,8 +302,8 @@ function OutboundCostNullTable({ items }: { items: OutboundCostNullItem[] }) {
             <th className="px-4 py-3">출고일</th>
             <th className="px-4 py-3">품목</th>
             <th className="px-4 py-3">판매처</th>
-            <th className="px-4 py-3">수량</th>
-            <th className="px-4 py-3">출고시점 판매원가</th>
+            <NumHead className="px-4 py-3">수량</NumHead>
+            <NumHead className="px-4 py-3">출고시점 판매원가</NumHead>
           </tr>
         </thead>
         <tbody>
@@ -314,10 +312,12 @@ function OutboundCostNullTable({ items }: { items: OutboundCostNullItem[] }) {
               <td className="px-4 py-3 text-gray-700">{it.outboundDate || '-'}</td>
               <td className="px-4 py-3 font-bold text-gray-900">{it.productName || '-'}</td>
               <td className="px-4 py-3 text-gray-600">{it.buyer || '-'}</td>
-              <td className="px-4 py-3 text-gray-600">{formatIntKo(it.qty)}박스</td>
-              <td className="px-4 py-3 font-bold text-red-600">
-                ₩{formatIntKo(it.salePriceSnapshot)}
-              </td>
+              <NumCell className="px-4 py-3 text-gray-600" value={it.qty} unit="박스" />
+              <NumCell
+                className="px-4 py-3 font-bold text-red-600"
+                value={it.salePriceSnapshot}
+                unit="원"
+              />
             </tr>
           ))}
         </tbody>

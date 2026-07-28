@@ -14,7 +14,8 @@ import { useRouter } from 'next/navigation';
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { fromGroupedIntegerInput, formatIntKo } from '@/lib/number-format';
+import { fromGroupedIntegerInput, formatNum } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import {
   listProcessingBatches,
   completeProcessingBatch,
@@ -24,7 +25,7 @@ import {
 import { listStorages, type Storage } from '@/app/actions/admin/master-storage';
 import { listProducts } from '@/app/actions/admin/master-products';
 
-const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
+const won = (n: number) => formatNum(n, '원');
 
 export default function ProcessingPage() {
   const router = useRouter();
@@ -195,8 +196,8 @@ function BatchTable({
             <th className="px-5 py-2.5">가공공장</th>
             <th className="px-5 py-2.5">가공품</th>
             <th className="px-5 py-2.5">동결</th>
-            <th className="px-5 py-2.5 text-right">산출</th>
-            <th className="px-5 py-2.5 text-right">가공원가/박스</th>
+            <NumHead className="px-5 py-2.5">산출</NumHead>
+            <NumHead className="px-5 py-2.5">가공원가/박스</NumHead>
             <th className="px-5 py-2.5">상태</th>
             <th className="px-5 py-2.5"></th>
           </tr>
@@ -208,12 +209,17 @@ function BatchTable({
               <td className="px-5 py-2.5 font-medium text-gray-900">{b.factoryName || '—'}</td>
               <td className="px-5 py-2.5 text-gray-800">{productName(b.productId)}</td>
               <td className="px-5 py-2.5 text-[12px] text-gray-500">{b.freezeType || '—'}</td>
-              <td className="px-5 py-2.5 text-right tabular-nums text-gray-700">
-                {b.outputBoxes > 0 ? `${b.outputBoxes}박스 / ${b.outputTotalKg}kg` : '—'}
-              </td>
-              <td className="px-5 py-2.5 text-right tabular-nums text-gray-900">
-                {b.costPerBox > 0 ? won(b.costPerBox) : '—'}
-              </td>
+              <NumCell className="px-5 py-2.5 text-gray-700">
+                {b.outputBoxes > 0
+                  ? `${formatNum(b.outputBoxes, '박스')} / ${formatNum(b.outputTotalKg, 'kg')}`
+                  : '—'}
+              </NumCell>
+              <NumCell
+                className="px-5 py-2.5 text-gray-900"
+                value={b.costPerBox > 0 ? b.costPerBox : null}
+                unit="원"
+                empty="—"
+              />
               <td className="px-5 py-2.5">
                 <StatusBadge status={b.status} />
               </td>

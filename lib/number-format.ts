@@ -20,6 +20,52 @@ export function formatQtyKo(n: number): string {
 }
 
 /**
+ * 표(테이블) 숫자 셀 공통 포맷 — 천 단위 콤마 + 단위를 값 뒤에 붙인다(공백 없음).
+ *   formatNum(12165160, '원')  → "12,165,160원"
+ *   formatNum(1000, '박스')     → "1,000박스"
+ *   formatNum(12.34, { unit: '%', decimals: 1 }) → "12.3%"
+ *   formatNum(null, { empty: '—' }) → "—"
+ *
+ * 정렬(우측)·tabular-nums는 표시 쪽 책임 → app/admin/_num-cell.tsx 의 NumCell / NumHead.
+ * 소수 옵션이 없으면 반올림한 정수(기존 화면들의 `formatIntKo(Math.round(n))` 동작과 동일).
+ */
+export type NumFormatOptions = {
+  /** 값 뒤에 공백 없이 붙일 단위 (원·박스·kg·일·건·% 등). */
+  unit?: string;
+  /** 고정 소수 자릿수 (예: 마진율 1 → "12.3%"). */
+  decimals?: number;
+  /** 소수 최대 자릿수 (끝자리 0 제거). decimals가 있으면 decimals 우선. */
+  maxDecimals?: number;
+  /** 값 없음(null·undefined·NaN·Infinity) 표시. 기본 "-". */
+  empty?: string;
+};
+
+export function formatNum(
+  value: number | null | undefined,
+  unitOrOptions?: string | NumFormatOptions,
+): string {
+  const opts: NumFormatOptions =
+    typeof unitOrOptions === "string" ? { unit: unitOrOptions } : (unitOrOptions ?? {});
+  if (value == null || !Number.isFinite(value)) return opts.empty ?? "-";
+
+  let body: string;
+  if (opts.decimals != null) {
+    body = value.toLocaleString(LOCALE, {
+      minimumFractionDigits: opts.decimals,
+      maximumFractionDigits: opts.decimals,
+    });
+  } else if (opts.maxDecimals != null) {
+    body = value.toLocaleString(LOCALE, { maximumFractionDigits: opts.maxDecimals });
+  } else {
+    body = Math.round(value).toLocaleString(LOCALE);
+  }
+  // -0.4 반올림 등에서 나오는 "-0" / "-0.0" 은 부호 제거
+  if (/^-0(?:\.0+)?$/.test(body)) body = body.slice(1);
+
+  return opts.unit ? `${body}${opts.unit}` : body;
+}
+
+/**
  * 정수만 (입고·출고 수량 입력창). 콤마 표시, API는 value.
  */
 export function fromGroupedIntegerInput(raw: string): { display: string; value: number } {

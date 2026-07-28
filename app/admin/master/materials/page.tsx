@@ -14,6 +14,7 @@ import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { fromGroupedIntegerInput, formatIntKo } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import { MATERIAL_SECTIONS, type MaterialSection } from '@/lib/material-sections';
 import {
   listMaterials,
@@ -25,7 +26,6 @@ import {
 
 type Editing = { section: MaterialSection; mat: Material | null };
 
-const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
 
 export default function MaterialsMasterPage() {
   const router = useRouter();
@@ -116,7 +116,7 @@ export default function MaterialsMasterPage() {
                     <thead>
                       <tr className="text-left text-[12px] font-bold text-gray-400">
                         <th className="px-5 py-2">품명</th>
-                        <th className="px-5 py-2 text-right">단가(박스당)</th>
+                        <NumHead className="px-5 py-2">단가(박스당)</NumHead>
                         <th className="px-5 py-2">단위</th>
                         <th className="px-5 py-2">상태</th>
                         <th className="px-5 py-2">비고</th>
@@ -132,9 +132,7 @@ export default function MaterialsMasterPage() {
                           <td className="px-5 py-2.5 font-bold text-gray-900">
                             {m.name || '-'}
                           </td>
-                          <td className="px-5 py-2.5 text-right tabular-nums text-gray-800">
-                            {won(m.price)}
-                          </td>
+                          <NumCell className="px-5 py-2.5 text-gray-800" value={m.price} unit="원" />
                           <td className="px-5 py-2.5 text-gray-500">{m.unit || '—'}</td>
                           <td className="px-5 py-2.5">
                             {m.active ? (

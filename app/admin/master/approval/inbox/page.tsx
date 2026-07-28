@@ -27,7 +27,8 @@ import {
 } from '@/app/components/approval-card-shared';
 import RejectBottomSheet from '@/app/components/RejectBottomSheet';
 import { useConfirm } from '@/app/components/ConfirmBottomSheet';
-import { formatIntKo } from '@/lib/number-format';
+import { formatNum } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 
 /**
  * PC 결재 수신함 — 표 일람 + 다중선택 일괄 처리.
@@ -525,7 +526,7 @@ export default function ApprovalInboxPage() {
                   <th className="px-4 py-3 w-24">구분</th>
                   <th className="px-4 py-3 w-24">신청자</th>
                   <th className="px-4 py-3">품목 · LOT</th>
-                  <th className="px-4 py-3 w-32 text-right">수량 · 금액</th>
+                  <NumHead className="px-4 py-3 w-32">수량 · 금액</NumHead>
                   <th className="px-4 py-3 w-40">신청일시</th>
                   <th className="px-4 py-3 w-28">상태</th>
                   <th className="px-4 py-3 w-44 text-right">액션</th>
@@ -572,9 +573,9 @@ export default function ApprovalInboxPage() {
                           <p className="text-[12px] text-gray-400 mt-0.5 truncate">{item.lotNumber}</p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-700">
+                      <NumCell className="px-4 py-3 font-bold text-gray-700">
                         {formatAmount(item)}
-                      </td>
+                      </NumCell>
                       <td className="px-4 py-3 text-gray-500">
                         {formatSubmittedAt(item.createdTime) ?? item.date ?? '-'}
                       </td>
@@ -760,10 +761,18 @@ export default function ApprovalInboxPage() {
   );
 }
 
+/**
+ * 수량 · 금액 컬럼 — 지출은 금액(원), 나머지(입고·출고·이동)는 박스 수량.
+ * amountOrQuantity는 모바일 신청 내역과 공유하는 문자열이라(이동은 콤마 없는 raw)
+ * 여기서 숫자로 되돌린 뒤 표 공통 표기(천단위 콤마 + 단위 접미)로 다시 만든다.
+ */
 function formatAmount(item: RequestItem): string {
   if (item.type === 'EXPENSE') {
     const n = Number(item.raw['금액'] ?? 0);
-    return n > 0 ? `${formatIntKo(n)}원` : '-';
+    return n > 0 ? formatNum(n, '원') : '-';
   }
-  return item.amountOrQuantity || '-';
+  const raw = item.amountOrQuantity || '';
+  const n = Number(raw.replace(/,/g, ''));
+  if (raw && Number.isFinite(n)) return formatNum(n, '박스');
+  return raw || '-';
 }

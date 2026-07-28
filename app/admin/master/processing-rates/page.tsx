@@ -15,6 +15,7 @@ import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { fromGroupedIntegerInput, formatIntKo } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import { RATE_BASES, type RateBasis } from '@/lib/processing-rate-basis';
 import {
   listProcessingRates,
@@ -26,7 +27,6 @@ import {
 import { listStorages, type Storage } from '@/app/actions/admin/master-storage';
 import { listProducts, type Product } from '@/app/actions/admin/master-products';
 
-const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
 
 function BasisBadge({ basis }: { basis: RateBasis | '' }) {
   if (!basis) return <span className="text-gray-300">—</span>;
@@ -133,7 +133,7 @@ export default function ProcessingRatesMasterPage() {
                 <tr className="text-left text-[12px] font-bold text-gray-400">
                   <th className="px-5 py-2.5">가공공장</th>
                   <th className="px-5 py-2.5">가공품</th>
-                  <th className="px-5 py-2.5 text-right">단가</th>
+                  <NumHead className="px-5 py-2.5">단가</NumHead>
                   <th className="px-5 py-2.5">기준</th>
                   <th className="px-5 py-2.5">적용기간</th>
                   <th className="px-5 py-2.5">비고</th>
@@ -152,9 +152,7 @@ export default function ProcessingRatesMasterPage() {
                         {resolveFactory(r.factoryId, r.factoryName)}
                       </td>
                       <td className="px-5 py-2.5 text-gray-800">{resolveProduct(r.productId)}</td>
-                      <td className="px-5 py-2.5 text-right tabular-nums text-gray-900">
-                        {won(r.price)}
-                      </td>
+                      <NumCell className="px-5 py-2.5 text-gray-900" value={r.price} unit="원" />
                       <td className="px-5 py-2.5">
                         <BasisBadge basis={r.basis} />
                       </td>

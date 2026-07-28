@@ -17,6 +17,7 @@ import { useParams } from 'next/navigation';
 import { readSession, isSessionExpired, isAdminRole } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { getWorkSettlementDetail } from '@/app/actions/admin/master-work-settlement';
+import { formatNum } from '@/lib/number-format';
 import {
   WS_CSS, BOX_LABEL, USE_LABEL, pn, fmt,
   OWNERS_TEMP, OWNER_DEFAULT_RATIO, allocateByRatio,
@@ -186,21 +187,19 @@ export default function WorkSettlementSplitPage() {
                       <td className="txt">{l.productName || '—'}</td>
                       <td className="txt">{BOX_LABEL[l.boxType] ?? l.boxType ?? '—'}</td>
                       <td className="txt">{l.spec || '—'}{l.misu ? ` (${l.misu})` : ''}</td>
-                      <td className="txt">{l.weightKg ? fmt(l.weightKg) : '—'}</td>
-                      <td className="n"><span className="nb" style={{ minWidth: '5ch' }}>{fmt(l.purchaseUnitPrice)}</span></td>
-                      <td className="n"><span className="nb" style={{ minWidth: '5ch' }}>{fmt(real)}</span></td>
+                      <td className="n">{l.weightKg ? formatNum(l.weightKg, 'kg') : '—'}</td>
+                      <td className="n">{formatNum(l.purchaseUnitPrice, '원')}</td>
+                      <td className="n">{formatNum(real, '원')}</td>
                       <td className="txt">{USE_LABEL[l.usage] ?? l.usage ?? '—'}</td>
                       <td className="txt dimtxt" title={l.memo}>{l.memo || '—'}</td>
-                      <td className="n"><span className="nb" style={{ minWidth: '4ch' }}>{fmt(l.quantity || 0)}</span></td>
+                      <td className="n">{formatNum(l.quantity || 0, '박스')}</td>
                       {owners.map((o, oi) => (
                         <td className="oc" key={o}>
                           <input className="oin" inputMode="numeric" value={alloc[li]?.[oi] ?? ''}
                             onChange={(e) => patchAlloc(li, oi, e.target.value)} />
                         </td>
                       ))}
-                      <td className="n">
-                        <span className={`nb ${ok ? 'okn' : 'badn'}`} style={{ minWidth: '4ch' }}>{fmt(sum)}</span>
-                      </td>
+                      <td className={`n ${ok ? 'okn' : 'badn'}`}>{formatNum(sum, '박스')}</td>
                     </tr>
                   );
                 })}
@@ -260,7 +259,8 @@ export default function WorkSettlementSplitPage() {
         .ws-page #split td.oc { text-align:center; }
         .ws-page #split td.oc .oin { width:64px; text-align:right; font-variant-numeric:tabular-nums;
           border:1px solid #DDE1E6; border-radius:6px; padding:4px 6px; font-size:13px; background:#F7FAFF; }
-        .ws-page #split .nb { display:inline-block; text-align:right; font-variant-numeric:tabular-nums; }
+        .ws-page #split td.n, .ws-page #split th.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .ws-page #split th.ni { text-align:right; }
         .ws-page #split .okn { color:#1E7B43; }
         .ws-page #split .badn { color:#C0392B; font-weight:600; }
         .ws-page #split td.dimtxt { color:#8A9099; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

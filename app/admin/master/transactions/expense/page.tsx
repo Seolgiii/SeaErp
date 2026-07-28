@@ -11,7 +11,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { formatIntKo } from '@/lib/number-format';
+import { formatNum } from '@/lib/number-format';
+import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import {
   getExpenseHistory,
   type ExpenseHistory,
@@ -45,8 +46,6 @@ function presetRange(preset: Preset): { from: string; to: string } {
   }
   return { from: `${t.slice(0, 4)}-01-01`, to: t };
 }
-
-const won = (n: number) => `${formatIntKo(Math.round(n))}원`;
 
 // 승인상태 필터 — 전체 + 베이스 표준 3종.
 type StatusFilter = '전체' | '승인 완료' | '승인 대기' | '반려';
@@ -298,7 +297,7 @@ export default function ExpenseHistoryPage() {
                   <th className="whitespace-nowrap px-4 py-3">지출일</th>
                   <th className="px-4 py-3">건명</th>
                   <th className="px-4 py-3">적요</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-right">금액</th>
+                  <NumHead className="px-4 py-3">금액</NumHead>
                   <th className="whitespace-nowrap px-4 py-3">신청자</th>
                   <th className="whitespace-nowrap px-4 py-3">상태</th>
                   <th className="px-4 py-3">비고</th>
@@ -325,9 +324,12 @@ export default function ExpenseHistoryPage() {
                           {r.description || '—'}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-[#191F28]">
-                        {r.amount > 0 ? won(r.amount) : '—'}
-                      </td>
+                      <NumCell
+                        className="px-4 py-3 text-[#191F28]"
+                        value={r.amount > 0 ? r.amount : null}
+                        unit="원"
+                        empty="—"
+                      />
                       <td className="whitespace-nowrap px-4 py-3 text-gray-700">{r.applicant || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className={`rounded-md px-2 py-0.5 text-[12px] font-medium ${statusBadgeClass(r.approvalStatus)}`}>
@@ -347,11 +349,9 @@ export default function ExpenseHistoryPage() {
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold text-[#191F28]">
                     <td className="px-4 py-3" colSpan={3}>
-                      합계 {formatIntKo(rows.length)}건
+                      합계 {formatNum(rows.length, '건')}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-                      {won(shown)}
-                    </td>
+                    <NumCell className="px-4 py-3" value={shown} unit="원" />
                     <td className="px-4 py-3" colSpan={3} />
                   </tr>
                 </tfoot>

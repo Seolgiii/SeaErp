@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   formatIntKo,
+  formatNum,
   formatQtyKo,
   fromGroupedIntegerInput,
   fromGroupedOptionalIntInput,
@@ -145,5 +146,54 @@ describe("fromGroupedQtyInputAllowDecimal — 수량(소수 허용)", () => {
 
   test("이미 콤마가 있는 입력 처리", () => {
     expect(fromGroupedQtyInputAllowDecimal("1,234.5")).toEqual({ display: "1,234.5", value: 1234.5 });
+  });
+});
+
+describe("formatNum — 표 숫자 셀 공통 포맷", () => {
+  test("천 단위 콤마 + 단위를 값 뒤에 (공백 없음)", () => {
+    expect(formatNum(12165160, "원")).toBe("12,165,160원");
+    expect(formatNum(1000, "박스")).toBe("1,000박스");
+    expect(formatNum(2450, "kg")).toBe("2,450kg");
+  });
+
+  test("단위 없이도 쓸 수 있다", () => {
+    expect(formatNum(1234)).toBe("1,234");
+  });
+
+  test("소수는 기본적으로 반올림한 정수", () => {
+    expect(formatNum(1234.4, "원")).toBe("1,234원");
+    expect(formatNum(1234.5, "원")).toBe("1,235원");
+  });
+
+  test("decimals — 고정 소수 자릿수 (마진율 등)", () => {
+    expect(formatNum(12.34, { unit: "%", decimals: 1 })).toBe("12.3%");
+    expect(formatNum(12, { unit: "%", decimals: 1 })).toBe("12.0%");
+    expect(formatNum(1234.56, { decimals: 1 })).toBe("1,234.6");
+  });
+
+  test("maxDecimals — 끝자리 0은 떨어뜨린다", () => {
+    expect(formatNum(12.5, { maxDecimals: 2 })).toBe("12.5");
+    expect(formatNum(12.0, { maxDecimals: 2 })).toBe("12");
+  });
+
+  test("값 없음 → empty (기본 '-')", () => {
+    expect(formatNum(null, "원")).toBe("-");
+    expect(formatNum(undefined, "원")).toBe("-");
+    expect(formatNum(Number.NaN, "원")).toBe("-");
+    expect(formatNum(Number.POSITIVE_INFINITY, "원")).toBe("-");
+    expect(formatNum(null, { unit: "원", empty: "—" })).toBe("—");
+  });
+
+  test("0은 값 없음이 아니다", () => {
+    expect(formatNum(0, "원")).toBe("0원");
+  });
+
+  test("음수는 부호를 유지 (매출총이익·현금흐름)", () => {
+    expect(formatNum(-1234567, "원")).toBe("-1,234,567원");
+  });
+
+  test("반올림으로 생긴 -0 은 부호를 떼어낸다", () => {
+    expect(formatNum(-0.4, "원")).toBe("0원");
+    expect(formatNum(-0.04, { unit: "%", decimals: 1 })).toBe("0.0%");
   });
 });

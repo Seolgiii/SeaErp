@@ -4,13 +4,15 @@
 //   목업 CSS는 .ws-page 접두사 플레인 스타일(Tailwind 충돌 회피: 고정행 클래스는 'wsfix').
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { formatNum } from '@/lib/number-format';
+
 // 박스종류: 내부값(에어테이블 구분 옵션) ↔ 표시라벨(목업)
 export const BOX_INTERNAL = ['사료팬', '베이트大', '베이트小'] as const;
 export const BOX_LABEL: Record<string, string> = { 사료팬: '사료(팬)', 베이트大: '베이트(大)', 베이트小: '베이트(小)' };
 export const USES = ['원물동결', '원프로즌 가공', '생물'];
 // 표시 라벨(저장값은 그대로) — '원프로즌 가공'이 칸에서 너무 길어 축약
 export const USE_LABEL: Record<string, string> = { 원물동결: '원물동결', '원프로즌 가공': '원프로즌', 생물: '생물' };
-// 단가에 ' 원' 표기하는 그룹(노임·기타 제외) — 스크롤 시 단가 칸 식별
+// 단가에 '원' 표기하는 그룹(노임·기타 제외) — 스크롤 시 단가 칸 식별
 // ⚠ 그룹명은 Airtable '작업 정산 작업비'.그룹 singleSelect 옵션과 **정확히** 일치해야 한다.
 //    안 맞으면 저장이 422(INVALID_MULTIPLE_CHOICE_OPTIONS)로 죽는다 — 새 옵션 생성 권한이 없어서.
 //    2026-07-16: Airtable 옵션이 '탈팬료'(팬) 오타여서 임시저장이 전부 실패하고 있었다.
@@ -22,14 +24,15 @@ export const TIMES: string[] = [];
 for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 10) TIMES.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
 
 export const pn = (s: string) => parseInt(String(s ?? '').replace(/[^0-9-]/g, ''), 10) || 0;
-export const fmt = (n: number) => n.toLocaleString('en-US');
+/** 표 숫자 표기 통일 — 천 단위 콤마(단위는 자리별로 dangaWon 등에서 덧붙임). */
+export const fmt = (n: number) => formatNum(n);
 let idSeq = 0;
 export const nid = () => `k${idSeq++}`;
 
-/** 단가 값 → "N 원" 표기(숫자 있을 때만). */
+/** 단가 값 → "N원" 표기(숫자 있을 때만). 단위는 값 뒤에 공백 없이. */
 export const dangaWon = (v: string) => {
   const n = pn(v);
-  return n ? `${fmt(n)} 원` : v;
+  return n ? `${fmt(n)}원` : v;
 };
 
 export type CostRow = {
@@ -71,16 +74,16 @@ export function defaultGroups(): CostGroup[] {
     ...(noRate && { noRateCells: true }), ...(hourly && { hourly: true }),
   });
   return [
-    { name: '수수료', rows: [fx('수수료', '', '', '총 매입액의 3.3%', true), fx('작업장수수료', '2,000 원', '센터', '박스당 2,000원')] },
+    { name: '수수료', rows: [fx('수수료', '', '', '총 매입액의 3.3%', true), fx('작업장수수료', '2,000원', '센터', '박스당 2,000원')] },
     // 회수 칸 = 작업 인원수(사용자 입력). 남·현장은 인원×단가, 여는 인원×단가×작업시간(hourly).
     { name: '노임', rows: [fx('남', '150,000/일'), fx('여', '15,000/시간', '', '', false, true), fx('현장노임', '150,000/일')] },
     { name: '운임', rows: [{ id: nid(), fixed: false, name: '', cells: ['', '', '', '', ''] }] },
     // 동결비·입출고비: 생산내역(행선지×구분×수량)에서 자동 산출 → buildFreezeRows/buildInoutRows
     { name: '동결비', rows: [] },
     { name: '입출고비', rows: [] },
-    { name: '박스', rows: [box('사료팬', '350 원', '센터', '재고→펜사용료'), box('베이트大', '1,100 원', '센터'), box('베이트小', '900 원', '센터')] },
-    { name: '내피', rows: [fx('내피', '170 원', '협회')] },
-    { name: '탈펜료', rows: [box('사료팬', '350 원', '김대현 노조반장'), box('베이트大', '350 원', '김대현 노조반장'), box('베이트小', '200 원', '김대현 노조반장')] },
+    { name: '박스', rows: [box('사료팬', '350원', '센터', '재고→펜사용료'), box('베이트大', '1,100원', '센터'), box('베이트小', '900원', '센터')] },
+    { name: '내피', rows: [fx('내피', '170원', '협회')] },
+    { name: '탈펜료', rows: [box('사료팬', '350원', '김대현 노조반장'), box('베이트大', '350원', '김대현 노조반장'), box('베이트小', '200원', '김대현 노조반장')] },
     { name: '기타', rows: [fx('식대'), fx('간식')] },
   ];
 }
@@ -338,12 +341,17 @@ export const WS_CSS = `
 .ws-page .pct-in:hover{background:var(--hover);}
 .ws-page .pct-in:focus{box-shadow:inset 0 0 0 1.6px var(--accent);background:var(--accent-soft);}
 .ws-page .pct{color:var(--faint);font-size:12px;font-weight:600;}
+/* 텍스트 컬럼은 목업대로 가운데. 숫자 컬럼(중량·수량·단가·금액)은 우측 정렬 통일 —
+   앱 전체 표 규칙과 동일(우측 정렬 + tabular-nums + 천단위 콤마 + 단위 값 뒤). */
 .ws-page #prod thead th{text-align:center;}
-.ws-page #prod td.txt input, .ws-page #prod td.n input, .ws-page #prod td.auto{text-align:center;}
+.ws-page #prod thead th.n, .ws-page #prod thead th.ni{text-align:right;}
+.ws-page #prod td.txt input{text-align:center;}
 .ws-page #cost thead th{text-align:center;}
-.ws-page #cost td.txt input, .ws-page #cost td.n input, .ws-page #cost td .combo > input{text-align:center;}
+.ws-page #cost thead th.n, .ws-page #cost thead th.ni{text-align:right;}
+.ws-page #cost td.txt input, .ws-page #cost td .combo > input{text-align:center;}
 .ws-page #cost td.fixed-name .fx{text-align:center;}
 .ws-page td .roval{display:block;padding:10px 10px;font-size:13px;text-align:center;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.ws-page td.n .roval{text-align:right;}
 .ws-page td .roval.robigo{color:var(--amber-ink);font-size:11px;font-weight:600;white-space:normal;}
 .ws-page #cost .phcell{padding:14px;text-align:center;color:var(--faint);font-size:12px;}
 .ws-page #cost .phcell b{color:var(--muted);font-weight:600;}
