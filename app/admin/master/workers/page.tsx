@@ -2,13 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  ArrowsUpDownIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  LockClosedIcon,
-  PlusIcon,
-} from '@heroicons/react/24/outline';
+import { LockClosedIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import {
@@ -18,6 +12,11 @@ import {
   type WorkerRole,
 } from '@/app/actions/admin/master-workers';
 import WorkerEditModal from '@/app/components/WorkerEditModal';
+import { Button } from '@/app/components/ui/Button';
+import { EmptyState } from '@/app/components/ui/EmptyState';
+import { LoadingState } from '@/app/components/ui/LoadingState';
+import { SortIcon, ariaSort, sortState } from '@/app/components/ui/SortIcon';
+import { SpacerCell, TableColGroup, tableMinWidth, type TableCol } from '@/app/admin/_table-cols';
 
 type SortField = 'name' | 'role' | 'active';
 type SortDir = 'asc' | 'desc';
@@ -30,11 +29,34 @@ const ROLE_LABEL: Record<WorkerRole, string> = {
   MASTER: '마스터',
 };
 
+/**
+ * 권한 배지 — §2-3 액센트 토큰. 분류 배지이므로 "최대 2종" 예외에 해당한다.
+ * 기본 권한(작업자)은 중립, 권한이 올라갈수록 강조.
+ */
 const ROLE_BADGE: Record<WorkerRole, string> = {
-  WORKER: 'bg-gray-100 text-gray-600',
-  ADMIN: 'bg-[#3182F6]/10 text-[#3182F6]',
-  MASTER: 'bg-purple-100 text-purple-700',
+  WORKER: 'bg-surface-alt text-text-muted',
+  ADMIN: 'bg-accent-bg text-accent-ink',
+  MASTER: 'bg-info-bg text-info-ink',
 };
+
+/**
+ * 컬럼 폭 — §7-2. 실측(2026-07-28, 작업자 3건) 최댓값 + 여유 8 + 패딩 32.
+ * PIN 상태는 문구가 길다 — `평문 (다음 로그인 시 해시화)` 179px이 하한.
+ */
+const COLS: TableCol[] = [
+  { key: 'name', label: '작업자명', px: 116 }, // max 74 `이경환 본인`
+  { key: 'role', label: '권한', px: 92 }, // 배지 49
+  { key: 'active', label: '활성', px: 92 }, // 배지 49
+  { key: 'pin', label: 'PIN 상태', px: 220 }, // max 179
+  { key: 'locked', label: '잠금', px: 100 }, // 배지 `잠금 5회` 58
+];
+
+/**
+ * 카드·컨트롤·헤더 공통 최대 폭 (§7-9).
+ * 표 합계 620 < **컨트롤 행 678**(검색 128 + 칩 7개 538) → 컨트롤이 폭을 정한다. 678 → 704.
+ * 이 화면만 표가 아니라 컨트롤이 하한이다 — 필터 칩이 두 그룹(활성·권한)이라 그렇다.
+ */
+const CONTENT_MAX = 'max-w-[704px]';
 
 export default function WorkersMasterPage() {
   const router = useRouter();
@@ -100,10 +122,11 @@ export default function WorkersMasterPage() {
     }
   };
 
+  // 최초 진입 — 레이아웃이 아직 없어 골격을 그릴 수 없다(§6-4의 스피너 허용 예외).
   if (!workerId) {
     return (
-      <div className="p-8 flex justify-center items-center min-h-screen">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
+      <div className="p-8">
+        <LoadingState />
       </div>
     );
   }
@@ -120,43 +143,40 @@ export default function WorkersMasterPage() {
 
   return (
     <div className="mx-auto max-w-[1200px] p-8 min-w-0">
-      <div className="flex items-center justify-between mb-6">
+      {/* 제목·버튼·컨트롤·카드가 모두 같은 최대 폭에 맞는다 (§7-9) */}
+      <div className={`mb-6 flex items-center justify-between gap-4 ${CONTENT_MAX}`}>
         <div>
-          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">작업자 마스터</h1>
-          <p className="text-[13px] text-gray-500 mt-1">
+          <h1 className="text-page text-text">작업자 마스터</h1>
+          <p className="mt-1 text-label text-text-muted">
             {visible.length}건
             {(search || activeFilter !== 'ALL' || roleFilter !== 'ALL') &&
               ` / 전체 ${items.length}건`}
             {counts.locked > 0 && (
-              <span className="ml-2 text-red-500 font-bold">
-                · 잠금 {counts.locked}건
-              </span>
+              <span className="ml-2 text-danger-ink">· 잠금 {counts.locked}건</span>
             )}
           </p>
         </div>
-        <button
-          onClick={() => setEditing('new')}
-          className="px-5 py-2.5 bg-[#3182F6] text-white font-bold text-[14px] rounded-xl shadow-sm hover:bg-[#1c6ce0] active:scale-95 transition-all flex items-center gap-1.5"
-        >
-          <PlusIcon className="w-4 h-4" />
+        {/* 화면의 유일한 Primary (§2-3) */}
+        <Button variant="primary" icon={PlusIcon} onClick={() => setEditing('new')}>
           작업자 추가
-        </button>
+        </Button>
       </div>
 
-      <div className="mb-4 flex items-center gap-3 flex-wrap">
+      <div className={`mb-4 flex flex-wrap items-center gap-3 ${CONTENT_MAX}`}>
+        {/* 검색 — 폭은 placeholder가 잘리지 않는 최소 (§6-3) */}
         <input
           type="text"
           placeholder="작업자명 검색"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-72 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+          className="h-control w-32 rounded-control border border-border bg-surface px-3 text-body text-text outline-none placeholder:text-text-faint focus:border-transparent focus:ring-2 focus:ring-accent-fill"
         />
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <Chip label="활성" active={activeFilter === 'active'} count={counts.active} onClick={() => setActiveFilter('active')} />
           <Chip label="비활성" active={activeFilter === 'inactive'} count={counts.inactive} onClick={() => setActiveFilter('inactive')} />
           <Chip label="전체" active={activeFilter === 'ALL'} count={counts.ALL} onClick={() => setActiveFilter('ALL')} />
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <Chip label="모든 권한" active={roleFilter === 'ALL'} count={counts.ALL} onClick={() => setRoleFilter('ALL')} />
           {(['WORKER', 'ADMIN', 'MASTER'] as WorkerRole[]).map((r) => (
             <Chip
@@ -170,25 +190,26 @@ export default function WorkersMasterPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className={`overflow-hidden rounded-card border border-border bg-surface ${CONTENT_MAX}`}>
         {isLoading ? (
-          <div className="py-20 flex justify-center items-center">
-            <div className="w-8 h-8 border-4 border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
-          </div>
+          <LoadingState cols={COLS} rows={8} spacer />
         ) : visible.length === 0 ? (
-          <div className="py-20 text-center">
-            <p className="text-gray-400 font-bold text-[15px]">결과가 없습니다</p>
-          </div>
+          <EmptyState
+            title="조건에 맞는 작업자가 없습니다"
+            hint="검색어를 지우거나 활성·권한 필터를 전체로 바꿔보세요."
+          />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr className="text-left font-bold text-gray-500 text-[12px]">
+            <table className="w-full table-fixed" style={{ minWidth: tableMinWidth(COLS) }}>
+              <TableColGroup cols={COLS} spacer />
+              <thead className="sticky top-0 bg-surface-alt">
+                <tr className="text-left">
                   <Th label="작업자명" field="name" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="권한" field="role" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="활성" field="active" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <th className="px-4 py-3">PIN 상태</th>
-                  <th className="px-4 py-3">잠금</th>
+                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">PIN 상태</th>
+                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">잠금</th>
+                  <SpacerCell as="th" />
                 </tr>
               </thead>
               <tbody>
@@ -198,48 +219,48 @@ export default function WorkersMasterPage() {
                     <tr
                       key={w.id}
                       onClick={() => setEditing(w)}
-                      className="border-t border-gray-100 hover:bg-blue-50/40 cursor-pointer transition-colors"
+                      className="cursor-pointer border-t border-border transition-colors hover:bg-surface-alt"
                     >
-                      <td className="px-4 py-3 font-bold text-gray-900">
-                        {w.name || '-'}
+                      {/* py-2 + body(14×1.5=21) + border 1 = 38px 행 높이 (§7-7) */}
+                      <td className="whitespace-nowrap px-4 py-2 text-body text-text">
+                        {w.name || '—'}
                         {isSelf && (
-                          <span className="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-black rounded">
+                          <span className="ml-2 rounded-pill bg-warn-bg px-2 text-caption text-warn-ink">
                             본인
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold ${ROLE_BADGE[w.role]}`}>
+                      <td className="whitespace-nowrap px-4 py-2">
+                        <span className={`inline-block rounded-pill px-2 text-caption ${ROLE_BADGE[w.role]}`}>
                           {ROLE_LABEL[w.role]}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="whitespace-nowrap px-4 py-2">
                         <span
-                          className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold ${w.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}
+                          className={`inline-block rounded-pill px-2 text-caption ${w.active ? 'bg-success-bg text-success-ink' : 'bg-surface-alt text-text-muted'}`}
                         >
                           {w.active ? '활성' : '비활성'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">
+                      <td className="whitespace-nowrap px-4 py-2 text-body text-text-muted">
                         {w.hasHashedPin
                           ? '해시 저장됨'
                           : w.hasPlainPin
                             ? '평문 (다음 로그인 시 해시화)'
-                            : <span className="text-red-500 font-bold">미설정</span>}
+                            : <span className="text-danger-ink">미설정</span>}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="whitespace-nowrap px-4 py-2">
                         {w.isLocked ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 rounded-md text-[11px] font-bold">
-                            <LockClosedIcon className="w-3 h-3" />
+                          <span className="inline-flex items-center gap-1 rounded-pill bg-danger-bg px-2 text-caption text-danger-ink">
+                            <LockClosedIcon className="h-3 w-3" aria-hidden="true" />
                             잠금
-                            {w.pinFailCount > 0 && (
-                              <span className="ml-0.5">{w.pinFailCount}회</span>
-                            )}
+                            {w.pinFailCount > 0 && <span>{w.pinFailCount}회</span>}
                           </span>
                         ) : (
-                          <span className="text-gray-300 text-[11px]">정상</span>
+                          <span className="text-caption text-text-muted">정상</span>
                         )}
                       </td>
+                      <SpacerCell />
                     </tr>
                   );
                 })}
@@ -277,16 +298,20 @@ function Chip({
   count: number;
   onClick: () => void;
 }) {
+  // 활성 칩은 채움이 아니라 소프트 태그 — 채움 Primary는 화면당 1개여야 한다 (§2-3).
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`px-3 py-2 rounded-xl text-[12px] font-bold transition-colors ${
+      aria-pressed={active}
+      className={`inline-flex h-control items-center gap-1 rounded-control px-3 text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-fill ${
         active
-          ? 'bg-[#3182F6] text-white'
-          : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+          ? 'bg-accent-bg text-accent-ink'
+          : 'border border-border bg-surface text-text-muted hover:bg-surface-alt'
       }`}
     >
-      {label} <span className={active ? 'text-blue-100' : 'text-gray-400'}>{count}</span>
+      {label}
+      <span className={active ? 'text-accent-ink' : 'text-text-faint'}>{count}</span>
     </button>
   );
 }
@@ -304,25 +329,18 @@ function Th({
   sortDir: SortDir;
   onToggle: (f: SortField) => void;
 }) {
-  const Icon =
-    sortField === field
-      ? sortDir === 'asc'
-        ? ChevronUpIcon
-        : ChevronDownIcon
-      : ArrowsUpDownIcon;
+  const state = sortState(sortField === field, sortDir);
   return (
-    <th
-      onClick={() => onToggle(field)}
-      className="px-4 py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors"
-    >
-      <span className="inline-flex items-center gap-1">
+    // aria-sort는 columnheader(th)에. 패딩은 버튼이 가져가 셀 전체가 클릭 영역이 된다 (§7-8).
+    <th aria-sort={ariaSort(state)} className="whitespace-nowrap p-0 text-label text-text-muted">
+      <button
+        type="button"
+        onClick={() => onToggle(field)}
+        className="group flex w-full cursor-pointer select-none items-center gap-1 px-4 py-2 text-left transition-colors hover:text-accent-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-fill motion-reduce:transition-none"
+      >
         {label}
-        <Icon
-          className={`w-3.5 h-3.5 ${
-            sortField === field ? 'text-[#3182F6]' : 'text-gray-300'
-          }`}
-        />
-      </span>
+        <SortIcon state={state} />
+      </button>
     </th>
   );
 }

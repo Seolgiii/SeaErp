@@ -113,16 +113,18 @@ export default function StorageEditModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/50 animate-fade-in motion-reduce:animate-none" onClick={onClose} />
+      <div className="fixed inset-0 bg-scrim animate-fade-in motion-reduce:animate-none" onClick={onClose} />
       <div className="relative flex max-h-[90vh] w-full max-w-md flex-col rounded-sheet bg-surface shadow-overlay animate-slide-up motion-reduce:animate-none">
-        <div className="flex items-center justify-between gap-3 px-6 pb-4 pt-6">
+        {/* 헤더 — 상하 16px + 아래 구분선 (§6-5) */}
+        <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
           <h3 className="text-section text-text">
             {mode === 'create' ? '보관처 추가' : '보관처 수정'}
           </h3>
           <Button variant="ghost" icon={XMarkIcon} onClick={onClose} aria-label="닫기" />
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto px-6">
+        {/* 본문 — 상하 24px, 필드 그룹 간격 24px (§6-5) */}
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
           <div>
             <label htmlFor="storage-name" className="mb-2 block text-label text-text-muted">
               보관처명 <span className="text-danger-ink">*</span>
@@ -172,6 +174,7 @@ export default function StorageEditModal({
           </div>
         </div>
 
+        {/* 푸터 — 상하 16px + 위 구분선. 삭제는 좌측, 취소·저장은 우측 (§6-5) */}
         <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
           {mode === 'edit' ? (
             <Button variant="ghost" tone="danger" icon={TrashIcon} onClick={handleDelete} disabled={isSaving}>

@@ -39,6 +39,10 @@ const config: Config = {
         "warn-ink": "#7A5510",
         "info-bg": "#E4E2F5",
         "info-ink": "#453E85",
+        "success-bg": "#DDEFE4",
+        "success-ink": "#1F6644", // success-bg 위 5.76
+        // 모달·시트 뒷배경. 순수 검정을 화면에서 직접 쓰지 않는다.
+        scrim: "rgba(0,0,0,.45)",
       },
 
       // ── 타입 스케일 (§3) ───────────────────────────────────────────────

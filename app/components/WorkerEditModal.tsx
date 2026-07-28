@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   LockOpenIcon,
   KeyIcon,
@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { toast } from '@/lib/toast';
 import { useConfirm } from '@/app/components/ConfirmBottomSheet';
+import { Button } from '@/app/components/ui/Button';
 import {
   createWorker,
   deleteWorker,
@@ -53,6 +54,12 @@ export default function WorkerEditModal({
   const [newPin, setNewPin] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  /** 필드 귀속 오류 — 토스트가 아니라 필드 바로 아래에 띄운다 (§6-3). */
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [pinError, setPinError] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const pinRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -61,13 +68,19 @@ export default function WorkerEditModal({
     };
   }, []);
 
+  const validateName = (v: string): string | null =>
+    v.trim() ? null : '작업자명을 입력하세요.';
+  const validatePin = (v: string): string | null =>
+    v.replace(/\D/g, '').length === 4 ? null : 'PIN을 숫자 4자리로 입력하세요.';
+
   const handleSave = async () => {
-    if (!name.trim()) {
-      toast('작업자명은 필수입니다.', 'error');
-      return;
-    }
-    if (mode === 'create' && pin.replace(/\D/g, '').length !== 4) {
-      toast('PIN은 숫자 4자리여야 합니다.', 'error');
+    const nErr = validateName(name);
+    const pErr = mode === 'create' ? validatePin(pin) : null;
+    setNameError(nErr);
+    setPinError(pErr);
+    if (nErr || pErr) {
+      // 저장 실패 후 첫 오류 필드로 포커스를 되돌린다 (§6-3).
+      (nErr ? nameRef : pinRef).current?.focus();
       return;
     }
     setIsSaving(true);
@@ -92,7 +105,9 @@ export default function WorkerEditModal({
       );
       onSaved();
     } else {
-      toast(`저장 실패: ${result.error}`, 'error');
+      // 필드에 귀속되지 않는 오류만 토스트. 서버 원문은 노출하지 않는다 (§6-4).
+      console.error('[workers] 저장 실패', result.error);
+      toast('저장하지 못했습니다. 잠시 후 다시 시도하세요.', 'error');
     }
   };
 
@@ -119,7 +134,9 @@ export default function WorkerEditModal({
       setShowPinReset(false);
       onSaved();
     } else {
-      toast(`재설정 실패: ${result.error}`, 'error');
+      // 필드에 귀속되지 않는 오류만 토스트. 서버 원문은 노출하지 않는다 (§6-4).
+      console.error('[workers] 재설정 실패', result.error);
+      toast('재설정하지 못했습니다. 잠시 후 다시 시도하세요.', 'error');
     }
   };
 
@@ -132,7 +149,9 @@ export default function WorkerEditModal({
       toast('PIN 잠금이 해제되었습니다.', 'success');
       onSaved();
     } else {
-      toast(`잠금 해제 실패: ${result.error}`, 'error');
+      // 필드에 귀속되지 않는 오류만 토스트. 서버 원문은 노출하지 않는다 (§6-4).
+      console.error('[workers] 잠금 해제 실패', result.error);
+      toast('잠금 해제하지 못했습니다. 잠시 후 다시 시도하세요.', 'error');
     }
   };
 
@@ -153,45 +172,49 @@ export default function WorkerEditModal({
       toast('삭제되었습니다.', 'success');
       onSaved();
     } else {
-      toast(`삭제 실패: ${result.error}`, 'error');
+      // 필드에 귀속되지 않는 오류만 토스트. 서버 원문은 노출하지 않는다 (§6-4).
+      console.error('[workers] 삭제 실패', result.error);
+      toast('삭제하지 못했습니다. 잠시 후 다시 시도하세요.', 'error');
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/50 animate-fade-in" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl animate-slide-up flex flex-col max-h-[90vh]">
+      <div className="fixed inset-0 bg-scrim animate-fade-in motion-reduce:animate-none" onClick={onClose} />
+      <div className="relative flex max-h-[90vh] w-full max-w-md flex-col rounded-sheet bg-surface shadow-overlay animate-slide-up motion-reduce:animate-none">
         {/* 헤더 */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-3">
+        {/* 헤더 — 상하 20px + 아래 구분선 (§6-5) */}
+        <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-[18px] font-black text-gray-900">
+            <h3 className="text-section text-text">
               {mode === 'create' ? '작업자 추가' : '작업자 수정'}
             </h3>
             {isSelf && (
-              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-black rounded">
+              <span className="rounded-pill bg-warn-bg px-2 text-caption text-warn-ink">
                 본인
               </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="w-8 h-8 flex items-center justify-center rounded-lg active:bg-gray-100 transition-colors"
-          >
-            <XMarkIcon className="w-5 h-5 text-gray-500" />
-          </button>
+          <Button variant="ghost" icon={XMarkIcon} onClick={onClose} aria-label="닫기" />
         </div>
 
-        {/* 폼 */}
-        <div className="flex-1 overflow-y-auto px-6 pb-3 space-y-4">
-          <Field label="작업자명" required>
+        {/* 본문 — 상하 24px, 필드 그룹 간격 20px (§6-5) */}
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+          <Field label="작업자명" required error={nameError} htmlFor="worker-name">
             <input
+              id="worker-name"
+              ref={nameRef}
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (nameError) setNameError(validateName(e.target.value));
+              }}
+              onBlur={(e) => setNameError(validateName(e.target.value))}
               placeholder="예: 홍길동"
-              className={inputClass}
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={nameError ? 'worker-name-error' : undefined}
+              className={fieldClass(Boolean(nameError))}
               autoFocus
             />
           </Field>
@@ -207,32 +230,32 @@ export default function WorkerEditModal({
                     type="button"
                     onClick={() => !disabled && setRole(opt.value)}
                     disabled={disabled}
-                    className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all ${
+                    className={`w-full rounded-control border px-4 py-3 text-left transition-colors motion-reduce:transition-none ${
                       selected
-                        ? 'border-[#3182F6] bg-[#3182F6]/5'
-                        : 'border-gray-200 hover:border-gray-300'
-                    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        ? 'border-accent-ink bg-accent-bg'
+                        : 'border-border hover:bg-surface-alt'
+                    } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
                   >
                     <div className="flex items-center justify-between">
                       <span
-                        className={`text-[14px] font-bold ${selected ? 'text-[#3182F6]' : 'text-gray-800'}`}
+                        className={`text-body ${selected ? 'text-accent-ink' : 'text-text'}`}
                       >
                         {opt.label}
-                        <span className="ml-2 font-mono text-[11px] text-gray-400">
+                        <span className="ml-2 text-caption text-text-muted">
                           {opt.value}
                         </span>
                       </span>
                       {selected && (
-                        <span className="text-[11px] font-bold text-[#3182F6]">선택됨</span>
+                        <span className="text-caption text-accent-ink">선택됨</span>
                       )}
                     </div>
-                    <p className="text-[12px] font-medium text-gray-500 mt-0.5">{opt.desc}</p>
+                    <p className="mt-1 text-label text-text-muted">{opt.desc}</p>
                   </button>
                 );
               })}
             </div>
             {isSelf && (
-              <p className="mt-2 text-[12px] font-medium text-amber-600">
+              <p className="mt-2 text-caption text-warn-ink">
                 본인 권한은 다른 마스터가 변경해야 합니다.
               </p>
             )}
@@ -243,56 +266,63 @@ export default function WorkerEditModal({
               type="button"
               onClick={() => !isSelf && setActive((a) => !a)}
               disabled={isSelf}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
-                active
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 bg-gray-50'
-              } ${isSelf ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-300'}`}
+              className={`flex w-full items-center justify-between rounded-control border px-4 py-3 transition-colors motion-reduce:transition-none ${
+                active ? 'border-success-ink bg-success-bg' : 'border-border bg-surface-alt'
+              } ${isSelf ? 'cursor-not-allowed opacity-50' : 'hover:bg-surface-alt'}`}
             >
               <span
-                className={`text-[14px] font-bold ${active ? 'text-green-700' : 'text-gray-500'}`}
+                className={`text-body ${active ? 'text-success-ink' : 'text-text-muted'}`}
               >
                 {active ? '활성 (로그인 가능)' : '비활성 (로그인 차단)'}
               </span>
               <span
-                className={`w-10 h-6 rounded-full transition-colors relative ${active ? 'bg-green-500' : 'bg-gray-300'}`}
+                className={`relative h-6 w-10 rounded-pill transition-colors motion-reduce:transition-none ${active ? 'bg-success-ink' : 'bg-border'}`}
               >
                 <span
-                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${active ? 'left-[18px]' : 'left-0.5'}`}
+                  className={`absolute top-0.5 h-5 w-5 rounded-pill bg-surface transition-all motion-reduce:transition-none ${active ? 'left-[18px]' : 'left-0.5'}`}
                 />
               </span>
             </button>
             {isSelf && (
-              <p className="mt-2 text-[12px] font-medium text-amber-600">
+              <p className="mt-2 text-caption text-warn-ink">
                 본인 계정은 비활성으로 바꿀 수 없습니다.
               </p>
             )}
           </Field>
 
           {mode === 'create' && (
-            <Field label="초기 PIN" required>
+            <Field label="초기 PIN" required error={pinError} htmlFor="worker-pin">
               <input
+                id="worker-pin"
+                ref={pinRef}
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={4}
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  setPin(v);
+                  if (pinError) setPinError(validatePin(v));
+                }}
+                onBlur={(e) => setPinError(validatePin(e.target.value))}
                 placeholder="숫자 4자리"
-                className={inputClass}
+                aria-invalid={pinError ? true : undefined}
+                aria-describedby={pinError ? 'worker-pin-error' : undefined}
+                className={fieldClass(Boolean(pinError))}
               />
-              <p className="mt-1 text-[11px] font-medium text-gray-400">
+              <p className="mt-2 text-caption text-text-muted">
                 입력 즉시 해시화되어 저장됩니다. 평문 PIN은 저장되지 않습니다.
               </p>
             </Field>
           )}
 
           {mode === 'edit' && worker && (
-            <div className="border-t border-gray-100 pt-4 space-y-3">
+            <div className="space-y-3 border-t border-border pt-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[12px] font-bold text-gray-500">PIN 보안 상태</p>
-                  <p className="text-[13px] font-bold text-gray-800 mt-0.5">
+                  <p className="text-label text-text-muted">PIN 보안 상태</p>
+                  <p className="mt-1 text-body text-text">
                     {worker.hasHashedPin
                       ? '해시 저장됨'
                       : worker.hasPlainPin
@@ -301,20 +331,20 @@ export default function WorkerEditModal({
                   </p>
                 </div>
                 {worker.isLocked && (
-                  <span className="px-2 py-1 bg-red-100 text-red-700 text-[11px] font-black rounded">
+                  <span className="rounded-pill bg-danger-bg px-2 text-caption text-danger-ink">
                     잠금 중
                   </span>
                 )}
               </div>
 
               {worker.pinFailCount > 0 && (
-                <p className="text-[12px] font-medium text-gray-500">
-                  실패 횟수: <span className="font-bold text-gray-700">{worker.pinFailCount}회</span>
+                <p className="text-label text-text-muted">
+                  실패 횟수: <span className="text-text">{worker.pinFailCount}회</span>
                   {worker.isLocked && (
                     <>
                       {' · '}
                       잠금 해제:{' '}
-                      <span className="font-bold text-gray-700">
+                      <span className="text-text">
                         {new Date(worker.pinLockedUntil).toLocaleString('ko-KR')}
                       </span>
                     </>
@@ -324,29 +354,18 @@ export default function WorkerEditModal({
 
               <div className="flex gap-2 flex-wrap">
                 {worker.isLocked && (
-                  <button
-                    type="button"
-                    onClick={handleUnlock}
-                    disabled={isSaving}
-                    className="px-3 py-2 bg-amber-100 text-amber-700 text-[12px] font-bold rounded-lg hover:bg-amber-200 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-40"
-                  >
-                    <LockOpenIcon className="w-4 h-4" />
+                  <Button variant="secondary" icon={LockOpenIcon} onClick={handleUnlock} disabled={isSaving}>
                     잠금 해제
-                  </button>
+                  </Button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setShowPinReset((s) => !s)}
-                  className="px-3 py-2 bg-blue-50 text-[#3182F6] text-[12px] font-bold rounded-lg hover:bg-blue-100 active:scale-95 transition-all flex items-center gap-1.5"
-                >
-                  <KeyIcon className="w-4 h-4" />
+                <Button variant="secondary" icon={KeyIcon} onClick={() => setShowPinReset((s) => !s)}>
                   {showPinReset ? '닫기' : 'PIN 재설정'}
-                </button>
+                </Button>
               </div>
 
               {showPinReset && (
-                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                  <label className="block text-[12px] font-bold text-gray-500">
+                <div className="space-y-2 rounded-card bg-surface-alt p-4">
+                  <label htmlFor="worker-new-pin" className="block text-label text-text-muted">
                     새 PIN (숫자 4자리)
                   </label>
                   <input
@@ -354,57 +373,42 @@ export default function WorkerEditModal({
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={4}
+                    id="worker-new-pin"
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
                     placeholder="예: 0000"
-                    className={inputClass}
+                    className={fieldClass(false)}
                   />
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    fullWidth
                     onClick={handlePinReset}
                     disabled={isSaving || newPin.length !== 4}
-                    className="w-full px-4 py-2.5 bg-[#3182F6] text-white text-[13px] font-bold rounded-lg hover:bg-[#1c6ce0] active:scale-95 transition-all disabled:bg-blue-300"
                   >
-                    {isSaving ? '재설정 중...' : '새 PIN으로 재설정'}
-                  </button>
+                    {isSaving ? '재설정 중…' : '새 PIN으로 재설정'}
+                  </Button>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* 푸터 */}
-        <div className="px-6 pt-3 pb-5 border-t border-gray-100 flex items-center justify-between gap-3">
+        {/* 푸터 — 상하 16px + 위 구분선. 삭제는 좌측, 취소·저장은 우측 (§6-5) */}
+        <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
           {mode === 'edit' && !isSelf ? (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={isSaving}
-              className="px-4 py-3 text-[14px] font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-1.5 disabled:opacity-40"
-            >
-              <TrashIcon className="w-4 h-4" />
+            <Button variant="ghost" tone="danger" icon={TrashIcon} onClick={handleDelete} disabled={isSaving}>
               삭제
-            </button>
+            </Button>
           ) : (
             <div />
           )}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSaving}
-              className="px-5 py-3 text-[14px] font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-40"
-            >
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={onClose} disabled={isSaving}>
               취소
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving || !name.trim()}
-              className="px-6 py-3 bg-[#3182F6] text-white text-[14px] font-bold rounded-xl shadow-sm hover:bg-[#1c6ce0] active:scale-95 transition-all disabled:bg-blue-300 disabled:cursor-not-allowed"
-            >
-              {isSaving ? '저장 중...' : '저장'}
-            </button>
+            </Button>
+            <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? '저장 중…' : '저장'}
+            </Button>
           </div>
         </div>
       </div>
@@ -412,24 +416,44 @@ export default function WorkerEditModal({
   );
 }
 
-const inputClass =
-  'w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent transition-all';
+
+/** 필드 공통 클래스 — 오류일 때만 테두리·포커스 링이 danger로 (§6-3). */
+function fieldClass(hasError: boolean): string {
+  return [
+    'h-control w-full rounded-control border bg-surface-alt px-3 text-body text-text outline-none',
+    'placeholder:text-text-faint focus:ring-2',
+    hasError
+      ? 'border-danger-ink focus:border-transparent focus:ring-danger-ink'
+      : 'border-border focus:border-transparent focus:ring-accent-fill',
+  ].join(' ');
+}
 
 function Field({
   label,
   required,
+  error,
+  htmlFor,
   children,
 }: {
   label: string;
   required?: boolean;
+  /** 필드에 귀속된 검증 오류 — 필드 바로 아래에 표시한다 (§6-3). */
+  error?: string | null;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="block text-[12px] font-bold text-gray-500 mb-1.5">
-        {label} {required && <span className="text-red-500">*</span>}
+      {/* 라벨 ↔ 입력 6px (§6-5) */}
+      <label htmlFor={htmlFor} className="mb-2 block text-label text-text-muted">
+        {label} {required && <span className="text-danger-ink">*</span>}
       </label>
       {children}
+      {error && (
+        <p id={htmlFor ? `${htmlFor}-error` : undefined} className="mt-2 text-caption text-danger-ink">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
