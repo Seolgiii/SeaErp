@@ -45,8 +45,10 @@ export default async function ExpenseListPage() {
         ) : (
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           expenses.map((item: any) => {
+            // ⚠ Airtable 승인상태 옵션은 '승인 완료'(공백 포함)다. '승인완료'로 비교하면
+            //    영영 매칭되지 않아 승인된 건이 대기(파랑) 배지로 보인다. 표기를 바꾸지 말 것.
             const status = item.fields.승인상태 || '검토중';
-            const statusColor = status === '승인완료' ? 'bg-green-100 text-green-700' : status === '반려' ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-600';
+            const statusColor = status === '승인 완료' ? 'bg-green-100 text-green-700' : status === '반려' ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-600';
             const rawDate = item.fields.날짜;
             const dateLabel =
               typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(rawDate.trim())

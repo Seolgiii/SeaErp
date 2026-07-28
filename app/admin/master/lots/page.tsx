@@ -561,7 +561,7 @@ export default function LotsMasterPage() {
                         </span>
                       )}
                     </td>
-                    <td className={lotCls.cell('text-gray-500')}>
+                    <td className={lotCls.clamp('text-gray-500')} title={l.memo || undefined}>
                       {l.memo || <span className="text-gray-300">-</span>}
                     </td>
                   </tr>
@@ -621,7 +621,9 @@ const LOT_COLS: TableCol[] = [
   { key: 'storageName', label: '보관처', px: 140 },      // max 98 `신우농수산2공장`
   { key: 'daysHeld', label: '보관일수', px: 112, numeric: true },    // 헤더(52+18)가 하한
   { key: 'status', label: '상태', px: 112 },             // 상태사유 배지 `이동 입고` 등
-  { key: 'memo', label: '비고', px: 308 },               // max 265 — 자유 텍스트, 주기 재측정 필요
+  // 비고만 「말줄임 금지」 예외(clamp) — 자유 텍스트라 최댓값을 예측할 수 없다.
+  // 실측 max 265지만 상한 240으로 묶고 넘치면 말줄임 + title 툴팁.
+  { key: 'memo', label: '비고', px: 240, clamp: true },
 ];
 const LOT_MIN_WIDTH = tableMinWidth(LOT_COLS);
 const lotCls = makeCellClasses('px-4');

@@ -1,5 +1,15 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * DESIGN.md 토큰 — 단일 정의 지점 (§2-1).
+ *
+ * ⚠ 여기 없는 색·크기·radius를 화면 파일에 직접 쓰지 않는다.
+ *   hex 리터럴 / text-[Npx] / rounded-[Npx] 금지.
+ *
+ * 지금은 **보관처 마스터 화면이 실제로 쓰는 토큰만** 정의되어 있다(세로 슬라이스 시범).
+ * 다른 화면을 전환할 때 그 화면이 쓰는 토큰을 여기에 추가한다.
+ * 화면이 안 쓰는 토큰을 미리 채워두지 않는다 — 검증 안 된 값이 기준처럼 굳는다.
+ */
 const config: Config = {
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -8,6 +18,56 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // ── 색 (§2-2 중립색 / §2-3 액센트) ──────────────────────────────────
+      // 이름은 DESIGN.md 토큰명을 그대로 쓴다. 문서↔코드 사이에 번역이 끼면
+      // work-settlement의 --ink/--muted 처럼 값이 조용히 갈린다.
+      colors: {
+        surface: "#FFFFFF", // --surface
+        "surface-alt": "#F4F5F7", // --surface-alt : 표 헤더, 입력 배경
+        border: "#E3E5E9", // --border
+        text: "#14171C", // --text        (흰 배경 대비 17.96)
+        "text-muted": "#646B78", // --text-muted  (5.35) 보조 라벨·캡션·빈 상태
+        "text-faint": "#98A0AC", // --text-faint  (2.61) ⚠ placeholder·비활성 전용
+        // Primary — 면 / 글자 / 채움 3분리 (§2-3)
+        "accent-bg": "#DCEAF5",
+        "accent-ink": "#235C82", // accent-bg 위 5.78
+        "accent-fill": "#1C6CE0", // 흰 글자 4.92 (#3182F6은 3.71로 미달)
+        "accent-fill-hover": "#1A61CC", // 흰 글자 5.79
+        "danger-bg": "#F7DFE0",
+        "danger-ink": "#8A2A35", // danger-bg 위 6.74
+        "warn-bg": "#F7EBD6",
+        "warn-ink": "#7A5510",
+        "info-bg": "#E4E2F5",
+        "info-ink": "#453E85",
+      },
+
+      // ── 타입 스케일 (§3) ───────────────────────────────────────────────
+      // 굵기를 토큰에 포함시킨다. 화면에서 font-bold를 덧붙이지 않는다.
+      fontSize: {
+        page: ["20px", { lineHeight: "1.3", fontWeight: "600" }], // h1
+        section: ["16px", { lineHeight: "1.4", fontWeight: "600" }], // h2·h3·모달 제목
+        body: ["14px", { lineHeight: "1.5", fontWeight: "400" }], // 본문·표 셀·입력
+        label: ["12px", { lineHeight: "1.4", fontWeight: "500" }], // 폼 라벨·표 헤더
+        caption: ["11px", { lineHeight: "1.4", fontWeight: "400" }], // 배지·도움말·오류
+      },
+
+      // ── Radius (§2-5) — 역할로 쓰고 값은 표면이 결정한다 ────────────────
+      // 실제 값은 globals.css의 CSS 변수. /admin과 모바일 PWA가 다르다.
+      borderRadius: {
+        control: "var(--r-control)", // 버튼·입력·셀렉트·칩
+        card: "var(--r-card)", // 카드·패널
+        sheet: "var(--r-sheet)", // 모달·바텀시트
+        pill: "var(--r-pill)", // 배지
+      },
+
+      // ── 컨트롤 높이 (§6-1) — padding이 아니라 고정 높이로 만든다 ─────────
+      height: { control: "var(--h-control)" }, // /admin 32px · 모바일 44px
+      minHeight: { control: "var(--h-control)" },
+      width: { control: "var(--h-control)" }, // 아이콘 전용 정사각 버튼
+
+      // ── Shadow (§2-6) — 띄우는 요소에만 1종 ────────────────────────────
+      boxShadow: { overlay: "0 4px 16px rgba(0,0,0,.10)" },
+
       // 추가된 토스 스타일 애니메이션 키프레임
       keyframes: {
         "slide-up": {

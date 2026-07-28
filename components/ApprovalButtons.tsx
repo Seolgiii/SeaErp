@@ -19,7 +19,9 @@ export const ApprovalButtons = ({ id, currentStatus }: { id: string, currentStat
     }
   }, []);
 
-  if (currentStatus === "승인완료" || currentStatus === "반려") {
+  // ⚠ Airtable 승인상태 옵션은 '승인 완료'(공백 포함) — 아래 handleStatusUpdate가 쓰는 값과 같아야 한다.
+  //    '승인완료'로 비교하면 매칭되지 않아 이미 처리된 문서에도 승인·반려 버튼이 계속 노출된다.
+  if (currentStatus === "승인 완료" || currentStatus === "반려") {
     return (
       <div className="w-full py-2 bg-gray-50 rounded-xl text-center text-xs font-bold text-gray-400 mb-3">
         결재 처리가 완료된 문서입니다.

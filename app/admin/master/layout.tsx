@@ -219,7 +219,10 @@ function MasterAdminLayoutInner({ children }: { children: React.ReactNode }) {
   const expanded = !railPinned || hovering;
 
   return (
+    // data-surface="admin" — DESIGN.md §2-5·§6-1의 표면별 값(radius·컨트롤 높이)을
+    // 이 서브트리에 적용한다. 값 정의는 app/globals.css. 토큰을 안 쓰는 화면에는 영향 없음.
     <div
+      data-surface="admin"
       className="min-h-screen bg-[#F2F4F6] flex"
       style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
     >

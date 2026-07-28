@@ -8,3 +8,31 @@
 body {
   font-family: 'Spoqa Han Sans Neo', 'sans-serif';
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   DESIGN.md §2-5(radius) · §6-1(컨트롤 높이) — 표면별 값
+
+   토큰 '이름'은 tailwind.config.ts에, 표면별 '값'은 여기 둔다.
+   화면 코드는 rounded-card / h-control 이라고만 쓰고,
+   얼마나 둥근지·얼마나 큰지는 어느 표면에 놓였는지가 결정한다.
+
+   기본값 = 모바일 PWA. /admin 서브트리만 data-surface="admin"으로 덮어쓴다
+   (app/admin/master/layout.tsx 루트에 부착).
+   ⚠ 앱 루트에 mount되는 오버레이(ConfirmBottomSheet·Toaster)는 /admin 화면에서 열려도
+     DOM상 admin 서브트리 밖이라 모바일 값을 받는다. 그 둘을 토큰화할 때 함께 정리할 것.
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  --r-control: 12px;
+  --r-card: 16px;
+  --r-sheet: 24px;
+  --r-pill: 999px;
+  --h-control: 44px; /* 모바일 터치 타겟 최소치 (§4) */
+}
+
+[data-surface='admin'] {
+  --r-control: 6px;
+  --r-card: 10px;
+  --r-sheet: 12px;
+  --r-pill: 999px;
+  --h-control: 32px; /* PC 컨트롤 높이 (§6-1) */
+}
