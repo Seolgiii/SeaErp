@@ -9,6 +9,12 @@
   (WSL 경로: /mnt/c/Users/user/Documents/Obsidian/SEAERP/DESIGN.md — Claude Code는 이 경로로 읽는다)
 - 색상·폰트·간격을 임의로 지정하지 말 것.
 
+■ 최근 변경 (2026-07-28)
+- **디자인 토큰 + 공통 컴포넌트 도입** — `tailwind.config.ts`에 색·타이포·radius·컨트롤높이 토큰, `app/globals.css`에 **표면별 값**(기본=모바일 / `[data-surface='admin']`=PC, radius 6/12/16·높이 32). `app/components/ui/` 5종 신설(Button·EmptyState·LoadingState·SortIcon·Modal). 마스터 5화면(storage/products/ships/workers/suppliers)+모달에 확산. **Modal은 일부러 포털 안 함**(포털하면 admin 서브트리를 벗어나 모바일 토큰을 받음).
+- **목록 표 넘침 처리 표준화 + 숫자 표기 통일** — `_table-cols.tsx`(TableCol·tableMinWidth·TableColGroup·스페이서 컬럼)·`transactions/_ledger-cols.tsx`·`_num-cell.tsx`+`formatNum`. **말줄임 폐지→실측폭 전량 표시+가로 스크롤**(비고 240px만 예외). 버그 fix: colgroup 합계>minWidth 전 컬럼 축소, `'승인완료'`(공백 없음) 비교가 실제값 `'승인 완료'`와 영영 불일치하던 2곳.
+- **보관처 마스터 3덩어리 재구성**(자사창고/외부창고/가공공장) — '보관처 비용 이력'·'가공비 단가' 별도 화면 흡수(`processing-rates/` 삭제, nav 2항목 제거), `listCurrentStorageCosts`(오늘 유효행만), 좌측 필터 레일. Airtable 이름 불일치 8→2·고아 7→0(동원통영수산·해원냉장 원가 복구), 구분 '기타' 폐지+필수화.
+- **미완**: 오늘 작업분 15파일 미커밋 + 3커밋 미푸시, `package.json` 0.12.1→0.13.0 bump 대기. 나머지 표 화면 확산·숫자 정렬 규칙 정합(DESIGN 우측↔07-01 좌측 상자) 미정.
+
 ■ 최근 변경 (2026-07-27)
 - **어황일보 번역 봇 배포·라이브 가동 (v0.12.0→0.12.1)** — 어획 조업보고서 사진→일본어 안내문(바이어용). `app/api/telegram/route.ts` 웹훅 + `lib/eohwang/*`(translate=claude-opus-4-8 비전·adaptive thinking / dictionary=Airtable 사전 어댑터 / telegram=헬퍼) + `@anthropic-ai/sdk`. Vercel env 4개 등록→push 자동배포→setWebhook(secret_token) 등록·검증, 실사진 2건(7/26·7/27) 라이브 번역 성공. **프로덕션 도메인=`seafood-erp.vercel.app`(seaerp 아님).**
 - **번역 출력 개선** — 각 행 순번(1.2.3…)+바이어용 일본어 안내(`行番号でお知らせください`), 하단 손글씨 `c/s`(위판장 24kg박스 실입하)를 60kg 표 합계와의 '불일치 오류'로 경고하던 것→단위 명시 참고치로만(허위 경보 제거). `sendMessage` 4096자 분할. 사전 등록 기능 검증(봇에 `등록 매가리=小アジ`).
