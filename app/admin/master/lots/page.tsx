@@ -2,20 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  ArrowsUpDownIcon,
-  ArrowDownTrayIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  FunnelIcon,
-  PrinterIcon,
-} from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, FunnelIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { formatNum } from '@/lib/number-format';
 import { NumCell, NUM_CELL } from '@/app/admin/_num-cell';
 import { makeCellClasses, tableMinWidth, TableColGroup, type TableCol } from '@/app/admin/_table-cols';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
+import { isNormalLotStatus } from '@/lib/status';
+import { Button } from '@/app/components/ui/Button';
+import { EmptyState } from '@/app/components/ui/EmptyState';
+import { LoadingState } from '@/app/components/ui/LoadingState';
+import { StatusBadge } from '@/app/components/ui/StatusBadge';
+import { SortIcon, ariaSort, sortState } from '@/app/components/ui/SortIcon';
 import { listLots, type Lot } from '@/app/actions/admin/master-lots';
 
 // 재고장 인쇄 핸드오프 키 — /admin/ledger 인쇄 화면과 공유(새 탭 공유 위해 localStorage).
@@ -35,7 +34,6 @@ type SortField =
   | 'costPerBox'
   | 'valuation';
 type SortDir = 'asc' | 'desc';
-type StatusFilter = 'ALL' | '활성' | '소진';
 type Filters = {
   from: string;
   to: string;
@@ -56,9 +54,15 @@ const EMPTY_FILTERS: Filters = {
 };
 
 /**
- * 재고 조회 — LOT 단위 read-only 표.
+ * 재고 조회 — **활성 LOT(재고수량 > 0) 전용** read-only 표.
  * LOT은 입고 승인 시 자동 생성되므로 admin 직접 생성 거의 없음.
- * 1차 dogfooding은 조회만 — 편집 필요성 확인되면 후속 추가.
+ *
+ * 2026-07-29 소진 LOT을 별도 화면(`/admin/master/lots-depleted`)으로 분리했다. 이유 두 가지:
+ *  ① **재고장 인쇄 안전** — 이 표는 인쇄해서 재고장이 된다. 소진 LOT이 섞이면 안 되는데,
+ *     예전엔 상태 칩을 '전체'로 바꾸면 소진까지 선택·인쇄할 수 있었다. 구조로 막는다.
+ *  ② **로딩** — 소진은 영구히 쌓인다. 서버에서 scope='active'로 걸러 애초에 안 받아온다.
+ *
+ * DESIGN.md 적용 완료(2026-07-29) — 토큰·공통 컴포넌트 확산 대상 2번째 화면(보관처 다음).
  */
 export default function LotsMasterPage() {
   const router = useRouter();
@@ -66,7 +70,7 @@ export default function LotsMasterPage() {
   const [items, setItems] = useState<Lot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('활성');
+  const [onlyAbnormal, setOnlyAbnormal] = useState(false);
   const [sortField, setSortField] = useState<SortField>('firstInboundDate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -85,9 +89,14 @@ export default function LotsMasterPage() {
   const loadData = useCallback(async () => {
     if (!workerId) return;
     setIsLoading(true);
-    const result = await listLots(workerId);
+    // 활성만 — 소진은 서버에서 아예 안 내려온다(소진 LOT 화면이 따로 받는다).
+    const result = await listLots(workerId, 'active');
     if (result.success) setItems(result.data);
-    else toast(`조회 실패: ${result.error}`, 'error');
+    else {
+      // 서버 원문은 콘솔로, 화면에는 사용자 행동으로 번역해 보여준다 (§6-4).
+      console.error('[lots] 재고 조회 실패:', result.error);
+      toast('재고를 불러오지 못했습니다. 잠시 후 다시 시도하세요.', 'error');
+    }
     setIsLoading(false);
   }, [workerId]);
 
@@ -122,9 +131,10 @@ export default function LotsMasterPage() {
       if (Number.isFinite(n)) list = list.filter((l) => l.daysHeld >= n);
     }
 
-    // 활성: 재고수량 > 0, 소진: 재고수량 == 0
-    if (statusFilter === '활성') list = list.filter((l) => l.stockQty > 0);
-    else if (statusFilter === '소진') list = list.filter((l) => l.stockQty === 0);
+    // 활성/소진 구분은 서버(scope='active')가 이미 했다 — 여기서 다시 거르지 않는다.
+
+    // 이상 LOT만 보기 — 아래 경고 줄에서 켠다.
+    if (onlyAbnormal) list = list.filter((l) => l.status && !isNormalLotStatus(l.status));
 
     const dir = sortDir === 'asc' ? 1 : -1;
     list = [...list].sort((a, b) => {
@@ -142,12 +152,21 @@ export default function LotsMasterPage() {
   const totalValuation = visible.reduce((sum, l) => sum + l.valuation, 0);
 
   const activeFilterCount = Object.values(filters).filter((v) => v.trim() !== '').length;
+  const isFiltered = activeFilterCount > 0 || search.trim() !== '' || onlyAbnormal;
   const setFilter = (k: keyof Filters, v: string) =>
     setFilters((p) => ({ ...p, [k]: v }));
   // 드롭다운 검색(datalist) 옵션 — 현재 적재된 LOT들의 고유값
   const storageOptions = Array.from(
     new Set(items.map((l) => l.storageName).filter(Boolean)),
   ).sort((a, b) => a.localeCompare(b, 'ko'));
+
+  /**
+   * 이상 LOT — 상태가 '승인 완료'가 아닌 것 (§6-2).
+   * 이 표는 인쇄해서 재고장으로 쓰이므로, 정상이 아닌 LOT이 섞여 있는 것 자체가 오류다.
+   * 200행을 눈으로 훑지 않고 잡아낼 수 있도록 표 위에 건수를 띄운다.
+   * items는 이미 활성만이므로 상태 조건만 본다(이상 필터 자신은 빼야 토글이 성립한다).
+   */
+  const abnormalPool = items.filter((l) => l.status && !isNormalLotStatus(l.status));
 
   // 다중선택 — "보이는 것 중 선택된 것"만 대상으로(필터로 가려진 선택은 출력 제외 → 직관적)
   const selectedVisible = visible.filter((l) => selected.has(l.id));
@@ -209,14 +228,17 @@ export default function LotsMasterPage() {
         LEDGER_KEY,
         JSON.stringify({ asOf: seoulToday(), lots: selectedVisible }),
       );
-    } catch {
-      toast('인쇄 데이터를 준비하지 못했습니다.', 'error');
+    } catch (err) {
+      console.error('[lots] 인쇄 핸드오프 실패:', err);
+      toast('인쇄 데이터를 준비하지 못했습니다. 선택을 줄이고 다시 시도하세요.', 'error');
       return;
     }
     window.open('/admin/ledger', '_blank');
   };
 
   // CSV 내보내기 — 엑셀 한글 위해 BOM 선두, 쉼표/따옴표 이스케이프.
+  // ⚠ CSV 헤더는 화면 라벨이 아니라 데이터 필드명이므로 '품목명'을 유지한다(§8-2 단서).
+  //   기존 내려받은 파일·수식과의 호환을 깨지 않기 위함.
   const handleCsv = () => {
     if (selectedVisible.length === 0) return;
     const asOf = seoulToday();
@@ -260,103 +282,87 @@ export default function LotsMasterPage() {
     }
   };
 
-  if (!workerId) {
-    return (
-      <div className="p-8 flex justify-center items-center min-h-screen">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // 최초 진입 — 레이아웃이 아직 없어 표 골격을 그릴 수 없다(§6-4).
+  if (!workerId) return <LoadingState label="세션 확인 중…" />;
 
-  // 상태별 카운트
-  const counts = {
-    ALL: items.length,
-    활성: items.filter((l) => l.stockQty > 0).length,
-    소진: items.filter((l) => l.stockQty === 0).length,
-  };
+  const thProps = { sortField, sortDir, onToggle: toggleSort };
 
   return (
-    <div className="p-8 min-w-0">
-      <div className="flex items-center justify-between mb-6">
+    <div className="min-w-0 p-8">
+      {/* 제목 줄에 검색·필터를 함께 둔다.
+          상태 칩(활성/소진/전체)이 화면 분리로 사라지면서 컨트롤 행 하나가 통째로 없어졌다 —
+          남은 컨트롤 2개를 다시 한 줄로 내리면 그 여백이 그대로 되살아난다. */}
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고 조회</h1>
-          <p className="text-[13px] text-gray-500 mt-1">
-            {visible.length}건{(search || statusFilter !== 'ALL') && ` / 전체 ${items.length}건`}
+          <h1 className="text-page text-text">재고 조회</h1>
+          <p className="mt-1 text-label text-text-muted">
+            재고가 남은 LOT {visible.length}건{isFiltered && ` / 전체 ${items.length}건`}
             {totalValuation > 0 && (
-              <span className="ml-2 font-bold text-gray-700">
-                · 평가액 합계 {formatNum(totalValuation, '원')}
-              </span>
+              <span className="ml-2 text-text">· 평가액 합계 {formatNum(totalValuation, '원')}</span>
             )}
-            <span className="ml-2 text-gray-400">(행 클릭 → 생애주기·원가 · 조회 전용)</span>
+            <span className="ml-2">(행을 클릭하면 생애주기·원가 · 조회 전용)</span>
           </p>
         </div>
-      </div>
-
-      <div className="mb-4 flex items-center gap-3 flex-wrap">
-        <input
-          type="text"
-          placeholder="LOT번호·품목명 검색"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-80 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
-        />
-        <button
-          onClick={() => setShowFilter((v) => !v)}
-          className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[14px] font-bold transition-colors ${
-            showFilter || activeFilterCount > 0
-              ? 'bg-[#3182F6]/10 text-[#3182F6] border border-[#3182F6]/30'
-              : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          <FunnelIcon className="w-4 h-4" />
-          필터
-          {activeFilterCount > 0 && (
-            <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-[#3182F6] text-white text-[11px] font-black leading-none">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-        <div className="flex items-center gap-1.5 ml-auto">
-          <StatusChip label="활성" active={statusFilter === '활성'} count={counts.활성} onClick={() => setStatusFilter('활성')} />
-          <StatusChip label="소진" active={statusFilter === '소진'} count={counts.소진} onClick={() => setStatusFilter('소진')} />
-          <StatusChip label="전체" active={statusFilter === 'ALL'} count={counts.ALL} onClick={() => setStatusFilter('ALL')} />
+        <div className="flex shrink-0 items-center gap-2">
+          {/* 카드 밖 입력이라 배경은 --surface (§6-3) */}
+          <input
+            type="text"
+            placeholder="LOT번호·품목 검색"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-control w-40 rounded-control border border-border bg-surface px-3 text-body text-text outline-none placeholder:text-text-faint focus:border-transparent focus:ring-2 focus:ring-accent-fill"
+          />
+          {/* 필터 토글 — 채움(Primary)은 '재고장 인쇄' 하나뿐이므로 여기는 면+글자 분리 (§2-3) */}
+          <Button
+            variant="secondary"
+            icon={FunnelIcon}
+            onClick={() => setShowFilter((v) => !v)}
+            aria-expanded={showFilter}
+            className={showFilter || activeFilterCount > 0 ? 'border-accent-ink bg-accent-bg text-accent-ink' : ''}
+          >
+            필터
+            {activeFilterCount > 0 && <span className="tabular-nums">{activeFilterCount}</span>}
+          </Button>
         </div>
-      </div>
+      </header>
 
-      {/* 필터 패널 — 입고기간/품목명/규격/미수/원산지 (입력된 항목만 AND 적용) */}
+      {/* 필터 패널 — 입고기간/보관처/규격/미수/원산지/보관일수 (입력된 항목만 AND 적용) */}
       {showFilter && (
-        <div className="mb-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="mb-4 rounded-card border border-border bg-surface p-6">
           <div className="flex flex-wrap gap-4">
             {/* 입고기간 */}
-            <div className="flex-[2] min-w-[240px]">
-              <label className="block text-[12px] font-bold text-gray-500 mb-1">입고기간</label>
+            <div className="min-w-[240px] flex-[2]">
+              <label className="mb-2 block text-label text-text-muted" htmlFor="lot-from">입고기간</label>
               <div className="flex items-center gap-2">
                 <input
+                  id="lot-from"
                   type="date"
                   value={filters.from}
                   max={filters.to || undefined}
                   onChange={(e) => setFilter('from', e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-lg px-2 py-2 text-[13px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+                  className={FIELD}
                 />
-                <span className="text-gray-400">~</span>
+                <span className="text-text-muted">~</span>
                 <input
                   type="date"
+                  aria-label="입고기간 끝"
                   value={filters.to}
                   min={filters.from || undefined}
                   onChange={(e) => setFilter('to', e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-lg px-2 py-2 text-[13px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+                  className={FIELD}
                 />
               </div>
             </div>
             {/* 보관처 — 드롭다운 검색 */}
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-[12px] font-bold text-gray-500 mb-1">보관처</label>
+            <div className="min-w-[152px] flex-1">
+              <label className="mb-2 block text-label text-text-muted" htmlFor="lot-storage">보관처</label>
               <input
+                id="lot-storage"
                 list="lot-storage-options"
                 value={filters.storage}
                 onChange={(e) => setFilter('storage', e.target.value)}
                 placeholder="전체"
-                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-[14px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+                className={FIELD}
               />
               <datalist id="lot-storage-options">
                 {storageOptions.map((s) => (
@@ -364,118 +370,147 @@ export default function LotsMasterPage() {
                 ))}
               </datalist>
             </div>
-            <FilterField className="flex-1 min-w-[110px]" label="규격" value={filters.spec} onChange={(v) => setFilter('spec', v)} placeholder="예: 11" />
-            <FilterField className="flex-1 min-w-[110px]" label="미수" value={filters.misu} onChange={(v) => setFilter('misu', v)} placeholder="예: 42/44" />
-            <FilterField className="flex-1 min-w-[110px]" label="원산지" value={filters.origin} onChange={(v) => setFilter('origin', v)} placeholder="예: 국산" />
+            <FilterField className="min-w-[112px] flex-1" label="규격" value={filters.spec} onChange={(v) => setFilter('spec', v)} placeholder="예: 11" />
+            <FilterField className="min-w-[112px] flex-1" label="미수" value={filters.misu} onChange={(v) => setFilter('misu', v)} placeholder="예: 42/44" />
+            <FilterField className="min-w-[112px] flex-1" label="원산지" value={filters.origin} onChange={(v) => setFilter('origin', v)} placeholder="예: 국산" />
             {/* 보관일수 (최소) */}
-            <div className="flex-1 min-w-[130px]">
-              <label className="block text-[12px] font-bold text-gray-500 mb-1">보관일수</label>
+            <div className="min-w-[136px] flex-1">
+              <label className="mb-2 block text-label text-text-muted" htmlFor="lot-days">보관일수</label>
               <div className="flex items-center gap-2">
                 <input
+                  id="lot-days"
                   type="number"
                   min="0"
                   value={filters.minDays}
                   onChange={(e) => setFilter('minDays', e.target.value)}
                   placeholder="예: 90"
-                  className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-[14px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+                  className={FIELD}
                 />
-                <span className="text-gray-400 text-[13px] whitespace-nowrap">일↑</span>
+                <span className="whitespace-nowrap text-body text-text-muted">일↑</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-end gap-2 mt-4">
-            <button
-              onClick={() => setFilters(EMPTY_FILTERS)}
-              disabled={activeFilterCount === 0}
-              className="px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-gray-700 disabled:text-gray-300 transition-colors"
-            >
+          <div className="mt-6 flex items-center justify-end gap-2">
+            <Button variant="ghost" onClick={() => setFilters(EMPTY_FILTERS)} disabled={activeFilterCount === 0}>
               초기화
-            </button>
-            <button
-              onClick={() => setShowFilter(false)}
-              className="px-4 py-2 bg-[#191F28] text-white text-[13px] font-bold rounded-lg active:scale-95 transition-transform"
-            >
+            </Button>
+            <Button variant="secondary" onClick={() => setShowFilter(false)}>
               닫기
-            </button>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* 이상 LOT 경고 (§6-2) — 이 표는 인쇄해 재고장으로 쓰이므로 비정상 LOT이 섞이는 것 자체가 오류다.
+          200행을 훑지 않고 잡아낼 수 있도록 건수를 띄우고, 바로 걸러볼 수 있게 토글을 붙인다. */}
+      {abnormalPool.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-card border border-warn-ink bg-warn-bg px-4 py-3">
+          <span className="text-body text-warn-ink">
+            상태가 정상이 아닌 LOT {abnormalPool.length}건이 있습니다. 재고장에 포함되면 안 됩니다.
+          </span>
+          <div className="ml-auto">
+            <Button variant="ghost" onClick={() => setOnlyAbnormal((v) => !v)} aria-pressed={onlyAbnormal}>
+              {onlyAbnormal ? '전체 보기' : '이상만 보기'}
+            </Button>
           </div>
         </div>
       )}
 
       {/* 다중선택 툴바 — 선택 시에만 노출 */}
       {selectedVisible.length > 0 && (
-        <div className="mb-3 flex items-center gap-3 flex-wrap rounded-xl bg-[#3182F6]/5 border border-[#3182F6]/20 px-4 py-3">
-          <span className="text-[13px] font-bold text-gray-800">
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface-alt px-4 py-3">
+          <span className="text-body text-text">
             {selectedVisible.length}건 선택
             {selectedValuation > 0 && (
-              <span className="ml-2 text-gray-500">· 평가액 {formatNum(selectedValuation, '원')}</span>
+              <span className="ml-2 text-text-muted">· 평가액 {formatNum(selectedValuation, '원')}</span>
             )}
           </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#3182F6] text-white font-bold text-[13px] rounded-lg hover:bg-[#1c6ce0] active:scale-95 transition-all"
-            >
-              <PrinterIcon className="w-4 h-4" /> 재고장 인쇄
-            </button>
-            <button
-              onClick={handleCsv}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold text-[13px] rounded-lg hover:bg-gray-50 active:scale-95 transition-all"
-            >
-              <ArrowDownTrayIcon className="w-4 h-4" /> CSV
-            </button>
-            <button
-              onClick={() => setSelected(new Set())}
-              className="px-3 py-2 text-gray-400 font-bold text-[13px] hover:text-gray-600 transition-colors"
-            >
+          <div className="ml-auto flex items-center gap-2">
+            {/* 화면의 유일한 Primary (§2-3) */}
+            <Button variant="primary" icon={PrinterIcon} onClick={handlePrint}>
+              재고장 인쇄
+            </Button>
+            <Button variant="secondary" icon={ArrowDownTrayIcon} onClick={handleCsv}>
+              CSV
+            </Button>
+            <Button variant="ghost" onClick={() => setSelected(new Set())}>
               해제
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="overflow-hidden rounded-card border border-border bg-surface">
         {isLoading ? (
-          <div className="py-20 flex justify-center items-center">
-            <div className="w-8 h-8 border-4 border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
-          </div>
+          <LoadingState cols={LOT_COLS} rows={8} />
         ) : visible.length === 0 ? (
-          <div className="py-20 text-center">
-            <p className="text-gray-400 font-bold text-[15px]">결과가 없습니다</p>
-          </div>
+          search.trim() !== '' ? (
+            /* 검색이 빈손일 때 — 이 화면은 활성만 담으므로 "없다"가 아니라
+               "여기엔 없다"가 정확하다. 소진됐을 수 있으니 검색어를 들고 넘어갈 길을 준다.
+               이 안내가 없으면 존재하는 LOT을 없다고 말하는 조용한 실패가 된다. */
+            <EmptyState
+              title={`'${search.trim()}'와 맞는 재고가 없습니다`}
+              hint="이미 소진된 LOT일 수 있습니다. 같은 검색어로 소진 LOT을 확인하세요."
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    router.push(`/admin/master/lots-depleted?q=${encodeURIComponent(search.trim())}`)
+                  }
+                >
+                  소진 LOT에서 찾기
+                </Button>
+              }
+            />
+          ) : isFiltered ? (
+            <EmptyState
+              title="조건에 맞는 LOT이 없습니다"
+              hint="필터를 초기화하거나 조건을 넓혀보세요."
+            />
+          ) : (
+            <EmptyState
+              title="재고가 남은 LOT이 없습니다"
+              hint="LOT은 입고 승인 시 자동으로 만들어집니다. 결재 수신함에서 대기 중인 입고를 확인하세요."
+            />
+          )
         ) : (
           <div className="overflow-x-auto">
             {/* 표준 구조(app/admin/_table-cols) — 잘림 없이 전부 표시하고 총폭을 넘으면 가로 스크롤.
                 창을 좁혀도 table-fixed + minWidth라 컬럼 폭이 줄지 않는다. */}
-            <table
-              className="w-full table-fixed text-[13px]"
-              style={{ minWidth: LOT_MIN_WIDTH }}
-            >
+            <table className="w-full table-fixed" style={{ minWidth: LOT_MIN_WIDTH }}>
               <TableColGroup cols={LOT_COLS} />
-              <thead className="bg-gray-50 sticky top-0 z-20">
-                <tr className="text-left font-bold text-gray-500 text-[12px]">
-                  <th className={lotCls.cell()}>
+              <thead className="sticky top-0 z-20 bg-surface-alt">
+                <tr className="text-left text-label text-text-muted">
+                  <th className={cls.cell()}>
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
                       onChange={toggleAllVisible}
                       aria-label="보이는 항목 전체 선택"
-                      className="w-4 h-4 accent-[#3182F6] cursor-pointer align-middle"
+                      className="h-4 w-4 cursor-pointer accent-accent-fill align-middle"
                     />
                   </th>
-                  <Th label="LOT번호" field="lotNumber" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} thClassName="sticky left-0 z-30 bg-gray-50" />
-                  <Th label="최초입고일" field="firstInboundDate" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="품목명" field="productName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <th className={lotCls.cell()}>규격</th>
-                  <th className={lotCls.cell()}>미수</th>
-                  <Th numeric label="재고수량" field="stockQty" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th numeric label="총중량" field="stockWeight" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th numeric label="수매가" field="purchasePrice" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th numeric label="재고원가" field="costPerBox" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th numeric label="평가액" field="valuation" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="보관처" field="storageName" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th numeric label="보관일수" field="daysHeld" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} title="최초 입고일 기준 총 보관기간 (이동해도 원본 입고일 유지). 냉장료는 현 보관처 입고일 기준이라 더 짧을 수 있음." />
-                  <th className={lotCls.cell()}>상태</th>
-                  <th className={lotCls.cell()}>비고</th>
+                  {/* sticky 헤더 셀은 불투명 배경이 필요하다 (§7-3) */}
+                  <SortTh label="LOT번호" field="lotNumber" {...thProps} thClassName="sticky left-0 z-30 bg-surface-alt" />
+                  {/* §8-2 용어 사전: 표 헤더는 '품목'(필드 라벨일 때만 '품목명') */}
+                  <SortTh label="품목" field="productName" {...thProps} />
+                  <th className={cls.cell()}>규격</th>
+                  <th className={cls.cell()}>미수</th>
+                  <SortTh label="보관처" field="storageName" {...thProps} />
+                  <SortTh label="최초입고일" field="firstInboundDate" {...thProps} />
+                  <SortTh numeric label="재고수량" field="stockQty" {...thProps} />
+                  <SortTh numeric label="총중량" field="stockWeight" {...thProps} />
+                  <SortTh numeric label="수매가" field="purchasePrice" {...thProps} />
+                  <SortTh numeric label="재고원가" field="costPerBox" {...thProps} />
+                  <SortTh numeric label="평가액" field="valuation" {...thProps} />
+                  <SortTh
+                    numeric
+                    label="보관일수"
+                    field="daysHeld"
+                    {...thProps}
+                    title={`최초 입고일 기준 총 보관기간 (이동해도 원본 입고일 유지). 냉장료는 현 보관처 입고일 기준이라 더 짧을 수 있음. ${DAYS_WARN}일 이상 주의색, ${DAYS_DANGER}일 이상 위험색.`}
+                  />
+                  <th className={cls.cell()}>비고</th>
                 </tr>
               </thead>
               <tbody>
@@ -491,10 +526,12 @@ export default function LotsMasterPage() {
                         : undefined
                     }
                     title={l.lotNumber ? '클릭해 LOT 생애주기·원가 보기' : undefined}
-                    className={`border-t border-gray-100 hover:bg-blue-50/40 transition-colors ${l.lotNumber ? 'cursor-pointer' : ''}`}
+                    className={`group border-t border-border transition-colors hover:bg-surface-alt motion-reduce:transition-none ${
+                      l.lotNumber ? 'cursor-pointer' : ''
+                    }`}
                   >
                     <td
-                      className={lotCls.pad('cursor-pointer select-none')}
+                      className={cls.pad('cursor-pointer select-none')}
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => onSelectMouseDown(idx, l.id, e)}
                       onMouseEnter={() => {
@@ -506,92 +543,92 @@ export default function LotsMasterPage() {
                         checked={selected.has(l.id)}
                         readOnly
                         aria-label="선택"
-                        className="w-4 h-4 accent-[#3182F6] cursor-pointer align-middle pointer-events-none"
+                        className="pointer-events-none h-4 w-4 cursor-pointer accent-accent-fill align-middle"
                       />
                     </td>
-                    <td className={lotCls.cell('font-bold text-gray-900 sticky left-0 z-10 bg-white')}>
-                      {l.lotNumber || '-'}
+                    {/* sticky 칸도 행 hover 배경을 따라가야 한다 (§7-3).
+                        bg-surface로 고정하면 가로 스크롤 시 이 칸만 hover가 끊겨 행이 잘려 보인다.
+
+                        **이상 상태 배지가 여기 붙는다.** 전에는 14번째 '상태' 컬럼(x=1640px)에
+                        있었는데, DESIGN.md §1의 최소 지원 폭 1280px에서는 화면 밖이었다 —
+                        가로 스크롤해야 보이는 오류 표시는 오류를 못 잡는다. sticky라 항상 보이는
+                        이 칸으로 옮겼다. 정상 행에는 아무 표식도 없다(§6-2 '정상은 조용히'). */}
+                    <td className={cls.cell('sticky left-0 z-10 bg-surface text-body text-text group-hover:bg-surface-alt')}>
+                      <span className="inline-flex items-center gap-2">
+                        {l.lotNumber || '—'}
+                        {l.status && !isNormalLotStatus(l.status) && (
+                          <StatusBadge status={l.status} label={l.statusReason || l.status} />
+                        )}
+                      </span>
                     </td>
-                    <td className={lotCls.cell('text-gray-500')}>{l.firstInboundDate || '-'}</td>
-                    <td className={lotCls.cell('font-bold text-gray-900')}>{l.productName || '-'}</td>
-                    <td className={lotCls.cell('text-gray-500')}>{formatSpec(l.spec)}</td>
-                    <td className={lotCls.cell('text-gray-500')}>{formatMisu(l.misu)}</td>
+                    <td className={cls.cell('text-body text-text')}>{l.productName || '—'}</td>
+                    <td className={cls.cell('text-body text-text-muted')}>{formatSpec(l.spec)}</td>
+                    <td className={cls.cell('text-body text-text-muted')}>{formatMisu(l.misu)}</td>
+                    <td className={cls.cell('text-body text-text-muted')}>{l.storageName || '—'}</td>
+                    <td className={cls.cell('text-body text-text-muted')}>{l.firstInboundDate || '—'}</td>
+                    {/* 이 화면의 핵심 지표 — 값 컬럼 중 유일하게 액센트를 쓴다.
+                        재고 0은 '있음'의 반대라 액센트를 빼고 중립으로 가라앉힌다. */}
                     <NumCell
-                      className={lotCls.pad(`font-bold ${l.stockQty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`)}
+                      className={cls.pad(`text-body ${l.stockQty > 0 ? 'text-accent-ink' : 'text-text-muted'}`)}
                       value={l.stockQty}
                       unit="박스"
+                      empty="—"
                     />
                     <NumCell
-                      className={lotCls.pad('text-gray-600')}
+                      className={cls.pad('text-body text-text-muted')}
                       value={l.stockWeight > 0 ? l.stockWeight : null}
                       unit="kg"
+                      empty="—"
                     />
                     <NumCell
-                      className={lotCls.pad('text-gray-700')}
+                      className={cls.pad('text-body text-text-muted')}
                       value={l.purchasePrice > 0 ? l.purchasePrice : null}
                       unit="원"
+                      empty="—"
                     />
                     <NumCell
-                      className={lotCls.pad('text-gray-700')}
+                      className={cls.pad('text-body text-text-muted')}
                       value={l.costPerBox > 0 ? l.costPerBox : null}
                       unit="원"
+                      empty="—"
                     />
                     <NumCell
-                      className={lotCls.pad('font-bold text-gray-900')}
+                      className={cls.pad('text-body text-text')}
                       value={l.costPerBox > 0 ? l.valuation : null}
                       unit="원"
+                      empty="—"
                     />
-                    <td className={lotCls.cell('text-gray-600')}>{l.storageName || '-'}</td>
+                    {/* 오래 묵은 LOT은 냉장료가 계속 붙어 원가가 오른다 → 임계 넘으면 주의·위험색 */}
                     <NumCell
-                      className={lotCls.pad('text-gray-500')}
+                      className={cls.pad(`text-body ${l.firstInboundDate ? daysHeldTone(l.daysHeld) : 'text-text-muted'}`)}
                       value={l.firstInboundDate ? l.daysHeld : null}
                       unit="일"
+                      empty="—"
                     />
-                    <td className={lotCls.cell()}>
-                      {!l.status ? (
-                        <span className="text-gray-300">-</span>
-                      ) : l.status === '승인 완료' ? (
-                        // 활성 LOT(대다수)은 조용한 점 — 상세 사유는 tooltip. 예외 상태만 배지로 강조.
-                        <span className="inline-flex items-center" title={l.statusReason || l.status}>
-                          <span className="w-2 h-2 rounded-full bg-green-400" />
-                        </span>
-                      ) : (
-                        <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold ${statusColor(l.status)}`}>
-                          {l.statusReason || l.status}
-                        </span>
-                      )}
-                    </td>
-                    <td className={lotCls.clamp('text-gray-500')} title={l.memo || undefined}>
-                      {l.memo || <span className="text-gray-300">-</span>}
+                    <td className={cls.clamp('text-body text-text-muted')} title={l.memo || undefined}>
+                      {l.memo || '—'}
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-gray-200 bg-gray-50 font-black text-gray-800 text-[13px]">
-                  <td className={lotCls.pad()} colSpan={6}>
+                {/* colSpan 7 = check·LOT번호·품목·규격·미수·보관처·최초입고일 (좌측 텍스트 묶음).
+                    뒤로 숫자 6칸 + 비고 1칸 = 총 14열. 컬럼을 더하거나 뺄 때 여기도 같이 고칠 것. */}
+                <tr className="border-t border-border bg-surface-alt text-body text-text">
+                  <td className={cls.pad()} colSpan={7}>
                     합계{' '}
-                    <span className="text-gray-400 font-bold">
+                    <span className="text-text-muted">
                       ({summaryIsSelection ? `선택 ${selectedVisible.length}건` : `${visible.length}건`})
                     </span>
                   </td>
-                  <NumCell className={lotCls.pad('text-[#3182F6]')} value={sumQty} unit="박스" />
-                  <NumCell
-                    className={lotCls.pad('text-gray-700')}
-                    value={sumWeight > 0 ? sumWeight : null}
-                    unit="kg"
-                  />
-                  <td className={lotCls.pad()} />
-                  <td className={lotCls.pad()} />
-                  <NumCell
-                    className={lotCls.pad('text-gray-900')}
-                    value={sumVal > 0 ? sumVal : null}
-                    unit="원"
-                  />
-                  <td className={lotCls.pad()} />
-                  <td className={lotCls.pad()} />
-                  <td className={lotCls.pad()} />
-                  <td className={lotCls.pad()} />
+                  {/* 합계도 본문과 같은 색 규칙 — 재고수량만 액센트 */}
+                  <NumCell className={cls.pad('text-accent-ink')} value={sumQty} unit="박스" empty="—" />
+                  <NumCell className={cls.pad()} value={sumWeight > 0 ? sumWeight : null} unit="kg" empty="—" />
+                  <td className={cls.pad()} />
+                  <td className={cls.pad()} />
+                  <NumCell className={cls.pad()} value={sumVal > 0 ? sumVal : null} unit="원" empty="—" />
+                  <td className={cls.pad()} />
+                  <td className={cls.pad()} />
                 </tr>
               </tfoot>
             </table>
@@ -603,48 +640,76 @@ export default function LotsMasterPage() {
 }
 
 // ── 컬럼 폭 (표준: app/admin/_table-cols — 잘림 없이 전부 표시 + 넘치면 가로 스크롤)
-// px = 실측 내용 최댓값 + 여유 8 + 좌우 패딩 32(px-4).
-// 실측 근거: 2026-07-28 Airtable `LOT별 재고` 200건 전량의 표시 문자열.
-// 정렬 헤더(Th)는 ↕ 아이콘 18px이 더 붙으므로 그 하한도 함께 반영.
+// px = 내용 최댓값 + 여유 8 + 좌우 패딩 32(px-4).
+//
+// 실측 근거: 2026-07-28 Airtable `LOT별 재고` 200건 전량의 표시 문자열(13px 기준).
+// ⚠ 2026-07-29 셀 글자를 13px → text-body(14px)로 올리며(§3 타입 스케일) 폭을 14/13 = 1.077배로
+//   환산했다. **브라우저 재실측이 아니라 산술 환산이다** — 실제 렌더 폭과 1~2px 어긋날 수 있다.
+//   헤더는 text-label(12px)로 그대로라 헤더가 하한인 컬럼은 값이 유지된다.
+//   (정렬 아이콘만 14 → 16px로 커져 +2px 반영.)
+// ── 컬럼 순서 (2026-07-29 재정렬) ─────────────────────────────────────────────
+// **좌측 정렬(텍스트) 묶음 → 우측 정렬(숫자) 묶음 → 비고** 순으로 뭉친다.
+// 전에는 …평가액(우) │ 보관처(좌) │ 보관일수(우)… 로 좌우가 세 번 갈렸다. 시선이 매 행마다
+// 지그재그로 튀고, 좌측 텍스트가 양옆 숫자 사이에 떠 보인다. 이제 좌우 전환이 한 번뿐이다.
+//
+// §7-6은 정렬 방향만 정한다(계산되는 수=우측 / 식별자·라벨=좌측). 보관처는 '거래처'류라
+// 좌측이 맞고, 어색함의 원인은 정렬이 아니라 순서였다 — 정렬을 바꾸지 않고 순서로 푼다.
+//
+// 2026-07-25 journal의 "최초입고일을 정체성 묶음 앞에서 보관처↔보관일수 사이로" 의도도
+// 함께 반영했다(그 작업은 코드에 반영되기 전에 유실됐다). 품목이 LOT번호 바로 옆이 되고,
+// 최초입고일은 앞머리에서 빠져 텍스트 묶음 끝으로 간다.
 const LOT_COLS: TableCol[] = [
   { key: 'check', label: '', px: 48 },
-  { key: 'lotNumber', label: 'LOT번호', px: 248 },      // max 206 `251002-MA1-21.5/22-점70/80-0008`
-  { key: 'firstInboundDate', label: '최초입고일', px: 124 }, // 헤더(65+18)가 하한
-  { key: 'productName', label: '품목명', px: 152 },      // max 111 `사료 (BOAR FISH)`
-  { key: 'spec', label: '규격', px: 100 },               // max 59 `11.5~12kg`
-  { key: 'misu', label: '미수', px: 104 },               // max 62 `70/120G미`
-  { key: 'stockQty', label: '재고수량', px: 112, numeric: true },  // max 59 `1,000박스`
-  { key: 'stockWeight', label: '총중량', px: 100, numeric: true }, // max 55 `11,245kg`
-  { key: 'purchasePrice', label: '수매가', px: 100, numeric: true }, // max 60 `104,000원`
-  { key: 'costPerBox', label: '재고원가', px: 112, numeric: true },  // 헤더(52+18)가 하한
-  { key: 'valuation', label: '평가액', px: 128, numeric: true },     // max 86 `156,307,899원`
-  { key: 'storageName', label: '보관처', px: 140 },      // max 98 `신우농수산2공장`
-  { key: 'daysHeld', label: '보관일수', px: 112, numeric: true },    // 헤더(52+18)가 하한
-  { key: 'status', label: '상태', px: 112 },             // 상태사유 배지 `이동 입고` 등
+  // 이상 상태 배지가 이 셀 안에 붙는다(아래 주석 참조) → 배지 폭 46 + 간격 8 만큼 넓혔다.
+  { key: 'lotNumber', label: 'LOT번호', px: 320 },      // 206→222 `251002-MA1-21.5/22-점70/80-0008`
+  { key: 'productName', label: '품목', px: 160 },        // 111→120 `사료 (BOAR FISH)`
+  { key: 'spec', label: '규격', px: 104 },               // 59→64 `11.5~12kg`
+  { key: 'misu', label: '미수', px: 108 },               // 62→67 `70/120G미`
+  { key: 'storageName', label: '보관처', px: 148 },      // 98→106 `신우농수산2공장`
+  { key: 'firstInboundDate', label: '최초입고일', px: 128 }, // 헤더(65+16+4)가 하한
+  { key: 'stockQty', label: '재고수량', px: 112, numeric: true },  // 헤더(48+16+4=68)가 하한
+  { key: 'stockWeight', label: '총중량', px: 100, numeric: true }, // 55→59 `11,245kg`
+  { key: 'purchasePrice', label: '수매가', px: 108, numeric: true }, // 60→65 `104,000원`
+  { key: 'costPerBox', label: '재고원가', px: 112, numeric: true },  // 헤더(48+16+4=68)가 하한
+  { key: 'valuation', label: '평가액', px: 136, numeric: true },     // 86→93 `156,307,899원`
+  { key: 'daysHeld', label: '보관일수', px: 112, numeric: true },    // 헤더(48+16+4=68)가 하한
   // 비고만 「말줄임 금지」 예외(clamp) — 자유 텍스트라 최댓값을 예측할 수 없다.
-  // 실측 max 265지만 상한 240으로 묶고 넘치면 말줄임 + title 툴팁.
+  // 상한 240은 실측이 아니라 정책값이므로 글자 크기 환산 대상이 아니다.
   { key: 'memo', label: '비고', px: 240, clamp: true },
 ];
 const LOT_MIN_WIDTH = tableMinWidth(LOT_COLS);
-const lotCls = makeCellClasses('px-4');
+// py-2 + body(14×1.5=21) + border 1 = 38px 행 높이 (§7-7)
+const cls = makeCellClasses('px-4', 'py-2');
 
-// 색은 라이프사이클 상태에 매핑: 승인 완료(녹색)/소진(회색)/반려(빨강)/취소(연빨강)
-function statusColor(status: string): string {
-  switch (status) {
-    case '승인 완료':
-      return 'bg-green-100 text-green-700';
-    case '소진':
-      return 'bg-gray-100 text-gray-500';
-    case '승인 대기':
-      return 'bg-[#3182F6]/10 text-[#3182F6]';
-    case '반려':
-      return 'bg-red-50 text-red-500';
-    case '취소':
-      return 'bg-red-50 text-red-400';
-    default:
-      return 'bg-gray-50 text-gray-400';
-  }
+// ── 색 운용 원칙 (DESIGN.md §2-3: 한 화면 액센트 최대 2종) ─────────────────────
+// **색은 "찾는 값"과 "예외"에만 준다.** 전부에 색을 주면 아무것도 강조되지 않는다.
+//   accent-ink  재고수량 — 이 화면에 온 이유. 값 컬럼 중 유일한 액센트.
+//   warn/danger 보관일수 임계 초과 — 상태 배지와 같은 계열을 재사용한다(새 색 도입 아님).
+//   text        LOT번호·평가액 — 액센트가 아니라 가장 진한 중립으로 위계를 만든다(§3).
+//   text-muted  나머지 전부.
+// LOT번호에 `--link`(§2-2)를 쓰지 않은 이유: 클릭 대상은 셀이 아니라 **행 전체**다.
+// 링크색을 주면 그 칸만 눌러야 하는 것처럼 읽힌다. 행 hover + cursor로 이미 알린다.
+
+/**
+ * 보관일수 경고 임계.
+ *
+ * ⚠ **업무 규칙으로 확정된 값이 아니다.** 냉장료가 하루 단위로 붙어 오래 묵을수록 원가가
+ *   오르므로 오래된 LOT을 눈에 띄게 한 것뿐이다. (필터 placeholder가 '예: 90'인 것에서 90을 땄다.)
+ *   실제 악성재고 기준이 정해지면 이 두 줄만 고친다.
+ */
+const DAYS_WARN = 90;
+const DAYS_DANGER = 180;
+
+/** 보관일수 → 글자색. 숫자 자체가 정보이고 색은 강조일 뿐이다(§6-2 '색만으로 표현 금지' 충족). */
+function daysHeldTone(days: number): string {
+  if (days >= DAYS_DANGER) return 'text-danger-ink';
+  if (days >= DAYS_WARN) return 'text-warn-ink';
+  return 'text-text-muted';
 }
+
+/** 카드 안에 놓이는 입력 — 배경은 --surface-alt (§6-3). 카드 밖 검색창만 --surface. */
+const FIELD =
+  'h-control w-full rounded-control border border-border bg-surface-alt px-3 text-body text-text outline-none placeholder:text-text-faint focus:border-transparent focus:ring-2 focus:ring-accent-fill';
 
 function FilterField({
   label,
@@ -659,46 +724,34 @@ function FilterField({
   placeholder?: string;
   className?: string;
 }) {
+  const id = `lot-filter-${label}`;
   return (
     <div className={className}>
-      <label className="block text-[12px] font-bold text-gray-500 mb-1">{label}</label>
+      <label className="mb-2 block text-label text-text-muted" htmlFor={id}>
+        {label}
+      </label>
       <input
+        id={id}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-[14px] font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+        className={FIELD}
       />
     </div>
   );
 }
 
-function StatusChip({
-  label,
-  active,
-  count,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  count: number;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-2 rounded-xl text-[12px] font-bold transition-colors ${
-        active
-          ? 'bg-[#3182F6] text-white'
-          : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-      }`}
-    >
-      {label} <span className={active ? 'text-blue-100' : 'text-gray-400'}>{count}</span>
-    </button>
-  );
-}
-
-function Th({
+/**
+ * 정렬 가능한 헤더 (§7-8).
+ *
+ * · 헤더 내용을 `<button>`으로 감싼다 — `<th onClick>`은 키보드로 조작할 수 없다.
+ * · `aria-sort`는 columnheader인 `<th>`에 붙는다.
+ * · **아이콘은 라벨의 정렬 반대편**: 좌측 정렬 컬럼은 라벨 오른쪽, 우측 정렬(숫자) 컬럼은
+ *   라벨 왼쪽. 그래야 숫자 헤더의 우측선이 값의 우측선과 일치한다.
+ * · 패딩은 th가 아니라 button이 가져간다 — 클릭 영역이 헤더 칸 전체가 되도록.
+ */
+function SortTh({
   label,
   field,
   sortField,
@@ -718,28 +771,25 @@ function Th({
   numeric?: boolean;
   thClassName?: string;
 }) {
-  const Icon =
-    sortField === field
-      ? sortDir === 'asc'
-        ? ChevronUpIcon
-        : ChevronDownIcon
-      : ArrowsUpDownIcon;
+  const state = sortState(sortField === field, sortDir);
   return (
     <th
-      onClick={() => onToggle(field)}
+      aria-sort={ariaSort(state)}
       title={title}
-      className={`whitespace-nowrap px-4 py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors ${
-        numeric ? NUM_CELL : ''
-      } ${thClassName}`}
+      className={`whitespace-nowrap p-0 ${numeric ? NUM_CELL : ''} ${thClassName}`.trim()}
     >
-      <span className="inline-flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onToggle(field)}
+        className={`group flex w-full cursor-pointer select-none items-center gap-1 px-4 py-2 transition-colors hover:text-accent-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-fill motion-reduce:transition-none ${
+          numeric ? 'justify-end' : 'text-left'
+        }`}
+      >
+        {/* 우측 정렬 컬럼은 아이콘이 라벨 왼쪽 (§7-8) */}
+        {numeric && <SortIcon state={state} />}
         {label}
-        <Icon
-          className={`w-3.5 h-3.5 ${
-            sortField === field ? 'text-[#3182F6]' : 'text-gray-300'
-          }`}
-        />
-      </span>
+        {!numeric && <SortIcon state={state} />}
+      </button>
     </th>
   );
 }

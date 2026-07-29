@@ -124,14 +124,39 @@ async function fetchStorageNameMap(): Promise<Record<string, string>> {
   return map;
 }
 
-export async function listLots(adminWorkerId: string): Promise<Result<Lot[]>> {
+/**
+ * 조회 범위 — **서버에서 거른다.**
+ *
+ * 예전엔 전량을 받아 화면에서 걸렀다. 소진 LOT은 출고가 끝나도 영구히 남으므로 시간이
+ * 갈수록 매 조회가 무거워진다(2026-07-29 시점 ~200건, 월 10~20건 증가).
+ * 재고 조회는 활성만 필요하므로 애초에 활성만 받아온다.
+ *
+ * · active   재고수량 > 0 — 재고 조회(운영). 재고장 인쇄 대상.
+ * · depleted 재고수량 = 0 — 소진 LOT(이력). **소진뿐 아니라 반려·취소도 여기 들어온다**
+ *            (반려·취소는 soft delete로 재고수량 0이 된다). 어느 화면에도 안 나오는
+ *            LOT이 생기지 않게 하려는 것 — 이상 상태는 그 화면의 경고 배너가 잡는다.
+ * · all      전량 — 재고 집계는 소진 포함 토글이 있어 둘 다 필요하다.
+ */
+export type LotScope = "active" | "depleted" | "all";
+
+/** Airtable formula. 빈 재고수량은 Airtable에서 0으로 비교되므로 depleted에 포함된다. */
+const SCOPE_FORMULA: Record<LotScope, string | null> = {
+  active: "{재고수량}>0",
+  depleted: "{재고수량}=0",
+  all: null,
+};
+
+export async function listLots(
+  adminWorkerId: string,
+  scope: LotScope = "all",
+): Promise<Result<Lot[]>> {
   const auth = await ensureAdmin(adminWorkerId, TAG);
   if (!auth.success) return { success: false, error: auth.error };
 
   try {
     // LOT 페이지네이션 + 보관처명 맵을 병렬로
     const [lotsRaw, storageMap] = await Promise.all([
-      fetchAllLots(),
+      fetchAllLots(SCOPE_FORMULA[scope]),
       fetchStorageNameMap(),
     ]);
     const asOfDate = seoulDateString();
@@ -143,13 +168,14 @@ export async function listLots(adminWorkerId: string): Promise<Result<Lot[]>> {
   }
 }
 
-async function fetchAllLots(): Promise<
-  { id: string; fields?: Record<string, unknown> }[]
-> {
+async function fetchAllLots(
+  formula: string | null,
+): Promise<{ id: string; fields?: Record<string, unknown> }[]> {
   const items: { id: string; fields?: Record<string, unknown> }[] = [];
   let offset: string | undefined;
   do {
     const params = new URLSearchParams({ pageSize: "100" });
+    if (formula) params.set("filterByFormula", formula);
     if (offset) params.set("offset", offset);
     const data = (await fetchAirtable(`${TABLE_PATH}?${params}`)) as {
       records?: { id: string; fields?: Record<string, unknown> }[];
