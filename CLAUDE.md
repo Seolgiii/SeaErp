@@ -2,7 +2,7 @@
 
 기술 스택: Next.js 15 + Airtable + Vercel + zod + Vitest + Resend + Anthropic SDK
 개발 방식: 1인 기획/개발 + Claude Code
-현재 버전: v0.13.0 · 277 커밋 / 활동 46일 (2026-04-17 ~ 07-28)
+현재 버전: v0.14.0 · 280 커밋 / 활동 47일 (2026-04-17 ~ 07-29)
 로드맵·목표 진행 현황: `docs/ROADMAP.md` (2026-07-29 갱신)
 
 ## 규칙
@@ -10,6 +10,12 @@
   C:\Users\user\Documents\Obsidian\SEAERP\DESIGN.md
   (WSL 경로: /mnt/c/Users/user/Documents/Obsidian/SEAERP/DESIGN.md — Claude Code는 이 경로로 읽는다)
 - 색상·폰트·간격을 임의로 지정하지 말 것.
+
+■ 최근 변경 (2026-07-29)
+- **재고 조회 DESIGN.md 적용 + 소진 LOT 화면 분리 (v0.14.0)** — 토큰·공통 컴포넌트 확산 2번째 화면. `<StatusBadge>`·`lib/status.ts`(상태 문자열 상수) 신설로 §6-1 미구현 항목 해소. 정렬 헤더 `aria-sort`(키보드 조작 불가였음), 컬럼 좌/우 정렬 묶음 재정렬(전환 3→1회), 색은 재고수량(accent) + 보관일수 임계(warn/danger)만. **소진 LOT은 `/admin/master/lots-depleted`로 분리** — 서버 `filterByFormula` scope(active/depleted/all)로 걸러 재고 조회는 활성만 받는다. 재고장 인쇄에 소진이 섞이는 경로를 구조로 차단.
+- **문서 현행화** — `docs/ROADMAP.md`가 2026-05-12자였던 것을 실측 대조로 갱신(Phase 상태·IA 6→7 카테고리·완료 기준 미충족 명시) + **「현장 발생 트랙」 신설**(계획 밖에서 자란 5갈래). CLAUDE.md 테스트 수치·중장기 목표 현황 정정.
+- **⚠️ 2026-07-25 작업 유실 확인** — 탭바 tear-off 휴면화가 워킹트리·stash·전 브랜치 어디에도 없다(`ENABLE_TEAROFF` 코드 이력 0건). **tear-off 오발동은 현재 활성 — 재작업 필요.** 같은 날 컬럼 재정렬분은 오늘 복원됨.
+- **미완**: 컬럼 폭 육안 확인(13→14px 산술 환산), 보관일수 90/180일 임계 업무 규칙 미확정, 재고 집계·거래 이력 토큰 미확산, `origin/main` 미푸시.
 
 ■ 최근 변경 (2026-07-28)
 - **디자인 토큰 + 공통 컴포넌트 도입** — `tailwind.config.ts`에 색·타이포·radius·컨트롤높이 토큰, `app/globals.css`에 **표면별 값**(기본=모바일 / `[data-surface='admin']`=PC, radius 6/12/16·높이 32). `app/components/ui/` 5종 신설(Button·EmptyState·LoadingState·SortIcon·Modal). 마스터 5화면(storage/products/ships/workers/suppliers)+모달에 확산. **Modal은 일부러 포털 안 함**(포털하면 admin 서브트리를 벗어나 모바일 토큰을 받음).
