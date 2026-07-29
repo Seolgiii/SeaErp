@@ -33,8 +33,18 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/admin/master/lots', label: '재고 조회', enabled: true },
       { href: '/admin/master/inventory-summary', label: '재고 집계', enabled: true },
-      // LOT 생애주기는 메뉴에서 제외 — 재고 조회 행 클릭으로 진입하는 drill-down 상세.
+      // 2026-07-29: 소진 LOT을 재고 조회에서 분리. 상태 칩(활성/소진/전체)은 함께 제거.
+      //   ① 재고장 인쇄 안전 — 재고 조회는 인쇄해서 재고장이 되는데, 칩을 '전체'로 바꾸면
+      //      소진 LOT까지 선택·인쇄할 수 있었다. 화면을 갈라 구조로 막는다.
+      //   ② 소진은 영구히 쌓인다 — 서버 scope로 걸러 재고 조회가 안 무거워지게.
+      //   명칭: '재고 이력'을 검토했으나 아래 '거래 이력' 그룹(입고/출고/이동/지출 이력)과
+      //   헷갈려 기각했다. 과거 '결재 이력·검색'을 없앤 것과 같은 이유(§8-2 '이력' 명사 충돌).
+      //   '소진'은 LOT 상태값이자 재고 집계 토글이 이미 쓰는 말이라 새 용어가 아니다.
+      { href: '/admin/master/lots-depleted', label: '소진 LOT', enabled: true },
+      // LOT 생애주기는 메뉴에서 제외 — 재고 조회·소진 LOT 행 클릭으로 진입하는 drill-down 상세.
       //   라우트(/admin/master/lot-timeline)는 그대로 존재하며 ?lot= 으로 자동 조회.
+      //   ⚠ 소진 LOT을 분리한 덕에 소진된 LOT의 생애주기도 LOT 단위로 찾아갈 수 있게 됐다.
+      //     (전에는 재고 조회 칩을 바꾸거나 거래 이력에서 출고 건을 찾아 들어가야 했다.)
       // 음수·이상 LOT 모니터는 시스템·운영 카테고리로 이동.
     ],
   },
