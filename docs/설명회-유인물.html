@@ -1,0 +1,933 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SEAERP 설명 자료</title>
+<style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0}img,svg{display:block;max-width:100%}</style>
+</head><body>
+<title>SEAERP 설명 자료</title>
+
+<style>
+  /* ─────────────────────────────────────────────
+     팔레트 — SEAERP DESIGN.md v0.4.2 토큰.
+     인쇄물은 DESIGN.md가 정의한 두 표면(모바일/admin) 밖이므로
+     색은 그대로 따르고 타입 스케일만 종이 기준으로 조정한다.
+
+     인쇄 원칙: 1 .sheet = A4 1장. 넘치지 않도록 print에서
+     타입·간격을 별도 축소하고, 면당 내용량 자체를 제한한다.
+     ───────────────────────────────────────────── */
+  :root {
+    --ground: #F4F5F7;
+    --paper: #FFFFFF;
+    --alt: #F4F5F7;
+    --rule: #E3E5E9;
+    --rule-soft: #EDEEF1;
+    --ink: #14171C;
+    --ink-muted: #646B78;
+    --pri-fill: #1C6CE0;
+    --pri-ink: #235C82;
+    --pri-surface: #DCEAF5;
+    --ok-ink: #1F6644;
+    --ok-surface: #DDEFE4;
+    --warn-ink: #7A5510;
+    --warn-surface: #F7EBD6;
+
+    --measure: 64ch;
+    --sheet-pad: 22mm 20mm;
+
+    /* 간격 토큰 — print에서 한 번에 줄인다 */
+    --gap-stack: 26px;
+    --gap-tight: 12px;
+    --pad-box: 18px;
+    --pad-cell: 9px 10px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0F1216; --paper: #171B21; --alt: #1E232B;
+      --rule: #2C323C; --rule-soft: #242A32;
+      --ink: #E7EAEE; --ink-muted: #9AA3B0;
+      --pri-fill: #4C8FEE; --pri-ink: #9CC6F2; --pri-surface: #16293F;
+      --ok-ink: #86CBA5; --ok-surface: #14291E;
+      --warn-ink: #DDB871; --warn-surface: #2B2114;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F1216; --paper: #171B21; --alt: #1E232B;
+    --rule: #2C323C; --rule-soft: #242A32;
+    --ink: #E7EAEE; --ink-muted: #9AA3B0;
+    --pri-fill: #4C8FEE; --pri-ink: #9CC6F2; --pri-surface: #16293F;
+    --ok-ink: #86CBA5; --ok-surface: #14291E;
+    --warn-ink: #DDB871; --warn-surface: #2B2114;
+  }
+  :root[data-theme="light"] {
+    --ground: #F4F5F7; --paper: #FFFFFF; --alt: #F4F5F7;
+    --rule: #E3E5E9; --rule-soft: #EDEEF1;
+    --ink: #14171C; --ink-muted: #646B78;
+    --pri-fill: #1C6CE0; --pri-ink: #235C82; --pri-surface: #DCEAF5;
+    --ok-ink: #1F6644; --ok-surface: #DDEFE4;
+    --warn-ink: #7A5510; --warn-surface: #F7EBD6;
+  }
+
+  /* 한글 웹폰트는 data URI로 인라인하기엔 너무 커서 시스템 스택을 쓴다.
+     역할 구분은 서체가 아니라 굵기·크기·자간으로 만든다. */
+  .doc {
+    font-family: "Pretendard Variable", Pretendard, -apple-system,
+      "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", "Noto Sans KR", sans-serif;
+    background: var(--ground);
+    color: var(--ink);
+    line-height: 1.75;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .sheet {
+    background: var(--paper);
+    width: 100%;
+    max-width: 210mm;
+    padding: var(--sheet-pad);
+    border: 1px solid var(--rule);
+    box-sizing: border-box;
+  }
+
+  /* ── 타이포 ── */
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: .14em;
+    color: var(--ink-muted); margin: 0 0 12px;
+  }
+  h1 {
+    font-size: 40px; font-weight: 700; letter-spacing: -.03em;
+    line-height: 1.15; margin: 0; text-wrap: balance;
+  }
+  .subtitle {
+    font-size: 16px; font-weight: 400; color: var(--ink-muted);
+    margin: 10px 0 0; max-width: var(--measure); line-height: 1.65;
+  }
+  h2 {
+    font-size: 22px; font-weight: 700; letter-spacing: -.02em;
+    line-height: 1.3; margin: 0; text-wrap: balance;
+  }
+  h3 { font-size: 16px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+  p { margin: 0; max-width: var(--measure); }
+  .muted { color: var(--ink-muted); }
+  .small { font-size: 14px; }
+  .xs { font-size: 13px; line-height: 1.6; }
+
+  .sheet-head {
+    display: flex; flex-direction: column; gap: 10px;
+    padding-bottom: 16px; border-bottom: 2px solid var(--ink);
+    margin-bottom: 22px;
+  }
+  .sheet-head.plain { border-bottom-width: 1px; border-bottom-color: var(--rule); }
+  .sheet-num {
+    font-size: 12px; font-weight: 600; letter-spacing: .12em;
+    color: var(--ink-muted); font-variant-numeric: tabular-nums;
+  }
+
+  .stack { display: flex; flex-direction: column; gap: var(--gap-stack); }
+  .stack-tight { display: flex; flex-direction: column; gap: var(--gap-tight); }
+
+  .callout {
+    background: var(--alt); padding: var(--pad-box);
+    border-left: 3px solid var(--rule); font-size: 15px; max-width: none;
+    line-height: 1.7; break-inside: avoid;
+  }
+  .callout.pri {
+    background: var(--pri-surface); color: var(--pri-ink); border-left-color: var(--pri-fill);
+  }
+  .callout p { max-width: none; }
+
+  /* ── 순서 있는 단계 ── */
+  .journey { display: flex; flex-direction: column; }
+  .step {
+    display: grid; grid-template-columns: 28px 1fr; gap: 14px;
+    padding: 12px 0; border-top: 1px solid var(--rule-soft); break-inside: avoid;
+  }
+  .step:first-child { border-top: none; padding-top: 0; }
+  .step-n {
+    font-size: 13px; font-weight: 700; color: var(--pri-ink);
+    font-variant-numeric: tabular-nums; padding-top: 2px;
+  }
+  .step-body { display: flex; flex-direction: column; gap: 2px; }
+  .step-body .what { font-size: 14px; color: var(--ink-muted); line-height: 1.6; }
+
+  /* ── 목록 ── */
+  ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  ul li { font-size: 15px; padding-left: 14px; position: relative; line-height: 1.55; }
+  ul li::before {
+    content: ""; position: absolute; left: 0; top: .66em;
+    width: 5px; height: 1px; background: var(--ink-muted);
+  }
+  ul.tight li { font-size: 14px; }
+  b { font-weight: 600; }
+
+  /* ── 표 ── */
+  .tw { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: var(--pad-cell); border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    font-size: 12px; font-weight: 600; color: var(--ink-muted);
+    border-bottom: 1px solid var(--rule); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { break-inside: avoid; }
+
+  /* ── 연결 매트릭스 ── */
+  .matrix { font-size: 13px; }
+  .matrix th, .matrix td { padding: 7px 6px; }
+  .matrix thead th { text-align: center; font-size: 11px; line-height: 1.3; white-space: normal; }
+  .matrix thead th:first-child { text-align: left; }
+  .matrix tbody th {
+    font-weight: 600; font-size: 13px; white-space: nowrap;
+    border-bottom: 1px solid var(--rule-soft); color: var(--ink);
+  }
+  .matrix td { text-align: center; font-size: 13px; }
+  .dot { color: var(--pri-fill); font-weight: 700; }
+  .dot-i { color: var(--ink-muted); }
+  .legend { display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px; color: var(--ink-muted); }
+
+  /* ── 입력 대 자동 ── */
+  .chain { border: 1px solid var(--rule); break-inside: avoid; }
+  .chain-head {
+    padding: 11px 14px; border-bottom: 1px solid var(--rule);
+    background: var(--alt); display: flex; justify-content: space-between;
+    align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  .chain-head .t { font-size: 15px; font-weight: 600; }
+  .chain-head .s { font-size: 13px; color: var(--ink-muted); }
+  .chain-cols { display: grid; grid-template-columns: 1fr 1.35fr; }
+  .chain-col { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .chain-col + .chain-col { border-left: 1px solid var(--rule); }
+  .chain-tag {
+    font-size: 12px; font-weight: 600; letter-spacing: .06em;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .chain-tag .n {
+    font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;
+    padding: 1px 7px; border-radius: 999px;
+  }
+  .tag-in { color: var(--ink); }
+  .tag-in .n { background: var(--ink); color: var(--paper); }
+  .tag-auto { color: var(--pri-ink); }
+  .tag-auto .n { background: var(--pri-fill); color: #FFFFFF; }
+  .chain-col ul { gap: 6px; }
+  .chain-col ul li { font-size: 13.5px; }
+  .chain-col p { max-width: none; }
+  .src { color: var(--ink-muted); font-size: 12px; }
+
+  /* ── 2열 ── */
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--rule); }
+  .col { padding: 16px; display: flex; flex-direction: column; gap: 11px; break-inside: avoid; }
+  .col + .col { border-left: 1px solid var(--rule); }
+  .col p { max-width: none; }
+  .col-tag { font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--ink-muted); }
+
+  /* ── 상태 박스 ── */
+  .box { padding: var(--pad-box); display: flex; flex-direction: column; gap: 11px; break-inside: avoid; }
+  .box p { max-width: none; }
+  .box.ok { background: var(--ok-surface); color: var(--ok-ink); }
+  .box.ok h3, .box.ok p { color: var(--ok-ink); }
+  .box.ok ul li::before { background: var(--ok-ink); }
+  .box.warn { background: var(--warn-surface); color: var(--warn-ink); }
+  .box.warn h3, .box.warn p { color: var(--warn-ink); }
+  .box.warn ul li::before { background: var(--warn-ink); }
+
+  /* ── 의견 양식 ── */
+  .form-q { display: flex; flex-direction: column; gap: 8px; padding: 13px 0; break-inside: avoid; }
+  .form-q + .form-q { border-top: 1px solid var(--rule-soft); }
+  .form-label { font-size: 15px; font-weight: 600; }
+  .form-hint { font-size: 13px; color: var(--ink-muted); margin-top: -5px; line-height: 1.55; }
+  .lines { display: flex; flex-direction: column; }
+  .line { border-bottom: 1px solid var(--rule); height: 28px; }
+  .who {
+    display: flex; gap: 26px; align-items: flex-end; padding-top: 16px;
+    margin-top: 4px; border-top: 1px solid var(--rule); flex-wrap: wrap;
+  }
+  .who-field { display: flex; align-items: baseline; gap: 10px; flex: 1 1 180px; }
+  .who-label { font-size: 14px; color: var(--ink-muted); white-space: nowrap; }
+  .who-line { border-bottom: 1px solid var(--rule); flex: 1; height: 24px; }
+
+  .footer {
+    margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--rule);
+    font-size: 13px; color: var(--ink-muted);
+    display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+
+  /* ── 화면 (좁은 폭) ── */
+  @media (max-width: 760px) {
+    :root { --sheet-pad: 24px 18px; }
+    .doc { padding: 16px 10px 40px; font-size: 15px; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 19px; }
+    .cols2, .chain-cols { grid-template-columns: 1fr; }
+    .col + .col, .chain-col + .chain-col { border-left: none; border-top: 1px solid var(--rule); }
+  }
+
+  /* ═══════════ 인쇄 (A4 · 1 sheet = 1 page) ═══════════
+     여백을 CSS에서 12mm로 고정해 브라우저 기본 여백에 좌우되지 않게 한다.
+     사용 가능 높이 = 297 - 24 = 273mm. 아래 축소값은 이 높이 기준. */
+  @page { size: A4 portrait; margin: 12mm; }
+
+  @media print {
+    :root {
+      --ground: #FFFFFF; --paper: #FFFFFF; --alt: #F4F5F7;
+      --rule: #D8DBE0; --rule-soft: #E6E8EC;
+      --ink: #14171C; --ink-muted: #5A616D;
+      --pri-fill: #1C6CE0; --pri-ink: #235C82; --pri-surface: #DCEAF5;
+      --ok-ink: #1F6644; --ok-surface: #DDEFE4;
+      --warn-ink: #7A5510; --warn-surface: #F7EBD6;
+
+      /* 간격 일괄 축소 */
+      --gap-stack: 12px;
+      --gap-tight: 7px;
+      --pad-box: 11px 13px;
+      --pad-cell: 5px 7px;
+    }
+
+    /* 조각화(page break)를 막는 조상 제거.
+       래퍼가 overflow:hidden 이나 고정 height를 걸면 브라우저가
+       break-after를 무시하고 빈 쪽을 만든다. */
+    html, body {
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #FFFFFF !important;
+      display: block !important;
+    }
+
+    .doc {
+      padding: 0; gap: 0; display: block;
+      font-size: 10pt; line-height: 1.5; background: #FFFFFF;
+      height: auto !important; min-height: 0 !important; overflow: visible !important;
+    }
+    .sheet {
+      max-width: none; width: auto; padding: 0; border: none;
+      display: block; overflow: visible;
+      break-after: page; page-break-after: always;   /* 신·구 속성 병기 */
+      break-inside: auto; page-break-inside: auto;
+    }
+    .sheet:last-child { break-after: auto; page-break-after: auto; }
+
+    /* 타입 축소 */
+    h1 { font-size: 24pt; }
+    h2 { font-size: 14pt; }
+    h3 { font-size: 11pt; }
+    .subtitle { font-size: 10pt; line-height: 1.5; margin-top: 7px; }
+    .eyebrow, .sheet-num { font-size: 8.5pt; margin-bottom: 8px; }
+    .sheet-head { gap: 7px; padding-bottom: 11px; margin-bottom: 15px; }
+
+    ul { gap: 5px; }
+    ul li { font-size: 10pt; line-height: 1.45; }
+    ul.tight li { font-size: 9.5pt; }
+    p.small, .callout { font-size: 9.5pt; line-height: 1.55; }
+    .xs, .form-hint, .src, .legend { font-size: 8.5pt; line-height: 1.45; }
+
+    table { font-size: 9pt; }
+    thead th { font-size: 8pt; }
+    .matrix { font-size: 8.5pt; }
+    .matrix th, .matrix td { padding: 4.5px 5px; }
+    .matrix thead th { font-size: 7.5pt; }
+    .matrix tbody th { font-size: 8.5pt; }
+
+    .step { padding: 8px 0; }
+    .step-body .what { font-size: 9.5pt; line-height: 1.45; }
+    .step-n { font-size: 9pt; }
+
+    .chain-head { padding: 7px 10px; }
+    .chain-head .t { font-size: 10pt; }
+    .chain-head .s { font-size: 8pt; }
+    .chain-col { padding: 9px 10px; gap: 7px; }
+    .chain-col ul { gap: 3.5px; }
+    .chain-col ul li { font-size: 8pt; line-height: 1.35; padding-left: 11px; }
+    .chain-tag, .chain-tag .n { font-size: 8pt; }
+    .col { padding: 11px 12px; gap: 8px; }
+    .col-tag { font-size: 8.5pt; }
+    .box { gap: 8px; }
+
+    .form-q { padding: 9px 0; gap: 6px; }
+    .form-label { font-size: 10pt; }
+    .line { height: 8mm; }
+    .who { padding-top: 12px; }
+    .who-line { height: 7mm; }
+    .who-label { font-size: 9pt; }
+    .footer { margin-top: 16px; padding-top: 9px; font-size: 8.5pt; }
+
+    /* 색 면이 흰색으로 인쇄되지 않도록 */
+    .callout, .box, .col, .chain-head, .chain-tag .n, .matrix td, .matrix th {
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .tw { overflow-x: visible; }
+    p, li { orphans: 2; widows: 2; }
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="doc">
+
+<!-- ═══════════════════ 1면 ═══════════════════ -->
+<section class="sheet">
+  <header class="sheet-head">
+    <p class="eyebrow">사내 설명 자료 · 1면</p>
+    <h1>SEAERP</h1>
+    <p class="subtitle">원물이 들어와서 보관·가공을 거쳐 나가기까지를 상자 묶음 단위로 기록하는 사내 프로그램입니다. 기록한 값에서 재고와 원가가 자동으로 계산됩니다.</p>
+  </header>
+
+  <div class="stack">
+
+    <div class="callout pri">
+      <p class="small">지금은 <b>예비 버전</b>입니다. 완성된 것을 배포하는 단계가 아니라, 실제로 써 보면서 고쳐 나가는 단계입니다. 쓰시다가 불편한 점이나 실제 업무와 맞지 않는 부분을 알려 주시면 그에 맞춰 고칩니다. 마지막 면에 의견 적는 칸이 있습니다.</p>
+    </div>
+
+    <div class="stack-tight">
+      <h2>상자 하나가 지나는 길</h2>
+      <p class="small muted">화면이 여러 개지만 모두 아래 다섯 단계 중 하나에 속합니다.</p>
+    </div>
+
+    <div class="journey">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-body">
+          <h3>입고</h3>
+          <p class="what">현장에서 휴대전화로 등록합니다. 관리자가 승인하면 <b>LOT 번호</b>가 부여되고 입고증이 만들어집니다.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-body">
+          <h3>보관</h3>
+          <p class="what">보관 일수가 날마다 누적되고, 보관처별 요율에 따라 냉장료가 쌓입니다.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-body">
+          <h3>이동 · 가공</h3>
+          <p class="what">보관처를 옮기면 새 LOT이 생기되 원래 LOT까지 거슬러 올라갈 수 있습니다. 가공하면 원물 LOT이 줄고 가공품 LOT이 생기며, 그때까지의 원가가 가공품으로 넘어갑니다.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-body">
+          <h3>출고</h3>
+          <p class="what">출고 시점의 원가와 판매가가 함께 기록되어 남습니다. 출고증이 만들어집니다.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">5</div>
+        <div class="step-body">
+          <h3>집계</h3>
+          <p class="what">품목별·매입처별·선박별·기간별로 모아 봅니다. 매일 아침 9시에 전날 내역이 메일로 발송됩니다.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════ 2면 ═══════════════════ -->
+<section class="sheet">
+  <header class="sheet-head plain">
+    <p class="sheet-num">2면</p>
+    <h2>LOT 번호와 기준 정보</h2>
+    <p class="subtitle">이 프로그램은 종이 서식을 화면으로 옮겨 놓은 것이 아닙니다. 값을 한 곳에만 등록해 두고 나머지 화면이 그것을 끌어다 쓰는 구조입니다. 그래서 실제 입력하는 양이 적습니다.</p>
+  </header>
+
+  <div class="stack">
+
+    <div class="stack-tight">
+      <h3>LOT 번호</h3>
+      <p class="small">한 묶음에 붙는 번호입니다. 이 번호로 그 물건이 지나온 전 과정을 한 화면에서 조회합니다.</p>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr><th>260417</th><th>MC1</th><th>11</th><th>26</th><th>0001</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>입고일</td>
+            <td>품목코드<br><span class="xs muted">품목마스터에서</span></td>
+            <td>규격</td>
+            <td>미수</td>
+            <td>일련번호<br><span class="xs muted">자동 채번</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="xs muted">번호 자체가 네 가지 정보를 담고 있어, 번호만 보고도 언제 들어온 어떤 물건인지 알 수 있습니다.</p>
+
+    <div class="stack-tight">
+      <h3>기준 정보(마스터)란</h3>
+      <p class="small">자주 바뀌지 않는 값 — 품목, 매입처, 보관처, 선박, 보관 요율 같은 것 — 을 따로 등록해 두는 표입니다. 거래를 기록할 때는 이 목록에서 <b>고르기만</b> 하고, 나머지 값은 연결을 타고 자동으로 따라옵니다.</p>
+      <p class="small">예를 들어 보관처를 한 번 고르면 그 보관처의 냉장료·입출고비·노조비 요율이 함께 따라옵니다. 요율을 매번 입력하지 않고, 요율이 바뀌면 보관처 비용 이력 한 곳만 고치면 됩니다.</p>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr><th style="width:27%">기준 정보</th><th>담고 있는 값</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><b>품목마스터</b></td><td>품목명, 품목코드, 품목 구분</td></tr>
+          <tr><td><b>매입처 마스터</b></td><td>매입처 정보</td></tr>
+          <tr><td><b>보관처 마스터</b></td><td>보관처명, 구분(자사창고 · 외부창고 · 가공공장)</td></tr>
+          <tr><td><b>보관처 비용 이력</b></td><td>보관처별 냉장료 · 입출고비 · 노조비 · 동결비 <span class="xs muted">(적용 기간이 있어 시점별로 다른 요율이 적용됨)</span></td></tr>
+          <tr><td><b>가공비 단가</b></td><td>가공공장 × 가공품별 임가공 단가, 기준(투입kg당 · 산출kg당)</td></tr>
+          <tr><td><b>선박 정보 마스터</b></td><td>선박명 등 9개 항목</td></tr>
+          <tr><td><b>작업자</b></td><td>이름, 로그인 번호, 권한</td></tr>
+          <tr><td><b>부자재·경비 마스터</b></td><td>아이스팩 · 박스 · 내피 · 진공팩의 박스당 단가</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════ 3면 ═══════════════════ -->
+<section class="sheet">
+  <header class="sheet-head plain">
+    <p class="sheet-num">3면</p>
+    <h2>어느 기준 정보가 어디에 쓰이는가</h2>
+    <p class="subtitle">한 기준 정보가 여러 화면에서 함께 쓰입니다. 아래는 실제 연결을 정리한 표입니다.</p>
+  </header>
+
+  <div class="stack">
+
+    <div class="tw">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th style="width:25%">기준 정보</th>
+            <th>입고</th>
+            <th>출고<br>이동</th>
+            <th>가공<br>거래</th>
+            <th>작업<br>정산</th>
+            <th>재고<br>원가 조회</th>
+            <th>서류<br>(PDF)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th>품목마스터</th><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td></tr>
+          <tr><th>매입처 마스터</th><td class="dot">●</td><td></td><td></td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td></tr>
+          <tr><th>보관처 마스터</th><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td></tr>
+          <tr><th>보관처 비용 이력</th><td class="dot">●</td><td class="dot">●</td><td class="dot-i">○</td><td class="dot">●</td><td class="dot">●</td><td></td></tr>
+          <tr><th>가공비 단가</th><td></td><td></td><td class="dot">●</td><td></td><td class="dot-i">○</td><td></td></tr>
+          <tr><th>선박 정보 마스터</th><td class="dot">●</td><td></td><td></td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td></tr>
+          <tr><th>작업자</th><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td></tr>
+          <tr><th>부자재·경비</th><td></td><td></td><td></td><td></td><td class="dot">●</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="legend">
+      <span><span class="dot">●</span> &nbsp;직접 연결 — 그 화면에서 고르거나 조회함</span>
+      <span><span class="dot-i">○</span> &nbsp;간접 — 앞 단계 원가에 이미 포함되어 따라옴</span>
+    </div>
+
+    <div class="callout">
+      <p class="small"><b>보관처 마스터를 예로 들면</b> — 입고할 때 어디에 넣을지 고르고, 이동할 때 어디로 옮길지 고르고, 가공할 때 어느 가공공장인지 고르고, 작업 정산에서 작업장과 행선지로 쓰이고, 재고 조회에서 보관처별로 묶어 보고, 입출고증을 발행할지 말지도 <b>보관처의 구분(자사창고 여부)</b>이 결정합니다. 여섯 군데에서 같은 한 곳을 봅니다.</p>
+    </div>
+
+    <div class="callout">
+      <p class="small"><b>가공비 단가는</b> 보관처 마스터 화면 안(가공공장 항목)에서 관리하고, 가공 거래에서 가공공장·가공품·날짜로 해당 단가를 자동으로 찾아 씁니다. 등록된 단가가 없으면 가공 거래가 진행되지 않고 먼저 등록하라는 안내가 나옵니다. 값이 없는 채로 원가가 잘못 계산되는 일을 막기 위한 것입니다.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════ 4면 ═══════════════════ -->
+<section class="sheet">
+  <header class="sheet-head plain">
+    <p class="sheet-num">4면</p>
+    <h2>한 번 입력하면 어디까지 따라가는가 ①</h2>
+    <p class="subtitle">앞 면의 연결이 실제로 어떻게 작동하는지 거래별로 정리했습니다. 왼쪽이 사람이 직접 넣는 값, 오른쪽이 그로부터 자동으로 채워지거나 계산되는 값입니다.</p>
+  </header>
+
+  <div class="stack">
+
+    <div class="chain">
+      <div class="chain-head">
+        <span class="t">입고 1건</span>
+        <span class="s">현장 휴대전화 → 관리자 승인</span>
+      </div>
+      <div class="chain-cols">
+        <div class="chain-col">
+          <span class="chain-tag tag-in"><span class="n">5</span> 사람이 넣는 값</span>
+          <ul class="tight">
+            <li>품목 <span class="src">(목록에서 선택)</span></li>
+            <li>규격</li>
+            <li>미수</li>
+            <li>수량(박스)</li>
+            <li>입고일 <span class="src">(오늘 날짜가 기본)</span></li>
+          </ul>
+          <p class="xs muted">수매가·비고는 선택 항목입니다. 매입처·보관처·선박·원산지는 컴퓨터 등록 화면에서 목록으로 고릅니다.</p>
+        </div>
+        <div class="chain-col">
+          <span class="chain-tag tag-auto"><span class="n">11</span> 자동으로 붙는 값</span>
+          <ul class="tight">
+            <li>LOT 번호 <span class="src">← 입고일 + 품목코드 + 규격 + 미수 + 채번</span></li>
+            <li>신청자 <span class="src">← 로그인 정보</span></li>
+            <li>승인상태 · 결정자 · 결정일시</li>
+            <li>재고수량 · 잔여수량 <span class="src">← 승인 시 반영</span></li>
+            <li>최초입고일</li>
+            <li>냉장료 단가 <span class="src">← 보관처 비용 이력</span></li>
+            <li>입출고비 <span class="src">← 보관처 비용 이력</span></li>
+            <li>노조비 <span class="src">← 보관처 비용 이력</span></li>
+            <li>입고증 PDF <span class="src">← 보관처 구분이 자사창고일 때</span></li>
+          </ul>
+          <p class="xs muted">동결비는 박스 종류(사료팬 · 베이트大 · 베이트小)별로 단가가 달라 작업 정산 쪽에서 종류별로 적용합니다.</p>
+        </div>
+      </div>
+    </div>
+    <p class="xs muted">보관처 비용 이력은 <b>입고일 기준</b>으로 조회합니다. 요율이 올해 바뀌었더라도 작년에 들어온 물건에는 작년 요율이 적용됩니다.</p>
+
+    <div class="chain">
+      <div class="chain-head">
+        <span class="t">출고 1건</span>
+        <span class="s">LOT 선택 → 승인</span>
+      </div>
+      <div class="chain-cols">
+        <div class="chain-col">
+          <span class="chain-tag tag-in"><span class="n">3</span> 사람이 넣는 값</span>
+          <ul class="tight">
+            <li>출고 수량(박스)</li>
+            <li>판매처</li>
+            <li>판매가</li>
+          </ul>
+          <p class="xs muted">어느 LOT에서 빼는지는 재고 목록에서 고릅니다.</p>
+        </div>
+        <div class="chain-col">
+          <span class="chain-tag tag-auto"><span class="n">9</span> 자동으로 계산되는 값</span>
+          <ul class="tight">
+            <li>보관일수 <span class="src">← 입고일 ~ 출고일</span></li>
+            <li>냉장료 <span class="src">← 냉장료 단가 × 보관일수 × 출고박스</span></li>
+            <li>입출고비 · 노조비 · 동결비 <span class="src">← LOT에 저장된 단가 × 출고박스</span></li>
+            <li>이월 비용 <span class="src">← 이동 이력이 있으면 그 몫만큼 비례 배분</span></li>
+            <li>출고 시점 원가 · 손익 <span class="src">그 시점 값으로 고정 보관</span></li>
+            <li>LOT 재고수량 차감 <span class="src">← 다 나가면 상태가 '소진'으로</span></li>
+            <li>출고증 PDF</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <p class="xs muted">출고 시점의 원가는 그때 값으로 <b>고정해서</b> 보관합니다. 나중에 요율이 바뀌어도 과거 손익이 흔들리지 않습니다.</p>
+
+  </div>
+</section>
+
+<!-- ═══════════════════ 5면 ═══════════════════ -->
+<section class="sheet">
+  <header class="sheet-head plain">
+    <p class="sheet-num">5면</p>
+    <h2>한 번 입력하면 어디까지 따라가는가 ②</h2>
+    <p class="subtitle">가공과 작업 정산은 기준 정보가 가장 많이 모이는 화면입니다.</p>
+  </header>
+
+  <div class="stack">
+
+    <div class="chain">
+      <div class="chain-head">
+        <span class="t">가공 1건</span>
+        <span class="s">원물 투입 → 가공품 산출</span>
+      </div>
+      <div class="chain-cols">
+        <div class="chain-col">
+          <span class="chain-tag tag-in"><span class="n">5</span> 사람이 넣는 값</span>
+          <ul class="tight">
+            <li>가공공장 <span class="src">(보관처 목록에서)</span></li>
+            <li>가공품 <span class="src">(품목 목록에서)</span></li>
+            <li>투입할 원물 LOT과 박스 수</li>
+            <li>산출 박스 수</li>
+            <li>산출 총중량(kg) <span class="src">실측</span></li>
+          </ul>
+        </div>
+        <div class="chain-col">
+          <span class="chain-tag tag-auto"><span class="n">6</span> 자동으로 붙는 값</span>
+          <ul class="tight">
+            <li>임가공 단가 <span class="src">← 가공비 단가 (가공공장 × 가공품 × 날짜)</span></li>
+            <li>투입 원물의 박스당 원가 <span class="src">← 각 원물 LOT에서</span></li>
+            <li>임가공비 총액 <span class="src">← 단가 × 기준kg (투입 또는 산출)</span></li>
+            <li>가공원가 <span class="src">= 투입 원물 원가 + 임가공비</span></li>
+            <li>가공품 LOT 번호</li>
+            <li>투입한 원물 LOT의 재고 차감</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="chain">
+      <div class="chain-head">
+        <span class="t">작업 정산 1건</span>
+        <span class="s">기준 정보 5종이 한 화면에서 쓰이는 곳</span>
+      </div>
+      <div class="chain-cols">
+        <div class="chain-col">
+          <span class="chain-tag tag-in">사람이 넣는 값</span>
+          <ul class="tight">
+            <li>작업장 · 선박 · 매입처 · 작업일 <span class="src">(모두 목록에서 선택)</span></li>
+            <li>사이즈별 생산내역 <span class="src">품목 · 구분 · 규격 · 수량 · 수매단가</span></li>
+            <li>작업비 항목별 금액</li>
+          </ul>
+        </div>
+        <div class="chain-col">
+          <span class="chain-tag tag-auto">자동으로 붙는 값</span>
+          <ul class="tight">
+            <li>입출고비 · 동결비 단가 <span class="src">← 보관처 비용 이력 (작업장 × 작업일)</span></li>
+            <li>동결비는 구분(사료팬 · 베이트大 · 베이트小)별로 다른 단가 적용</li>
+            <li>작업단가 <span class="src">= 작업비 총액 ÷ 총 박스수</span></li>
+            <li>실단가 <span class="src">= 수매단가 + 작업단가</span></li>
+            <li><b>확정하면 입고 기록 1행과 LOT 1개가 자동 생성</b></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <p class="xs muted">작업 정산 한 화면에서 품목 · 매입처 · 보관처 · 선박 · 작업자 다섯 가지 기준 정보와 보관처 비용 이력을 함께 씁니다. 종이 정산서에서 매번 옮겨 적던 값들입니다.</p>
+
+  </div>
+</section>
+
+<!-- ═══════════════════ 6면 ═══════════════════ -->
+<section class="sheet">
+  <header class="sheet-head plain">
+    <p class="sheet-num">6면</p>
+    <h2>화면 목록과 승인 구조</h2>
+    <p class="subtitle">맡으신 일에 따라 쓰는 기기와 화면이 다릅니다. 현장 화면은 휴대전화에, 관리 화면은 컴퓨터에 맞춰 만들어져 있습니다.</p>
+  </header>
+
+  <div class="stack">
+
+    <div class="cols2">
+      <div class="col">
+        <p class="col-tag">현장 — 휴대전화</p>
+        <ul class="tight">
+          <li><b>물품 입고</b> · 들어온 물건 등록</li>
+          <li><b>물품 출고</b> · 나가는 물건 등록</li>
+          <li><b>재고 조회</b> · 현재 보관 중인 물건 조회</li>
+          <li><b>재고 이동</b> · 보관처 간 이동 등록</li>
+          <li><b>지출 신청</b> · 자재비 · 경비 결의</li>
+          <li><b>신청 내역</b> · 본인이 올린 건의 처리 상태</li>
+          <li><b>QR 스캔</b> · 서류의 QR로 해당 물건 화면 열기</li>
+        </ul>
+        <p class="xs muted">로그인은 이름 선택 + 숫자 4자리. 30분간 조작이 없으면 자동 로그아웃되며 5분 전에 안내가 표시됩니다.</p>
+      </div>
+
+      <div class="col">
+        <p class="col-tag">관리 — 컴퓨터</p>
+        <ul class="tight">
+          <li><b>결재</b> · 결재 수신함 <span class="xs muted">(다건 일괄 처리)</span></li>
+          <li><b>재고</b> · 재고 조회, 재고 집계</li>
+          <li><b>재고 작업</b> · 작업 정산, 가공 거래</li>
+          <li><b>거래 이력</b> · 입고 · 출고 · 이동 · 지출</li>
+          <li><b>원가·손익</b> · 손익 추이, 매입 통계</li>
+          <li><b>기준 정보</b> · 제품 · 매입처 · 보관처 · 작업자 · 선박 · 부자재</li>
+          <li><b>시스템</b> · 이상 LOT 감시, 용어 위키</li>
+        </ul>
+        <p class="xs muted">표는 A4 인쇄와 엑셀 내려받기를 지원합니다.</p>
+      </div>
+    </div>
+
+    <div class="stack-tight">
+      <h3>승인 구조</h3>
+      <p class="small">현장에서 등록하는 것은 <b>신청</b>까지입니다. 관리자가 승인해야 재고 수량이 변경됩니다. 승인 후에 잘못이 발견되면 반려로 되돌릴 수 있고, 이때 재고 수량과 관련 비용 값도 함께 원래대로 복구됩니다.</p>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr><th style="width:20%">단계</th><th style="width:24%">재고 반영</th><th>기록</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><b>신청</b></td><td>변동 없음</td><td>신청자 · 신청 시각</td></tr>
+          <tr><td><b>승인</b></td><td>반영됨</td><td>결정자 · 결정 시각 · 비용 단가 저장 · PDF 발행</td></tr>
+          <tr><td><b>반려</b></td><td>원래대로 복구</td><td>반려 사유 · 반려 메모</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="stack-tight">
+      <h3>그밖에 동작하는 것</h3>
+      <ul class="tight">
+        <li><b>일일 정산 메일</b> · 매일 아침 9시, 전날 입고 · 출고 · 이동 · 지출 내역과 손익 추정</li>
+        <li><b>QR 공개 페이지</b> · 서류에 인쇄된 QR은 로그인 없이 열리며 품목 · 규격 · 원산지 · 입고일을 보여줍니다</li>
+        <li><b>어황일보 번역</b> · 조업보고서 사진을 일본어 안내문으로 변환 (텔레그램, 현재 운영 중)</li>
+        <li><b>이상 감시</b> · 재고가 음수가 되거나 값이 어긋난 건을 매일 점검해 메일에 표시</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════ 7면 ═══════════════════ -->
+<section class="sheet">
+  <header class="sheet-head plain">
+    <p class="sheet-num">7면</p>
+    <h2>현재 범위</h2>
+    <p class="subtitle">지금 동작하는 것과 아직 만들지 않은 것을 구분해 적었습니다. 예비 버전이므로 아래 범위는 앞으로 조정될 수 있습니다.</p>
+  </header>
+
+  <div class="stack">
+
+    <div class="box ok">
+      <h3>동작하는 것</h3>
+      <ul class="tight">
+        <li>입고 · 출고 · 이동 · 지출 등록과 결재</li>
+        <li>LOT 단위 재고 조회 · 집계, 이력 추적</li>
+        <li>가공 거래(원물 → 가공품 변환)와 가공원가 계산</li>
+        <li>작업 정산 등록(사이즈별 원물 매입 → 입고 · LOT 자동 생성)</li>
+        <li>보관처 요율에 따른 냉장료 · 입출고비 · 노조비 · 동결비 계산</li>
+        <li>입고증 · 출고증 PDF 자동 발행과 QR 조회</li>
+        <li>매입 통계 · 손익 추이, A4 인쇄, 엑셀 내려받기</li>
+        <li>일일 정산 메일, 어황일보 일본어 번역</li>
+      </ul>
+    </div>
+
+    <div class="box warn">
+      <h3>아직 만들지 않은 것</h3>
+      <ul class="tight">
+        <li><b>주문 · 수출 서류 관리</b> — 고객 · 주문 개념이 아직 없습니다</li>
+        <li><b>세금계산서 · 부가세 · 회계 전표</b> — 회계 프로그램 영역으로 보고 넣지 않을 예정입니다. 필요한 자료를 뽑아 넘기는 방식을 검토 중입니다</li>
+        <li><b>팩스 자동 발송</b></li>
+        <li><b>인터넷 없이 등록</b> — 저장하려면 인터넷 연결이 필요합니다</li>
+        <li><b>바코드 출고</b> — QR 조회는 되지만 바코드 스캔 출고는 아직입니다</li>
+        <li><b>기기별 고정 로그인</b> — 매번 이름을 고르셔야 합니다</li>
+      </ul>
+      <p class="small">이 목록에 우선순위를 매기는 것이 다음 단계입니다. 어느 것이 급한지, 또는 여기 없는데 필요한 것이 있는지 알려 주시면 그 순서대로 만듭니다.</p>
+    </div>
+
+    <div class="stack-tight">
+      <h3>확인해 두실 사항</h3>
+      <ul class="tight">
+        <li>로그인 번호를 5회 연속 잘못 입력하면 5분간 입력이 제한됩니다. 이후 다시 5회 틀리면 30분입니다. 한 번이라도 맞으면 횟수는 초기화됩니다.</li>
+        <li>번호를 잊으신 경우 관리자가 새로 발급합니다. 본인이 변경하는 화면은 없습니다.</li>
+        <li>누가 언제 등록하고 승인했는지가 기록됩니다. 수치가 맞지 않을 때 어느 단계에서 어긋났는지 확인하기 위한 기록입니다.</li>
+        <li>원가 관련 값은 컴퓨터 관리 화면에서만 표시되며 현장 휴대전화 화면에는 나오지 않습니다.</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════ 8면 ═══════════════════ -->
+<section class="sheet">
+  <header class="sheet-head plain">
+    <p class="sheet-num">8면</p>
+    <h2>접속 방법</h2>
+    <p class="subtitle">예비 버전은 지금 접속해서 쓰실 수 있습니다. 설치 없이 인터넷 주소로도 열리고, 홈 화면에 추가하면 앱처럼 쓰입니다.</p>
+  </header>
+
+  <div class="stack">
+
+    <div class="callout pri">
+      <p class="small"><b>주소</b> &nbsp;&nbsp; seafood-erp.vercel.app</p>
+    </div>
+
+    <div class="cols2">
+      <div class="col">
+        <p class="col-tag">아이폰 (사파리)</p>
+        <ul class="tight">
+          <li>사파리에서 위 주소를 엽니다</li>
+          <li>화면 아래 <b>공유</b> 단추(↑ 모양)를 누릅니다</li>
+          <li>목록에서 <b>홈 화면에 추가</b>를 누릅니다</li>
+          <li>홈 화면에 아이콘이 생깁니다</li>
+        </ul>
+      </div>
+      <div class="col">
+        <p class="col-tag">안드로이드 (크롬)</p>
+        <ul class="tight">
+          <li>크롬에서 위 주소를 엽니다</li>
+          <li>오른쪽 위 <b>점 세 개</b> 단추를 누릅니다</li>
+          <li><b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 누릅니다</li>
+          <li>홈 화면에 아이콘이 생깁니다</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stack-tight">
+      <h3>로그인</h3>
+      <ul class="tight">
+        <li>목록에서 본인 이름을 고릅니다.</li>
+        <li>숫자 4자리를 누릅니다. <span class="muted">번호는 개별적으로 알려드립니다.</span></li>
+        <li>컴퓨터에서 접속하면 관리 화면이, 휴대전화에서 접속하면 현장 화면이 열립니다. 같은 주소이며 기기에 따라 자동으로 나뉩니다.</li>
+      </ul>
+    </div>
+
+    <div class="box warn">
+      <h3>예비 버전을 쓰실 때</h3>
+      <ul class="tight">
+        <li><b>실제 업무 기록으로 쓰시기 전에 확인해 주십시오.</b> 지금 입력하시는 값은 실제 데이터에 반영됩니다. 시험 삼아 넣어 보신 건은 알려 주시면 정리하겠습니다.</li>
+        <li>잘못 등록하셨다면 관리자가 반려하면 원래대로 돌아갑니다.</li>
+        <li>화면이 이상하게 나오거나 오류가 뜨면 <b>그 화면을 사진으로 찍어</b> 알려 주십시오. 어느 화면에서 무엇을 누르셨는지가 있으면 원인을 찾기 쉽습니다.</li>
+      </ul>
+    </div>
+
+    <div class="stack-tight">
+      <h3>문의</h3>
+      <p class="small">담당 &nbsp;____________________ &nbsp;&nbsp; 연락처 &nbsp;____________________</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════ 9면 ═══════════════════ -->
+<section class="sheet">
+  <header class="sheet-head plain">
+    <p class="sheet-num">9면</p>
+    <h2>의견</h2>
+    <p class="subtitle">예비 버전을 다듬는 데 쓰입니다. 한 줄이어도 괜찮고, 이름은 적지 않으셔도 됩니다. 작성 후 이 면만 떼어 제출해 주십시오.</p>
+  </header>
+
+  <div>
+    <div class="form-q">
+      <p class="form-label">1. 맡고 계신 일 중에서, 이 프로그램으로 처리하면 될 것 같은 부분은 무엇입니까?</p>
+      <div class="lines"><div class="line"></div><div class="line"></div></div>
+    </div>
+
+    <div class="form-q">
+      <p class="form-label">2. 반대로, 이 프로그램으로는 처리가 안 될 것 같은 부분이 있습니까?</p>
+      <p class="form-hint">실제 업무 절차와 화면이 맞지 않는 부분이 있으면 적어 주십시오.</p>
+      <div class="lines"><div class="line"></div><div class="line"></div></div>
+    </div>
+
+    <div class="form-q">
+      <p class="form-label">3. 7면의 「아직 만들지 않은 것」 중 급한 것은 무엇입니까?</p>
+      <div class="lines"><div class="line"></div><div class="line"></div></div>
+    </div>
+
+    <div class="form-q">
+      <p class="form-label">4. 지금 업무에서 시간이 가장 많이 걸리는 일은 무엇입니까?</p>
+      <p class="form-hint">이 프로그램과 관계없는 내용이어도 괜찮습니다.</p>
+      <div class="lines"><div class="line"></div><div class="line"></div><div class="line"></div></div>
+    </div>
+
+    <div class="form-q">
+      <p class="form-label">5. 화면에서 이해가 안 되거나 용어가 낯선 부분이 있었습니까?</p>
+      <div class="lines"><div class="line"></div><div class="line"></div></div>
+    </div>
+
+    <div class="form-q">
+      <p class="form-label">6. 그밖에 남기실 내용</p>
+      <div class="lines"><div class="line"></div><div class="line"></div><div class="line"></div></div>
+    </div>
+
+    <div class="who">
+      <div class="who-field"><span class="who-label">이름 (선택)</span><span class="who-line"></span></div>
+      <div class="who-field"><span class="who-label">담당 업무</span><span class="who-line"></span></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>SEAERP 사내 설명 자료</span>
+    <span>작성일 &nbsp;______년 ____월 ____일</span>
+  </div>
+</section>
+
+</div>
+
+</body></html>
