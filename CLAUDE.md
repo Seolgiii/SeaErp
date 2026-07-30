@@ -11,6 +11,10 @@
   (WSL 경로: /mnt/c/Users/user/Documents/Obsidian/SEAERP/DESIGN.md — Claude Code는 이 경로로 읽는다)
 - 색상·폰트·간격을 임의로 지정하지 말 것.
 
+■ 최근 변경 (2026-07-30)
+- **LOT 생애주기 진입 통일 + 디자인 시스템 2차 확산** — 거래 이력·재고 조회·소진 LOT의 진입 방식(행 클릭 vs LOT번호 클릭)을 **LOT번호 링크**로 통일(`app/admin/_lot-link.tsx` 신설, 링크색 토큰 `--link` 신설). **Pretendard 폰트 self-host 전환**(Spoqa 원격 로드 제거, DESIGN.md v0.4.3) + 표 헤더 전용 토큰 `--t-table-head`(14px/500) /admin 23화면 확산 + 헤더발 컬럼폭 재계산.
+- **미완**: 컬럼 폭 전량 산술 환산(육안 확인 필요), 옛 링크색(#3182F6) 2곳 잔존(LOT 생애주기·건강도), 거래 이력 표 행 높이 재고 조회와 불일치, 전량 미커밋.
+
 ■ 최근 변경 (2026-07-29)
 - **재고 조회 DESIGN.md 적용 + 소진 LOT 화면 분리 (v0.14.0)** — 토큰·공통 컴포넌트 확산 2번째 화면. `<StatusBadge>`·`lib/status.ts`(상태 문자열 상수) 신설로 §6-1 미구현 항목 해소. 정렬 헤더 `aria-sort`(키보드 조작 불가였음), 컬럼 좌/우 정렬 묶음 재정렬(전환 3→1회), 색은 재고수량(accent) + 보관일수 임계(warn/danger)만. **소진 LOT은 `/admin/master/lots-depleted`로 분리** — 서버 `filterByFormula` scope(active/depleted/all)로 걸러 재고 조회는 활성만 받는다. 재고장 인쇄에 소진이 섞이는 경로를 구조로 차단.
 - **문서 현행화** — `docs/ROADMAP.md`가 2026-05-12자였던 것을 실측 대조로 갱신(Phase 상태·IA 6→7 카테고리·완료 기준 미충족 명시) + **「현장 발생 트랙」 신설**(계획 밖에서 자란 5갈래). CLAUDE.md 테스트 수치·중장기 목표 현황 정정.
