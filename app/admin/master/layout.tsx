@@ -206,10 +206,7 @@ function MasterAdminLayoutInner({ children }: { children: React.ReactNode }) {
   // 임베드(분할 칸) — 사이드바·탭바·분할 없이 본문만 꽉 채워 렌더 (중첩 크롬 방지).
   if (embed) {
     return (
-      <div
-        className="min-h-screen bg-[#F2F4F6]"
-        style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
-      >
+      <div className="min-h-screen bg-[#F2F4F6]">
         {children}
       </div>
     );
@@ -224,7 +221,6 @@ function MasterAdminLayoutInner({ children }: { children: React.ReactNode }) {
     <div
       data-surface="admin"
       className="min-h-screen bg-[#F2F4F6] flex"
-      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
     >
       {/* 사이드바 — rail 접기 지원: 우상단 토글로 접힘 고정, 접힌 상태에서 마우스 올리면 임시 펼침(flyout).
           aside는 폭만 차지하는 스페이서(접힘 w-12 / 펼침 w-60), 실제 패널은 absolute라 flyout이 본문을 밀지 않고 덮는다. */}

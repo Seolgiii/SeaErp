@@ -1,12 +1,13 @@
-@import url('https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSansNeo.css');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 전체 기본 폰트 강제 적용 */
+/* 전체 기본 폰트 — Pretendard Variable, next/font/local self-host (app/fonts.ts).
+   전역 폰트는 이 한 줄뿐이다(DESIGN.md §3) — 화면별 font-family 선언은
+   전부 이 CSS 변수를 참조해야 한다(work-settlement/_shared.ts 포함). */
 body {
-  font-family: 'Spoqa Han Sans Neo', 'sans-serif';
+  font-family: var(--font-pretendard), -apple-system, BlinkMacSystemFont,
+    'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

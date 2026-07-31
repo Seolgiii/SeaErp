@@ -8,6 +8,7 @@ import { toast } from '@/lib/toast';
 import { formatNum } from '@/lib/number-format';
 import { NumCell, NUM_CELL } from '@/app/admin/_num-cell';
 import { makeCellClasses, tableMinWidth, TableColGroup, type TableCol } from '@/app/admin/_table-cols';
+import { LotLink } from '@/app/admin/_lot-link';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
 import { isNormalLotStatus } from '@/lib/status';
 import { Button } from '@/app/components/ui/Button';
@@ -480,7 +481,7 @@ export default function LotsMasterPage() {
             <table className="w-full table-fixed" style={{ minWidth: LOT_MIN_WIDTH }}>
               <TableColGroup cols={LOT_COLS} />
               <thead className="sticky top-0 z-20 bg-surface-alt">
-                <tr className="text-left text-label text-text-muted">
+                <tr className="text-left text-table-head text-text-muted">
                   <th className={cls.cell()}>
                     <input
                       type="checkbox"
@@ -517,22 +518,10 @@ export default function LotsMasterPage() {
                 {visible.map((l, idx) => (
                   <tr
                     key={l.id}
-                    onClick={
-                      l.lotNumber
-                        ? () =>
-                            router.push(
-                              `/admin/master/lot-timeline?lot=${encodeURIComponent(l.lotNumber)}`,
-                            )
-                        : undefined
-                    }
-                    title={l.lotNumber ? '클릭해 LOT 생애주기·원가 보기' : undefined}
-                    className={`group border-t border-border transition-colors hover:bg-surface-alt motion-reduce:transition-none ${
-                      l.lotNumber ? 'cursor-pointer' : ''
-                    }`}
+                    className="group border-t border-border transition-colors hover:bg-surface-alt motion-reduce:transition-none"
                   >
                     <td
                       className={cls.pad('cursor-pointer select-none')}
-                      onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => onSelectMouseDown(idx, l.id, e)}
                       onMouseEnter={() => {
                         if (dragRef.current) applyDrag(idx);
@@ -552,14 +541,30 @@ export default function LotsMasterPage() {
                         **이상 상태 배지가 여기 붙는다.** 전에는 14번째 '상태' 컬럼(x=1640px)에
                         있었는데, DESIGN.md §1의 최소 지원 폭 1280px에서는 화면 밖이었다 —
                         가로 스크롤해야 보이는 오류 표시는 오류를 못 잡는다. sticky라 항상 보이는
-                        이 칸으로 옮겼다. 정상 행에는 아무 표식도 없다(§6-2 '정상은 조용히'). */}
-                    <td className={cls.cell('sticky left-0 z-10 bg-surface text-body text-text group-hover:bg-surface-alt')}>
-                      <span className="inline-flex items-center gap-2">
-                        {l.lotNumber || '—'}
+                        이 칸으로 옮겼다. 정상 행에는 아무 표식도 없다(§6-2 '정상은 조용히').
+
+                        **LOT 생애주기 진입 = 이 링크뿐이다** (2026-07-30, 근거: _lot-link.tsx).
+                        전에는 행 전체 클릭이었는데 셀 텍스트를 복사하려 드래그하면 페이지가
+                        이동했고, Ctrl+클릭으로 새 탭에 못 띄웠다. 링크가 셀 패딩을 갖는 대신
+                        td는 p-0 — 패딩을 td에 남기면 세로 타겟이 20px로 얇아진다.
+                        상태 배지는 링크 안에 둔다 — 그 LOT을 설명하는 라벨이라 목적지가 같다.
+
+                        ⚠ **LOT번호를 `inline-flex`로 감싸지 말 것.** text-decoration은 flex
+                        컨테이너·inline-block 같은 원자 상자 안으로 전파되지 않아서, 감싸면
+                        hover 밑줄이 조용히 사라진다(2026-07-30 실제 발생). LOT번호는 링크의
+                        직계 텍스트로 두고, 배지 간격은 배지 쪽 `ml-2`로 준다.
+                        배지 자신은 inline-block이라 밑줄이 안 번진다 — 이건 의도한 것이다. */}
+                    <td className="sticky left-0 z-10 whitespace-nowrap bg-surface p-0 text-body group-hover:bg-surface-alt">
+                      <LotLink lotNumber={l.lotNumber} className={cls.pad()}>
+                        {l.lotNumber}
                         {l.status && !isNormalLotStatus(l.status) && (
-                          <StatusBadge status={l.status} label={l.statusReason || l.status} />
+                          <StatusBadge
+                            status={l.status}
+                            label={l.statusReason || l.status}
+                            className="ml-2"
+                          />
                         )}
-                      </span>
+                      </LotLink>
                     </td>
                     <td className={cls.cell('text-body text-text')}>{l.productName || '—'}</td>
                     <td className={cls.cell('text-body text-text-muted')}>{formatSpec(l.spec)}</td>
@@ -645,8 +650,10 @@ export default function LotsMasterPage() {
 // 실측 근거: 2026-07-28 Airtable `LOT별 재고` 200건 전량의 표시 문자열(13px 기준).
 // ⚠ 2026-07-29 셀 글자를 13px → text-body(14px)로 올리며(§3 타입 스케일) 폭을 14/13 = 1.077배로
 //   환산했다. **브라우저 재실측이 아니라 산술 환산이다** — 실제 렌더 폭과 1~2px 어긋날 수 있다.
-//   헤더는 text-label(12px)로 그대로라 헤더가 하한인 컬럼은 값이 유지된다.
 //   (정렬 아이콘만 14 → 16px로 커져 +2px 반영.)
+// ⚠ 2026-07-30 헤더도 text-label(12px) → text-table-head(14px)로 올라가며, 헤더가
+//   하한이던 4개 컬럼(최초입고일·재고수량·재고원가·보관일수)을 ×1.2로 재환산했다 —
+//   이 역시 산술 환산이다. Pretendard가 Spoqa보다 자면이 커서 안전 마진을 더 뒀다.
 // ── 컬럼 순서 (2026-07-29 재정렬) ─────────────────────────────────────────────
 // **좌측 정렬(텍스트) 묶음 → 우측 정렬(숫자) 묶음 → 비고** 순으로 뭉친다.
 // 전에는 …평가액(우) │ 보관처(좌) │ 보관일수(우)… 로 좌우가 세 번 갈렸다. 시선이 매 행마다
@@ -666,13 +673,13 @@ const LOT_COLS: TableCol[] = [
   { key: 'spec', label: '규격', px: 104 },               // 59→64 `11.5~12kg`
   { key: 'misu', label: '미수', px: 108 },               // 62→67 `70/120G미`
   { key: 'storageName', label: '보관처', px: 148 },      // 98→106 `신우농수산2공장`
-  { key: 'firstInboundDate', label: '최초입고일', px: 128 }, // 헤더(65+16+4)가 하한
-  { key: 'stockQty', label: '재고수량', px: 112, numeric: true },  // 헤더(48+16+4=68)가 하한
+  { key: 'firstInboundDate', label: '최초입고일', px: 156 }, // 128→156. 헤더가 하한
+  { key: 'stockQty', label: '재고수량', px: 136, numeric: true },  // 112→136. 헤더가 하한
   { key: 'stockWeight', label: '총중량', px: 100, numeric: true }, // 55→59 `11,245kg`
   { key: 'purchasePrice', label: '수매가', px: 108, numeric: true }, // 60→65 `104,000원`
-  { key: 'costPerBox', label: '재고원가', px: 112, numeric: true },  // 헤더(48+16+4=68)가 하한
+  { key: 'costPerBox', label: '재고원가', px: 136, numeric: true },  // 112→136. 헤더가 하한
   { key: 'valuation', label: '평가액', px: 136, numeric: true },     // 86→93 `156,307,899원`
-  { key: 'daysHeld', label: '보관일수', px: 112, numeric: true },    // 헤더(48+16+4=68)가 하한
+  { key: 'daysHeld', label: '보관일수', px: 136, numeric: true },    // 112→136. 헤더가 하한
   // 비고만 「말줄임 금지」 예외(clamp) — 자유 텍스트라 최댓값을 예측할 수 없다.
   // 상한 240은 실측이 아니라 정책값이므로 글자 크기 환산 대상이 아니다.
   { key: 'memo', label: '비고', px: 240, clamp: true },

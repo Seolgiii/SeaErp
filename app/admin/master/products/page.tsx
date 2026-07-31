@@ -23,21 +23,26 @@ type SortDir = 'asc' | 'desc';
  * ⚠ 권장규격·상세규격은 **항상 비어 있다.** master-products.ts가 읽는 `권장표기`·
  *   `상세규격_표기` 필드가 Airtable 품목마스터에 존재하지 않는다(API가 이름을 거부).
  *   두 컬럼 폭은 헤더 기준으로만 잡았다. 데이터 쪽 정리는 별도 작업.
+ *
+ * ⚠ 2026-07-30: 헤더가 `--t-label`(12px) → `--t-table-head`(14px)로 바뀌며 헤더가
+ *   하한인 4개 컬럼을 산술 환산(×1.2, 4px 단위 올림)했다 — **브라우저 재실측이 아니다.**
+ *   Pretendard가 Spoqa보다 자면이 커서 안전 마진을 더 뒀다. 육안 확인 필요.
  */
 const COLS: TableCol[] = [
   { key: 'name', label: '품목명', px: 248 }, // max 207 `사료 (FORZEN BRADED HORSE)`
-  { key: 'code', label: '품목코드', px: 108 }, // 헤더(66+18)가 하한
-  { key: 'category', label: '품목구분', px: 108 }, // 헤더가 하한
-  { key: 'spec', label: '권장규격', px: 108 }, // 헤더가 하한 (값 없음)
-  { key: 'detailSpec', label: '상세규격', px: 88 }, // 헤더가 하한 (값 없음)
+  { key: 'code', label: '품목코드', px: 132 }, // 108→132. 헤더(66+18)가 하한
+  { key: 'category', label: '품목구분', px: 132 }, // 108→132. 헤더가 하한
+  { key: 'spec', label: '권장규격', px: 132 }, // 108→132. 헤더가 하한 (값 없음)
+  { key: 'detailSpec', label: '상세규격', px: 108 }, // 88→108. 헤더가 하한 (값 없음)
   { key: 'origin', label: '원산지', px: 84 }, // max 42 `국내산`
 ];
 
 /**
  * 카드·컨트롤·헤더 공통 최대 폭 (§7-9).
  * 표 합계 744 > 컨트롤 행 176(검색창 하나) → 표가 폭을 정한다. 744 → 768.
+ * 2026-07-30: 헤더 폭 재계산으로 표 합계 836 → 860.
  */
-const CONTENT_MAX = 'max-w-[768px]';
+const CONTENT_MAX = 'max-w-[860px]';
 
 /**
  * 제품 마스터 관리 페이지.
@@ -179,8 +184,8 @@ export default function ProductsMasterPage() {
                   <Th label="품목코드" field="code" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="품목구분" field="category" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="권장규격" field="spec" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">상세규격</th>
-                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">원산지</th>
+                  <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">상세규격</th>
+                  <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">원산지</th>
                   <SpacerCell as="th" />
                 </tr>
               </thead>
@@ -240,7 +245,7 @@ function Th({
   const state = sortState(sortField === field, sortDir);
   return (
     // aria-sort는 columnheader(th)에. 패딩은 버튼이 가져가 셀 전체가 클릭 영역이 된다 (§7-8).
-    <th aria-sort={ariaSort(state)} className="whitespace-nowrap p-0 text-label text-text-muted">
+    <th aria-sort={ariaSort(state)} className="whitespace-nowrap p-0 text-table-head text-text-muted">
       <button
         type="button"
         onClick={() => onToggle(field)}

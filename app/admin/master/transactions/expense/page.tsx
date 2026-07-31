@@ -291,9 +291,9 @@ export default function ExpenseHistoryPage() {
 
           {/* 원장 표 */}
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-body">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
+                <tr className="border-b border-gray-100 bg-gray-50 text-left text-table-head text-gray-500">
                   <th className="whitespace-nowrap px-4 py-3">지출일</th>
                   <th className="px-4 py-3">건명</th>
                   <th className="px-4 py-3">적요</th>

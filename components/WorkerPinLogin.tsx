@@ -174,10 +174,7 @@ export function WorkerPinLogin() {
   };
 
   return (
-    <main
-      className="flex min-h-screen flex-col bg-[#F2F4F6]"
-      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
-    >
+    <main className="flex min-h-screen flex-col bg-[#F2F4F6]">
       {/* 블루 헤더 */}
       <header
         className="bg-[#3182F6] px-6 pt-12 pb-10 flex-shrink-0 relative overflow-hidden flex flex-col items-end justify-end"

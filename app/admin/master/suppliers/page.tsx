@@ -124,7 +124,7 @@ export default function SuppliersMasterPage() {
               <TableColGroup cols={COLS} spacer />
               <thead className="sticky top-0 bg-surface-alt">
                 <tr className="text-left">
-                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">
+                  <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">
                     매입처명
                   </th>
                   <SpacerCell as="th" />

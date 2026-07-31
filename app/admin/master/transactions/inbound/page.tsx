@@ -13,6 +13,7 @@ import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { formatNum } from '@/lib/number-format';
 import { NumCell, NumHead } from '@/app/admin/_num-cell';
+import { LotLink } from '@/app/admin/_lot-link';
 import {
   CELL_X,
   LEDGER_COL,
@@ -336,12 +337,12 @@ export default function InboundHistoryPage() {
               폭·패딩은 공유 컬럼 정의(_ledger-cols)에서만 온다. */}
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
             <table
-              className="w-full table-fixed text-[13px]"
+              className="w-full table-fixed text-body"
               style={{ minWidth: ledgerMinWidth(COLS) }}
             >
               <LedgerColGroup cols={COLS} />
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
+                <tr className="border-b border-gray-100 bg-gray-50 text-left text-table-head text-gray-500">
                   {COLS.map((c) =>
                     c.numeric ? (
                       <NumHead key={c.key} className={ledgerCell()}>
@@ -366,22 +367,9 @@ export default function InboundHistoryPage() {
                   rows.map((r) => (
                     <tr key={r.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
                       <td className={ledgerCell('text-gray-500')}>{r.date}</td>
-                      <td className={ledgerCell('font-medium')}>
-                        {r.lotNumber ? (
-                          <button
-                            onClick={() =>
-                              router.push(
-                                `/admin/master/lot-timeline?lot=${encodeURIComponent(r.lotNumber)}`,
-                              )
-                            }
-                            title="클릭해 LOT 생애주기·원가 보기"
-                            className="text-[#3182F6] hover:underline"
-                          >
-                            {r.lotNumber}
-                          </button>
-                        ) : (
-                          <span className="text-[#191F28]">—</span>
-                        )}
+                      {/* 링크가 셀 패딩까지 갖는다 → td는 p-0 (근거: _lot-link.tsx) */}
+                      <td className="whitespace-nowrap p-0 font-medium">
+                        <LotLink lotNumber={r.lotNumber} className="px-3 py-3" />
                       </td>
                       <td className={ledgerCell('text-[#191F28]')}>{r.product}</td>
                       <td className={ledgerCell('text-gray-500')}>{formatSpec(r.spec)}</td>

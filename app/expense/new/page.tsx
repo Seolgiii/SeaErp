@@ -112,7 +112,7 @@ export default function NewExpensePage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F2F4F6] pb-10 font-['Spoqa_Han_Sans_Neo']">
+    <main className="min-h-screen bg-[#F2F4F6] pb-10">
       <PageHeader
         title="지출 결의서 작성"
         onBack={() => router.push('/')}

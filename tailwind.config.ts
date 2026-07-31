@@ -28,6 +28,10 @@ const config: Config = {
         text: "#14171C", // --text        (흰 배경 대비 17.96)
         "text-muted": "#646B78", // --text-muted  (5.35) 보조 라벨·캡션·빈 상태
         "text-faint": "#98A0AC", // --text-faint  (2.61) ⚠ placeholder·비활성 전용
+        // --link : 클릭 가능한 텍스트(표 행 제목 등). 값은 accent-fill과 같지만
+        // 역할이 달라 별도 토큰으로 둔다 — 채움 '배경'과 링크 '글자'는 함께 바뀌지 않는다.
+        // ⚠ 옛 링크색 #3182F6은 흰 배경 대비 3.71로 §2-4 미달이었다. 이 값은 4.92.
+        link: "#1C6CE0", // --link
         // Primary — 면 / 글자 / 채움 3분리 (§2-3)
         "accent-bg": "#DCEAF5",
         "accent-ink": "#235C82", // accent-bg 위 5.78
@@ -51,7 +55,12 @@ const config: Config = {
         page: ["20px", { lineHeight: "1.3", fontWeight: "600" }], // h1
         section: ["16px", { lineHeight: "1.4", fontWeight: "600" }], // h2·h3·모달 제목
         body: ["14px", { lineHeight: "1.5", fontWeight: "400" }], // 본문·표 셀·입력
-        label: ["12px", { lineHeight: "1.4", fontWeight: "500" }], // 폼 라벨·표 헤더
+        label: ["12px", { lineHeight: "1.4", fontWeight: "500" }], // 폼 라벨 전용
+        // 목록 표 헤더 전용 (2026-07-30) — 이전엔 `label`(12px)을 표 헤더에도 같이 썼는데,
+        // 화면 절반은 대신 text-[12px] font-bold를 하드코딩해 굵기가 500/700으로 갈려 있었다.
+        // 셀(body 14px)과 나란히 놓였을 때 12px이 작아 보인다는 지적으로 14px로 올리며,
+        // 폼 라벨까지 같이 커지지 않도록 표 헤더만의 토큰으로 분리했다.
+        "table-head": ["14px", { lineHeight: "1.4", fontWeight: "500" }],
         caption: ["11px", { lineHeight: "1.4", fontWeight: "400" }], // 배지·도움말·오류
       },
 

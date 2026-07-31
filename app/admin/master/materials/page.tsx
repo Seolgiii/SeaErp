@@ -114,7 +114,7 @@ export default function MaterialsMasterPage() {
                 ) : (
                   <table className="w-full text-[13px]">
                     <thead>
-                      <tr className="text-left text-[12px] font-bold text-gray-400">
+                      <tr className="text-left text-table-head text-gray-400">
                         <th className="px-5 py-2">품명</th>
                         <NumHead className="px-5 py-2">단가(박스당)</NumHead>
                         <th className="px-5 py-2">단위</th>

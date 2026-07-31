@@ -291,7 +291,7 @@ export default function TransferPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-32 font-['Spoqa_Han_Sans_Neo']">
+    <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-32">
       <PageHeader
         title="재고 이동"
         subtitle="어디로 옮기시나요?"

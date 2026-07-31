@@ -23,6 +23,25 @@ export const COMMISSION_RATE = 0.033;
 export const TIMES: string[] = [];
 for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 10) TIMES.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
 
+/** 작업일 입력 → YYYY-MM-DD */
+export function normDate(s: string): string {
+  const t = s.trim().replace(/[.\s]/g, '-').replace(/\//g, '-');
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = /^(\d{4})(\d{2})(\d{2})$/.exec(t.replace(/-/g, ''));
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return s;
+}
+/** 시간 입력 → HH:MM */
+export function normTime(s: string): string {
+  const t = s.trim();
+  const m = /^(\d{1,2}):(\d{1,2})$/.exec(t);
+  if (m) return `${m[1].padStart(2, '0')}:${m[2].padStart(2, '0')}`;
+  const d = t.replace(/\D/g, '');
+  if (/^\d{3,4}$/.test(d)) return `${d.slice(0, d.length - 2).padStart(2, '0')}:${d.slice(-2)}`;
+  return s;
+}
+
 export const pn = (s: string) => parseInt(String(s ?? '').replace(/[^0-9-]/g, ''), 10) || 0;
 /** 표 숫자 표기 통일 — 천 단위 콤마(단위는 자리별로 dangaWon 등에서 덧붙임). */
 export const fmt = (n: number) => formatNum(n);
@@ -282,7 +301,7 @@ export function buildInoutRows(
 }
 
 export const WS_CSS = `
-.ws-page{--bg:#FFFFFF;--surface:#FFFFFF;--line:#E7EBF0;--line-2:#D9DFE7;--ink:#1E2530;--muted:#6A7480;--faint:#9AA4B0;--accent:#2E75B6;--accent-ink:#1B4E7F;--accent-soft:#EAF2FA;--green-soft:#E4F3E9;--green-ink:#256B3E;--amber-soft:#FBF0DA;--amber-ink:#8A5A00;--auto:#F4F7FA;--footer:#EFF5FB;--hover:#F5F7F9;--band:#F7F9FB;--shadow:0 1px 2px rgba(20,30,45,.06),0 6px 20px rgba(20,30,45,.05);background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",-apple-system,sans-serif;}
+.ws-page{--bg:#FFFFFF;--surface:#FFFFFF;--line:#E7EBF0;--line-2:#D9DFE7;--ink:#1E2530;--muted:#6A7480;--faint:#9AA4B0;--accent:#2E75B6;--accent-ink:#1B4E7F;--accent-soft:#EAF2FA;--green-soft:#E4F3E9;--green-ink:#256B3E;--amber-soft:#FBF0DA;--amber-ink:#8A5A00;--auto:#F4F7FA;--footer:#EFF5FB;--hover:#F5F7F9;--band:#F7F9FB;--shadow:0 1px 2px rgba(20,30,45,.06),0 6px 20px rgba(20,30,45,.05);background:var(--bg);color:var(--ink);font-family:var(--font-pretendard),"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",-apple-system,sans-serif;}
 .ws-page *{box-sizing:border-box;}
 .ws-page .page{max-width:1180px;margin:0 auto;padding:22px 4px 90px;}
 .ws-page .title-row{display:flex;align-items:center;gap:12px;margin:8px 0 2px;}
@@ -403,7 +422,11 @@ export const WS_CSS = `
 .ws-page .ctxbar .ci{display:flex;flex-direction:column;gap:2px;}
 .ws-page .ctxbar .ck{font-size:10.5px;font-weight:600;color:var(--faint);}
 .ws-page .ctxbar .cv{font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
-.ws-page .ctxbar .edit{margin-left:auto;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;}
+.ws-page .ctxbar .edit{margin-left:auto;border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;cursor:pointer;padding:0;}
+.ws-page .ctxbar .edit:hover{opacity:.75;}
+.ws-page .ctx-edit{margin:10px 0 22px;}
+.ws-page .ctx-edit .fields{margin:0;}
+.ws-page .fields-actions{grid-column:1/-1;display:flex;justify-content:flex-end;padding:10px 14px 6px;margin-top:4px;border-top:1px solid var(--line);}
 .ws-page .steps{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600;color:var(--faint);margin:10px 0 0;}
 .ws-page .steps .on{color:var(--accent);}
 .ws-page .steps .sep{color:var(--line-2);}
@@ -417,7 +440,7 @@ export const WS_CSS = `
 .ws-page .time-range{gap:4px;}
 .ws-page .time-range .combo{flex:none;width:60px;}
 .ws-page td .combo > input{font-size:13px;font-weight:500;padding:10px 11px;}
-.ws-combo-portal{z-index:9999;background:#fff;border:1px solid #D9DFE7;border-radius:9px;box-shadow:0 8px 24px rgba(20,30,45,.14);max-height:172px;overflow-y:auto;max-width:280px;padding:4px;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",-apple-system,sans-serif;}
+.ws-combo-portal{z-index:9999;background:#fff;border:1px solid #D9DFE7;border-radius:9px;box-shadow:0 8px 24px rgba(20,30,45,.14);max-height:172px;overflow-y:auto;max-width:280px;padding:4px;font-family:var(--font-pretendard),"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",-apple-system,sans-serif;}
 .ws-combo-opt{padding:7px 11px;font-size:13px;font-weight:600;border-radius:6px;cursor:pointer;color:#1E2530;white-space:nowrap;font-variant-numeric:tabular-nums;}
 .ws-combo-opt:hover,.ws-combo-opt.active{background:#EAF2FA;color:#1B4E7F;}
 @media (max-width:720px){.ws-page .fields{grid-template-columns:repeat(2,1fr);}.ws-page h1{font-size:21px;}}

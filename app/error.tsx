@@ -16,10 +16,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <main
-      className="min-h-screen flex flex-col items-center justify-center bg-[#F2F4F6] px-6"
-      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
-    >
+    <main className="min-h-screen flex flex-col items-center justify-center bg-[#F2F4F6] px-6">
       <div className="w-full max-w-sm bg-white rounded-[24px] shadow-[0_8px_24px_rgba(149,157,165,0.08)] p-7 flex flex-col items-center text-center gap-4">
         <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
           <ExclamationTriangleIcon className="w-8 h-8 text-[#FF3B30]" />

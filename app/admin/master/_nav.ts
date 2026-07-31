@@ -63,7 +63,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/admin/master/transactions/inbound', label: '입고 이력', enabled: true },
       { href: '/admin/master/transactions/outbound', label: '출고 이력', enabled: true },
       { href: '/admin/master/transactions/transfer', label: '이동 이력', enabled: true },
-      { href: '/admin/master/transactions/expense', label: '지출 이력', enabled: true },
+      // 2026-07-31: 비용 관리를 회계 프로그램으로 이관하기로 해 진입 경로만 숨김(기능·라우트는 유지).
+      //   enabled:false(준비중 배지)는 안 쓴다 — 미완성이 아니라 의도적 비활성화라 의미가 다르다.
+      // { href: '/admin/master/transactions/expense', label: '지출 이력', enabled: true },
       { href: '/admin/master/transactions/pdf-reissue', label: 'PDF 재발행', enabled: false },
     ],
   },

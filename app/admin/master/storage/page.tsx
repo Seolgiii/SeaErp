@@ -393,7 +393,7 @@ function CostSection({
                   {/* aria-sort는 columnheader(th)에. 패딩은 버튼이 가져간다 (§7-8). */}
                   <th
                     aria-sort={ariaSort(state)}
-                    className="whitespace-nowrap p-0 text-label text-text-muted"
+                    className="whitespace-nowrap p-0 text-table-head text-text-muted"
                   >
                     <button
                       type="button"
@@ -406,13 +406,13 @@ function CostSection({
                   </th>
                   {COST_COLS.slice(1).map((c) =>
                     c.numeric ? (
-                      <NumHead key={c.key} className="px-4 py-2 text-label text-text-muted">
+                      <NumHead key={c.key} className="px-4 py-2 text-table-head text-text-muted">
                         {c.label}
                       </NumHead>
                     ) : (
                       <th
                         key={c.key}
-                        className="whitespace-nowrap px-4 py-2 text-label text-text-muted"
+                        className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted"
                       >
                         {c.label}
                       </th>
@@ -555,13 +555,13 @@ function FactorySection({
                     <tr className="text-left">
                       {RATE_COLS.map((c) =>
                         c.numeric ? (
-                          <NumHead key={c.key} className="px-4 py-2 text-label text-text-muted">
+                          <NumHead key={c.key} className="px-4 py-2 text-table-head text-text-muted">
                             {c.label}
                           </NumHead>
                         ) : (
                           <th
                             key={c.key}
-                            className="whitespace-nowrap px-4 py-2 text-label text-text-muted"
+                            className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted"
                           >
                             {c.label}
                           </th>

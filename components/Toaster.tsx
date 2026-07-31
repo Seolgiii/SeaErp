@@ -30,7 +30,6 @@ export default function Toaster() {
             t.type === 'info'    ? 'bg-[#3182F6]' :
                                    'bg-[#191F28]'
           }`}
-          style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
         >
           {t.message}
         </div>

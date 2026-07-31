@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { pretendard } from './fonts';
 import ServiceWorker from './components/ServiceWorker';
 import SessionGuard from './components/SessionGuard';
 import { ConfirmProvider } from './components/ConfirmBottomSheet';
@@ -35,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko">
+    <html lang="ko" className={pretendard.variable}>
       <body className="bg-[#F2F4F6] text-gray-900 min-h-screen">
         <ServiceWorker />
         <ConfirmProvider>

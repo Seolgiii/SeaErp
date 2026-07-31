@@ -17,27 +17,8 @@ import {
 } from '@/app/actions/admin/master-work-settlement';
 import { listStorages, type Storage } from '@/app/actions/admin/master-storage';
 import { listShips, type Ship } from '@/app/actions/admin/master-ships';
-import { WS_CSS, TIMES, pn, fmt } from '../_shared';
+import { WS_CSS, TIMES, pn, fmt, normDate, normTime } from '../_shared';
 import { Combo } from '../_combo';
-
-/** 작업일 → YYYY-MM-DD */
-function normDate(s: string): string {
-  const t = s.trim().replace(/[.\s]/g, '-').replace(/\//g, '-');
-  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
-  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-  m = /^(\d{4})(\d{2})(\d{2})$/.exec(t.replace(/-/g, ''));
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  return s;
-}
-/** 시간 → HH:MM */
-function normTime(s: string): string {
-  const t = s.trim();
-  const m = /^(\d{1,2}):(\d{1,2})$/.exec(t);
-  if (m) return `${m[1].padStart(2, '0')}:${m[2].padStart(2, '0')}`;
-  const d = t.replace(/\D/g, '');
-  if (/^\d{3,4}$/.test(d)) return `${d.slice(0, d.length - 2).padStart(2, '0')}:${d.slice(-2)}`;
-  return s;
-}
 
 export default function WorkSettlementStep1Page() {
   const router = useRouter();

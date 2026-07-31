@@ -781,35 +781,40 @@ export default function PurchaseStatsPage() {
 
             <div className="overflow-x-auto">
               {/* table-fixed — 검색 타이핑으로 행이 바뀌어도 컬럼 폭이 재계산되지 않게 고정 */}
-              <table className="w-full min-w-[960px] table-fixed text-[13px]">
+              {/* 2026-07-30: 본문 13px → text-body(14px). 아래 colgroup도 ×14/13 산술 환산
+                  (4px 단위 올림) — 실측이 아니므로 육안 확인 필요. 헤더가 하한인 컬럼
+                  (평균단가(박스))은 이미 헤더 기준으로 더 크게 잡혀 있어 다시 건드리지 않았다. */}
+              <table className="w-full min-w-[960px] table-fixed text-body">
                 <colgroup>
                   {/* 숫자 컬럼은 px 고정, 남는 폭은 맨 끝(건) 컬럼이 흡수 — 화면이 넓어져도 컬럼이 벌어지지 않음 */}
                   {isDetail ? (
                     <>
-                      <col style={{ width: 170 }} />
-                      <col style={{ width: 80 }} />
+                      <col style={{ width: 184 }} />
+                      <col style={{ width: 88 }} />
+                      <col style={{ width: 92 }} />
+                      <col style={{ width: 148 }} />
+                      <col style={{ width: 104 }} />
+                      <col style={{ width: 108 }} />
+                      {/* 144 = 125→ (2026-07-30 헤더 14px 전환, '평균단가(박스)' 7자 라벨이 하한권에
+                          가까워져 안전 마진 추가. 인라인 colgroup — §10 통합 대기, 통합 시 재검토) */}
+                      <col style={{ width: 144 }} />
                       <col style={{ width: 84 }} />
-                      <col style={{ width: 135 }} />
-                      <col style={{ width: 95 }} />
-                      <col style={{ width: 100 }} />
-                      <col style={{ width: 125 }} />
-                      <col style={{ width: 78 }} />
                       <col />
                     </>
                   ) : (
                     <>
-                      <col style={{ width: 220 }} />
-                      <col style={{ width: 140 }} />
-                      <col style={{ width: 100 }} />
-                      <col style={{ width: 105 }} />
-                      <col style={{ width: 130 }} />
-                      <col style={{ width: 80 }} />
+                      <col style={{ width: 240 }} />
+                      <col style={{ width: 152 }} />
+                      <col style={{ width: 108 }} />
+                      <col style={{ width: 116 }} />
+                      <col style={{ width: 148 }} />
+                      <col style={{ width: 88 }} />
                       <col />
                     </>
                   )}
                 </colgroup>
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
+                  <tr className="border-b border-gray-100 bg-gray-50 text-left text-table-head text-gray-500">
                     {/* 상세 모드 행은 어느 탭이든 품목(규격·미수) 분포 */}
                     <th className="px-4 py-3">{isDetail ? '품목' : tabMeta.noun}</th>
                     {isDetail && (
@@ -1009,18 +1014,20 @@ export default function PurchaseStatsPage() {
           {/* 추이 표 — 랭킹 모드: 기간 전체 / 상세 모드: 검색 스코프 */}
           {periods.length > 0 && (
           <div className="print-section overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full min-w-[860px] table-fixed text-[13px]">
+            {/* 2026-07-30: 본문 13px → text-body(14px), colgroup ×14/13 산술 환산(육안 확인 필요) */}
+            <table className="w-full min-w-[860px] table-fixed text-body">
               <colgroup>
                 {/* 숫자 컬럼 px 고정 — 남는 폭은 막대(매입 추이) 컬럼이 흡수 */}
-                <col style={{ width: 110 }} />
-                <col style={{ width: 140 }} />
-                <col style={{ width: 105 }} />
-                <col style={{ width: 130 }} />
+                <col style={{ width: 120 }} />
+                <col style={{ width: 152 }} />
+                <col style={{ width: 116 }} />
+                {/* 148 = 130→ (2026-07-30 헤더 14px 전환, 위 표와 동일 사유) */}
+                <col style={{ width: 148 }} />
                 <col />
-                <col style={{ width: 64 }} />
+                <col style={{ width: 72 }} />
               </colgroup>
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
+                <tr className="border-b border-gray-200 bg-gray-50 text-left text-table-head text-gray-500">
                   <th className="whitespace-nowrap px-4 py-3">
                     기간{' '}
                     <span className="font-normal text-gray-400">

@@ -55,10 +55,7 @@ export default function StockStatusResults({
   };
 
   return (
-    <main
-      className="min-h-screen bg-[#F2F4F6] pb-36"
-      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
-    >
+    <main className="min-h-screen bg-[#F2F4F6] pb-36">
       <PageHeader
         title="재고 조회"
         onBack={onBackToForm}

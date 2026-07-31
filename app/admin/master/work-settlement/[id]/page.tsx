@@ -15,6 +15,7 @@ import { formatNum } from '@/lib/number-format';
 import { toast } from '@/lib/toast';
 import {
   saveWorkSettlement,
+  saveWorkSettlementHeader,
   confirmWorkSettlement,
   getWorkSettlementDetail,
   getStorageBoxTypeFees,
@@ -24,8 +25,8 @@ import { listProducts, type Product } from '@/app/actions/admin/master-products'
 import { listStorages, type Storage } from '@/app/actions/admin/master-storage';
 import { listShips, type Ship } from '@/app/actions/admin/master-ships';
 import {
-  WS_CSS, BOX_INTERNAL, BOX_LABEL, USES, USE_LABEL, DANGA_WON_GROUPS, COMMISSION_RATE,
-  pn, fmt, nid, dangaWon, computeWorkHours,
+  WS_CSS, TIMES, BOX_INTERNAL, BOX_LABEL, USES, USE_LABEL, DANGA_WON_GROUPS, COMMISSION_RATE,
+  pn, fmt, nid, dangaWon, computeWorkHours, normDate, normTime,
   defaultGroups, emptyProd, prodRowsFromLines, groupsFromCosts,
   buildFreezeRows, buildInoutRows, sumByBoxType, isFeeExemptUse,
   type CostRow, type CostGroup, type ProdRow, type StorageFee,
@@ -57,6 +58,20 @@ export default function WorkSettlementStep2Page() {
   const [groups, setGroups] = useState<CostGroup[]>(() => defaultGroups());
   const [prod, setProd] = useState<ProdRow[]>(() => [emptyProd(), emptyProd()]);
   const [fees, setFees] = useState<Record<string, StorageFee>>({}); // 행선지 보관처 동결비·입출고비 단가 캐시
+
+  // 사전기입 인라인 수정(접기/펼치기) — 페이지 이동 없이 ①단계 값을 바로 고친다.
+  const [hdrEdit, setHdrEdit] = useState(false);
+  const [hdrSaving, setHdrSaving] = useState(false);
+  const [ewWork, setEwWork] = useState('');
+  const [ewGu, setEwGu] = useState('');
+  const [ewFood, setEwFood] = useState(false);
+  const [ewSundo, setEwSundo] = useState('');
+  const [ewDate, setEwDate] = useState('');
+  const [ewStart, setEwStart] = useState('');
+  const [ewEnd, setEwEnd] = useState('');
+  const [ewShip, setEwShip] = useState('');
+  const [ewEodae, setEwEodae] = useState('');
+  const [ewMemo, setEwMemo] = useState('');
 
   useEffect(() => {
     const s = readSession();
@@ -235,6 +250,61 @@ export default function WorkSettlementStep2Page() {
     };
   };
 
+  const openHdrEdit = () => {
+    if (!hdr) return;
+    setEwWork(storages.find((x) => x.id === hdr.workplaceId)?.name ?? '');
+    setEwGu(hdr.fishingArea);
+    setEwFood(hdr.hasFeed === 'O');
+    setEwSundo(hdr.freshness);
+    setEwDate(hdr.date);
+    setEwStart(hdr.startTime);
+    setEwEnd(hdr.endTime);
+    setEwShip(ships.find((x) => x.id === hdr.shipId)?.name ?? '');
+    setEwEodae(hdr.catchAmount ? fmt(hdr.catchAmount) : '');
+    setEwMemo(hdr.memo);
+    setHdrEdit(true);
+  };
+
+  const saveHdrEdit = async () => {
+    const s = readSession();
+    if (!s || isSessionExpired(s)) return toast('로그인이 필요합니다.', 'error');
+    const d = normDate(ewDate);
+    if (!d.trim()) return toast('작업일을 입력하세요.', 'error');
+    setHdrSaving(true);
+    try {
+      const res = await saveWorkSettlementHeader(s.workerId, {
+        settlementId,
+        date: d,
+        workplaceId: storages.find((x) => x.name === ewWork.trim())?.id || undefined,
+        fishingArea: ewGu || undefined,
+        hasFeed: ewFood ? 'O' : 'X',
+        freshness: ewSundo || undefined,
+        shipId: ships.find((x) => x.name === ewShip.trim())?.id || undefined,
+        startTime: normTime(ewStart) || undefined,
+        endTime: normTime(ewEnd) || undefined,
+        catchAmount: pn(ewEodae) || undefined,
+        memo: ewMemo || undefined,
+      });
+      if (res.success) {
+        setHdr({
+          date: d,
+          workplaceId: storages.find((x) => x.name === ewWork.trim())?.id ?? '',
+          fishingArea: ewGu,
+          hasFeed: ewFood ? 'O' : 'X',
+          freshness: ewSundo,
+          shipId: ships.find((x) => x.name === ewShip.trim())?.id ?? '',
+          supplierId: hdr?.supplierId ?? '',
+          startTime: normTime(ewStart),
+          endTime: normTime(ewEnd),
+          catchAmount: pn(ewEodae),
+          memo: ewMemo,
+        });
+        toast('사전기입 저장', 'success');
+        setHdrEdit(false);
+      } else toast(res.error ?? '저장 실패', 'error');
+    } finally { setHdrSaving(false); }
+  };
+
   const doSave = async () => {
     const s = readSession();
     if (!s || isSessionExpired(s)) return toast('로그인이 필요합니다.', 'error');
@@ -290,14 +360,45 @@ export default function WorkSettlementStep2Page() {
           <p className="lede">정산서 나온 뒤 <b>생산내역</b>과 <b>작업비</b>를 채웁니다. 생산내역 <b>구분</b>을 고르면 작업비 수량이 자동 합산되고, <b>지급처</b> 선택 시 동결비·입출고비 단가가 자동 채워집니다. <b>확정</b> 시 생산내역별 재고(LOT)가 생성됩니다.</p>
         </header>
 
-        {/* 사전기입 요약 (읽기 전용) */}
+        {/* 사전기입 요약 — 펼치면 페이지 이동 없이 바로 수정 */}
         <div className="ctxbar">
           <div className="ci"><span className="ck">작업일</span><span className="cv">{hdr?.date || '—'}</span></div>
           <div className="ci"><span className="ck">선박</span><span className="cv">{shipName}</span></div>
           <div className="ci"><span className="ck">어대금</span><span className="cv">{hdr?.catchAmount ? `${fmt(hdr.catchAmount)}원` : '—'}</span></div>
           <div className="ci"><span className="ck">작업시간</span><span className="cv">{hdr ? `${hdr.startTime || '—'} ~ ${hdr.endTime || '—'}` : '—'}</span></div>
-          <Link href={`/admin/master/work-settlement/new?id=${settlementId}`} className="edit">사전기입 수정</Link>
+          {editable && (
+            <button type="button" className="edit" onClick={() => (hdrEdit ? setHdrEdit(false) : openHdrEdit())}>
+              {hdrEdit ? '접기 ▴' : '사전기입 수정 ▾'}
+            </button>
+          )}
         </div>
+
+        {hdrEdit && (
+          <div className="ctx-edit">
+            <section className="fields">
+              <div className="f"><label>작업장</label><Combo value={ewWork} onChange={setEwWork} options={storages.map((s) => s.name)} placeholder="예: 금능" /></div>
+              <div className="f"><label>조업 해구</label><input value={ewGu} onChange={(e) => setEwGu(e.target.value)} placeholder="예: 110" /></div>
+              <div className="f"><label>먹이유무</label>
+                <label className="chk"><input type="checkbox" checked={ewFood} onChange={(e) => setEwFood(e.target.checked)} /><span className="chk-box" /><span className="chk-txt">{ewFood ? 'O' : 'X'}</span></label>
+              </div>
+              <div className="f"><label>선도</label><input value={ewSundo} onChange={(e) => setEwSundo(e.target.value)} placeholder="A / B / C" /></div>
+              <div className="f"><label>작업일</label><input value={ewDate} onChange={(e) => setEwDate(e.target.value)} onBlur={() => setEwDate(normDate(ewDate))} placeholder="YYYY-MM-DD" /></div>
+              <div className="f"><label>시작 ~ 종료시간</label>
+                <div className="time-range">
+                  <Combo value={ewStart} onChange={setEwStart} options={TIMES} startsWith blurFormat={normTime} placeholder="19:00" />
+                  <span className="tl">~</span>
+                  <Combo value={ewEnd} onChange={setEwEnd} options={TIMES} startsWith blurFormat={normTime} placeholder="04:00" />
+                </div>
+              </div>
+              <div className="f"><label>선박명</label><Combo value={ewShip} onChange={setEwShip} options={ships.map((s) => s.name)} placeholder="예: 해금호" /></div>
+              <div className="f"><label>어대금 <span className="dim">(원물 대금)</span></label><input value={ewEodae} onChange={(e) => setEwEodae(e.target.value)} onBlur={(e) => { const v = pn(e.target.value); if (v) setEwEodae(fmt(v)); }} placeholder="0" /></div>
+              <div className="f"><label>비고</label><input value={ewMemo} onChange={(e) => setEwMemo(e.target.value)} placeholder="—" /></div>
+              <div className="fields-actions">
+                <button type="button" className="btn primary" onClick={() => void saveHdrEdit()} disabled={hdrSaving}>{hdrSaving ? '저장 중…' : '저장'}</button>
+              </div>
+            </section>
+          </div>
+        )}
 
         {status && status !== '임시저장' && (
           <p className="cap" style={{ color: '#8A5A00' }}>이 정산은 ‘{status}’ 상태입니다. 수정·확정할 수 없습니다.</p>

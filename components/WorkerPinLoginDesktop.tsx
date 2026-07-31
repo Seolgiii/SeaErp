@@ -196,10 +196,7 @@ export function WorkerPinLoginDesktop() {
   };
 
   return (
-    <div
-      className="min-h-screen flex bg-[#F2F4F6]"
-      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
-    >
+    <div className="min-h-screen flex bg-[#F2F4F6]">
       {/* ─── 좌측: 브랜드 파노라마 ─── */}
       <aside
         className="w-1/2 relative overflow-hidden flex flex-col justify-between px-16 py-14"

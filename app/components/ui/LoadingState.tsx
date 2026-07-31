@@ -60,7 +60,7 @@ export function LoadingState({ cols, rows = 8, spacer = false, label = '불러�
         <thead>
           <tr className="bg-surface-alt">
             {cols.map((c) => (
-              <th key={c.key} className="px-4 py-2 text-left text-label text-text-muted">
+              <th key={c.key} className="px-4 py-2 text-left text-table-head text-text-muted">
                 {c.label}
               </th>
             ))}

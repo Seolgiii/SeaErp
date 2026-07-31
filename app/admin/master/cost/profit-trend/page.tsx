@@ -425,19 +425,22 @@ export default function ProfitTrendPage() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[960px] table-fixed text-[13px]">
+              {/* 2026-07-30: 본문 13px → text-body(14px), colgroup ×14/13 산술 환산(육안 확인 필요) */}
+              <table className="w-full min-w-[960px] table-fixed text-body">
                 <colgroup>
                   {/* 숫자 컬럼은 px 고정, 남는 폭은 맨 끝(건) 컬럼이 흡수 — 화면이 넓어져도 컬럼이 벌어지지 않음 */}
-                  <col style={{ width: 200 }} />
-                  <col style={{ width: 140 }} />
-                  <col style={{ width: 140 }} />
-                  <col style={{ width: 145 }} />
-                  <col style={{ width: 80 }} />
-                  <col style={{ width: 100 }} />
+                  <col style={{ width: 216 }} />
+                  <col style={{ width: 152 }} />
+                  <col style={{ width: 152 }} />
+                  <col style={{ width: 160 }} />
+                  {/* 92 = 80→ (2026-07-30 헤더 14px 전환, '마진율' 3자 라벨이 하한권에 가까워져
+                      안전 마진 추가. 인라인 colgroup — §10 통합 대기, 통합 시 재검토) */}
+                  <col style={{ width: 92 }} />
+                  <col style={{ width: 108 }} />
                   <col />
                 </colgroup>
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
+                  <tr className="border-b border-gray-100 bg-gray-50 text-left text-table-head text-gray-500">
                     <th className="px-4 py-3">{tab === 'product' ? '품목' : '판매처'}</th>
                     <NumHead className="px-4 py-3">매출</NumHead>
                     <NumHead className="px-4 py-3">매출원가</NumHead>
@@ -486,19 +489,21 @@ export default function ProfitTrendPage() {
 
           {/* 추이 표 */}
           <div className="print-section overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full min-w-[960px] table-fixed text-[13px]">
+            {/* 2026-07-30: 본문 13px → text-body(14px), colgroup ×14/13 산술 환산(육안 확인 필요) */}
+            <table className="w-full min-w-[960px] table-fixed text-body">
               <colgroup>
                 {/* 숫자 컬럼 px 고정 — 남는 폭은 막대(이익 추이) 컬럼이 흡수 */}
-                <col style={{ width: 110 }} />
-                <col style={{ width: 140 }} />
-                <col style={{ width: 140 }} />
-                <col style={{ width: 145 }} />
-                <col style={{ width: 80 }} />
+                <col style={{ width: 120 }} />
+                <col style={{ width: 152 }} />
+                <col style={{ width: 152 }} />
+                <col style={{ width: 160 }} />
+                {/* 92 = 80→ (2026-07-30, 위 표와 동일 사유) */}
+                <col style={{ width: 92 }} />
                 <col />
-                <col style={{ width: 130 }} />
+                <col style={{ width: 140 }} />
               </colgroup>
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
+                <tr className="border-b border-gray-200 bg-gray-50 text-left text-table-head text-gray-500">
                   <th className="px-4 py-3">기간</th>
                   <NumHead className="px-4 py-3">매출</NumHead>
                   <NumHead className="px-4 py-3">매출원가</NumHead>

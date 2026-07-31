@@ -207,8 +207,8 @@ export default function WorkersMasterPage() {
                   <Th label="작업자명" field="name" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="권한" field="role" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="활성" field="active" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">PIN 상태</th>
-                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">잠금</th>
+                  <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">PIN 상태</th>
+                  <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">잠금</th>
                   <SpacerCell as="th" />
                 </tr>
               </thead>
@@ -332,7 +332,7 @@ function Th({
   const state = sortState(sortField === field, sortDir);
   return (
     // aria-sort는 columnheader(th)에. 패딩은 버튼이 가져가 셀 전체가 클릭 영역이 된다 (§7-8).
-    <th aria-sort={ariaSort(state)} className="whitespace-nowrap p-0 text-label text-text-muted">
+    <th aria-sort={ariaSort(state)} className="whitespace-nowrap p-0 text-table-head text-text-muted">
       <button
         type="button"
         onClick={() => onToggle(field)}

@@ -20,21 +20,26 @@ type SortDir = 'asc' | 'desc';
  * 컬럼 폭 — §7-2. 실측(2026-07-28, 선박 정보 마스터 24건) 최댓값 + 여유 8 + 패딩 32.
  * 선장·선적항·어업허가번호·연락처는 **24건 전부 비어 있어** 헤더 폭이 하한이다.
  * 값이 들어오기 시작하면 재측정 대상.
+ *
+ * ⚠ 2026-07-30: 헤더가 `--t-label`(12px) → `--t-table-head`(14px)로 바뀌며 헤더가
+ *   하한인 5개 컬럼을 산술 환산(×1.2, 4px 단위 올림)했다 — **브라우저 재실측이 아니다.**
+ *   Pretendard가 Spoqa보다 자면이 커서 안전 마진을 더 뒀다. 육안 확인 필요.
  */
 const COLS: TableCol[] = [
   { key: 'name', label: '선박명', px: 108 }, // max 69 `151헤승(2)`
-  { key: 'company', label: '선박회사', px: 108 }, // 헤더(66+18)가 하한
-  { key: 'captain', label: '선장', px: 84 }, // 헤더가 하한 (값 없음)
-  { key: 'homePort', label: '선적항', px: 96 }, // 헤더가 하한 (값 없음)
-  { key: 'licenseNo', label: '어업허가번호', px: 112 }, // 헤더가 하한 (값 없음)
-  { key: 'phone', label: '연락처', px: 76 }, // 헤더가 하한 (값 없음)
+  { key: 'company', label: '선박회사', px: 132 }, // 108→132. 헤더(66+18)가 하한
+  { key: 'captain', label: '선장', px: 104 }, // 84→104. 헤더가 하한 (값 없음)
+  { key: 'homePort', label: '선적항', px: 116 }, // 96→116. 헤더가 하한 (값 없음)
+  { key: 'licenseNo', label: '어업허가번호', px: 136 }, // 112→136. 헤더가 하한 (값 없음)
+  { key: 'phone', label: '연락처', px: 92 }, // 76→92. 헤더가 하한 (값 없음)
 ];
 
 /**
  * 카드·컨트롤·헤더 공통 최대 폭 (§7-9).
  * 표 합계 584 > 컨트롤 행 184(검색창 하나) → 표가 폭을 정한다. 584 → 608.
+ * 2026-07-30: 헤더 폭 재계산으로 표 합계 688 → 712.
  */
-const CONTENT_MAX = 'max-w-[608px]';
+const CONTENT_MAX = 'max-w-[712px]';
 
 export default function ShipsMasterPage() {
   const router = useRouter();
@@ -162,8 +167,8 @@ export default function ShipsMasterPage() {
                   <Th label="선박회사" field="company" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="선장" field="captain" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <Th label="선적항" field="homePort" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">어업허가번호</th>
-                  <th className="whitespace-nowrap px-4 py-2 text-label text-text-muted">연락처</th>
+                  <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">어업허가번호</th>
+                  <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">연락처</th>
                   <SpacerCell as="th" />
                 </tr>
               </thead>
@@ -222,7 +227,7 @@ function Th({
   const state = sortState(sortField === field, sortDir);
   return (
     // aria-sort는 columnheader(th)에. 패딩은 버튼이 가져가 셀 전체가 클릭 영역이 된다 (§7-8).
-    <th aria-sort={ariaSort(state)} className="whitespace-nowrap p-0 text-label text-text-muted">
+    <th aria-sort={ariaSort(state)} className="whitespace-nowrap p-0 text-table-head text-text-muted">
       <button
         type="button"
         onClick={() => onToggle(field)}

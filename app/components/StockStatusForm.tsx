@@ -40,10 +40,7 @@ export default function StockStatusForm({
     : [];
 
   return (
-    <main
-      className="min-h-screen bg-[#F2F4F6]"
-      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
-    >
+    <main className="min-h-screen bg-[#F2F4F6]">
       <PageHeader title="재고 조회" onBack={() => router.push('/')} />
 
       <div className="pt-3 px-5 pb-5 space-y-3">

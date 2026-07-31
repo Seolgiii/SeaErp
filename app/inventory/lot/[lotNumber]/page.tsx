@@ -23,10 +23,7 @@ async function buildQrDataUrl(lotNumber: string): Promise<string | null> {
 
 function NotFoundView({ lotNumber }: { lotNumber: string }) {
   return (
-    <main
-      className="min-h-screen bg-[#F2F4F6]"
-      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
-    >
+    <main className="min-h-screen bg-[#F2F4F6]">
       <PageHeader title="LOT 상세" />
       <div className="px-5 pt-6 space-y-3">
         <div className="bg-white rounded-[24px] p-6 shadow-[0_8px_24px_rgba(149,157,165,0.08)] text-center space-y-3">
@@ -96,10 +93,7 @@ function DetailView({
   qrDataUrl: string | null;
 }) {
   return (
-    <main
-      className="min-h-screen bg-[#F2F4F6] pb-10"
-      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
-    >
+    <main className="min-h-screen bg-[#F2F4F6] pb-10">
       <PageHeader title="LOT 상세" />
 
       <div className="px-5 pt-4 space-y-3">

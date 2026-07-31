@@ -202,7 +202,7 @@ export default function InventoryRecordPage() {
   };
 
   return (
-    <div className={`min-h-screen bg-[#F2F4F6] flex flex-col font-['Spoqa_Han_Sans_Neo'] ${cart.length > 0 ? 'pb-32' : 'pb-10'}`}>
+    <div className={`min-h-screen bg-[#F2F4F6] flex flex-col ${cart.length > 0 ? 'pb-32' : 'pb-10'}`}>
       <PageHeader
         title="물품 입고"
         subtitle="어떤 물건이 들어왔나요?"

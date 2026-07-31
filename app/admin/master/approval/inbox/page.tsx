@@ -56,7 +56,9 @@ const TYPE_FILTERS: { key: TypeFilter; label: string }[] = [
   { key: 'INBOUND', label: '입고' },
   { key: 'OUTBOUND', label: '출고' },
   { key: 'TRANSFER', label: '이동' },
-  { key: 'EXPENSE', label: '지출' },
+  // 2026-07-31: 비용 관리를 회계 프로그램으로 이관하기로 해 진입 경로만 숨김(처리 로직은 유지 —
+  //   '전체' 탭에서는 계속 섞여 나오고 승인·반려도 그대로 동작한다).
+  // { key: 'EXPENSE', label: '지출' },
 ];
 
 export default function ApprovalInboxPage() {

@@ -17,13 +17,13 @@ import {
   cancelWorkSettlement,
   type WorkSettlementSummary,
 } from '@/app/actions/admin/master-work-settlement';
-import { listSuppliers } from '@/app/actions/admin/master-suppliers';
+import { listShips } from '@/app/actions/admin/master-ships';
 
 export default function WorkSettlementPage() {
   const router = useRouter();
   const [workerId, setWorkerId] = useState<string | null>(null);
   const [rows, setRows] = useState<WorkSettlementSummary[]>([]);
-  const [supplierNames, setSupplierNames] = useState<Map<string, string>>(new Map());
+  const [shipNames, setShipNames] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -40,11 +40,11 @@ export default function WorkSettlementPage() {
     setIsLoading(true);
     const [w, s] = await Promise.all([
       listWorkSettlements(workerId),
-      listSuppliers(workerId),
+      listShips(workerId),
     ]);
     if (w.success) setRows(w.data);
     else toast(`조회 실패: ${w.error}`, 'error');
-    if (s.success) setSupplierNames(new Map(s.data.map((x) => [x.id, x.name])));
+    if (s.success) setShipNames(new Map(s.data.map((x) => [x.id, x.name])));
     setIsLoading(false);
   }, [workerId]);
 
@@ -52,24 +52,24 @@ export default function WorkSettlementPage() {
     if (workerId) void loadData();
   }, [workerId, loadData]);
 
-  const supplierName = useMemo(
-    () => (id: string) => supplierNames.get(id) ?? '—',
-    [supplierNames],
+  const shipName = useMemo(
+    () => (id: string) => shipNames.get(id) ?? '—',
+    [shipNames],
   );
 
   const cancel = async (row: WorkSettlementSummary) => {
     if (!workerId) return;
-    const msg =
-      row.status === '확정'
-        ? `'${row.no}'를 취소할까요? 생성된 입고·재고(LOT)가 함께 취소됩니다. (미출고 상태만 가능)`
-        : `'${row.no}'를 취소할까요?`;
+    const isDraft = row.status === '임시저장';
+    const msg = isDraft
+      ? `'${row.no}'를 삭제할까요?`
+      : `'${row.no}'를 취소할까요? 생성된 입고·재고(LOT)가 함께 취소됩니다. (미출고 상태만 가능)`;
     if (!confirm(msg)) return;
     const res = await cancelWorkSettlement(workerId, row.id);
     if (res.success) {
-      toast('취소되었습니다.', 'success');
+      toast(isDraft ? '삭제되었습니다.' : '취소되었습니다.', 'success');
       void loadData();
     } else {
-      toast(res.error ?? '취소 실패', 'error');
+      toast(res.error ?? (isDraft ? '삭제 실패' : '취소 실패'), 'error');
     }
   };
 
@@ -116,7 +116,7 @@ export default function WorkSettlementPage() {
                   임시저장 <span className="text-[13px] font-medium text-gray-400">{draft.length}건</span>
                 </h2>
               </div>
-              <SettlementTable rows={draft} supplierName={supplierName} onCancel={cancel} />
+              <SettlementTable rows={draft} shipName={shipName} onCancel={cancel} />
             </section>
           )}
 
@@ -129,7 +129,7 @@ export default function WorkSettlementPage() {
             {rest.length === 0 ? (
               <div className="px-5 py-10 text-center text-[13px] text-gray-400">아직 없습니다.</div>
             ) : (
-              <SettlementTable rows={rest} supplierName={supplierName} onCancel={cancel} />
+              <SettlementTable rows={rest} shipName={shipName} onCancel={cancel} />
             )}
           </section>
         </div>
@@ -140,41 +140,41 @@ export default function WorkSettlementPage() {
 
 function SettlementTable({
   rows,
-  supplierName,
+  shipName,
   onCancel,
 }: {
   rows: WorkSettlementSummary[];
-  supplierName: (id: string) => string;
+  shipName: (id: string) => string;
   onCancel: (r: WorkSettlementSummary) => void;
 }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[13px]">
         <thead>
-          <tr className="text-left text-[12px] font-bold text-gray-400">
-            <th className="px-5 py-2.5">정산번호</th>
-            <th className="px-5 py-2.5">작업일</th>
-            <th className="px-5 py-2.5">매입처</th>
+          <tr className="text-left text-table-head text-gray-400">
+            <th className="px-5 py-2.5 text-center">정산번호</th>
+            <th className="px-5 py-2.5 text-center">작업일</th>
+            <th className="px-5 py-2.5 text-center">선박명</th>
             <NumHead className="px-5 py-2.5">생산내역</NumHead>
-            <NumHead className="px-5 py-2.5">어대금</NumHead>
-            <th className="px-5 py-2.5">상태</th>
+            <NumHead className="pl-5 py-2.5 pr-[21px]">어대금</NumHead>
+            <th className="px-5 py-2.5 text-center">상태</th>
             <th className="px-5 py-2.5" />
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} className="border-t border-gray-50">
-              <td className="px-5 py-2.5 font-medium tabular-nums text-gray-900">{r.no || '—'}</td>
-              <td className="px-5 py-2.5 tabular-nums text-gray-700">{r.date || '—'}</td>
-              <td className="px-5 py-2.5 text-gray-800">{supplierName(r.supplierId)}</td>
+              <td className="px-5 py-2.5 text-center font-medium tabular-nums text-gray-900">{r.no || '—'}</td>
+              <td className="px-5 py-2.5 text-center tabular-nums text-gray-700">{r.date || '—'}</td>
+              <td className="px-5 py-2.5 text-center text-gray-800">{shipName(r.shipId)}</td>
               <NumCell className="px-5 py-2.5 text-gray-700" value={r.lineCount} unit="줄" />
               <NumCell
-                className="px-5 py-2.5 text-gray-700"
+                className="pl-5 py-2.5 pr-[21px] text-gray-700"
                 value={r.catchAmount > 0 ? r.catchAmount : null}
                 unit="원"
                 empty="—"
               />
-              <td className="px-5 py-2.5">
+              <td className="px-5 py-2.5 text-center">
                 <StatusBadge status={r.status} />
               </td>
               <td className="px-5 py-2.5 text-right whitespace-nowrap">
@@ -191,7 +191,7 @@ function SettlementTable({
                     onClick={() => onCancel(r)}
                     className="text-[12px] font-medium text-red-500 hover:text-red-600"
                   >
-                    취소
+                    {r.status === '임시저장' ? '삭제' : '취소'}
                   </button>
                 )}
               </td>

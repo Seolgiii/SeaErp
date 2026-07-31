@@ -111,19 +111,25 @@ export default function WorkerDashboard() {
   const allSecondaryItems = [
     { id: "transfer", title: "재고 이동", desc: "보관처 이동", Icon: ArrowsRightLeftIcon, iconBg: "#FF8C00", path: "/inventory/transfer" },
     { id: "status", title: "재고 조회", desc: "조회 · 묶음 출고/이동", Icon: CubeIcon, iconBg: "#8B95A1", path: "/inventory/status" },
-    { id: "expense-new", title: "지출 신청", desc: "자재/경비 결의서", Icon: BanknotesIcon, iconBg: "#00D082", path: "/expense/new" },
+    // 2026-07-31: 비용 관리를 회계 프로그램으로 이관하기로 해 진입 경로만 숨김(기능은 유지, CLAUDE.md 참고).
+    { id: "expense-new", title: "지출 신청", desc: "자재/경비 결의서", Icon: BanknotesIcon, iconBg: "#00D082", path: "/expense/new", disabled: true },
     { id: "my-requests", title: "신청 내역", desc: "내 신청 현황 조회", Icon: ClipboardDocumentListIcon, iconBg: "#5061FF", path: "/my-requests" },
     { id: "admin-system", title: "관리자 시스템", desc: "결재 및 통합 관리", Icon: ShieldCheckIcon, iconBg: "#191F28", path: "/admin/dashboard", adminOnly: true },
   ];
 
   const secondaryItems = allSecondaryItems.filter(
-    (item) => !item.adminOnly || role === "ADMIN" || role === "MASTER"
+    (item) => (!item.adminOnly || role === "ADMIN" || role === "MASTER") && !item.disabled
   );
 
+  const kpiItems = [
+    { label: "입·출고 대기", value: stats?.pendingLogistics, tab: "LOGISTICS" },
+    // 2026-07-31: 비용 관리를 회계 프로그램으로 이관하기로 해 진입 경로만 숨김(기능은 유지, CLAUDE.md 참고).
+    // { label: "지출 대기", value: stats?.pendingExpense, tab: "EXPENSE" },
+  ];
+
   return (
-    // font-sans 클래스 대신 명시적으로 style 속성이나 globals.css의 설정을 따릅니다.
-    <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-10" style={{ fontFamily: "'Spoqa Han Sans Neo', 'sans-serif'" }}>
-      
+    <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-10">
+
       {/* 상단 헤더 */}
       <header className="px-5 pt-5 pb-1 flex items-center justify-between">
         <h1 className="text-[20px] font-black text-[#3182F6] tracking-tight">SEAERP</h1>
@@ -141,11 +147,8 @@ export default function WorkerDashboard() {
       <main className="flex-1 p-5 flex flex-col gap-4">
         {/* KPI 스트립 — 결재 대기 (관리자/마스터 전용) */}
         {(role === "ADMIN" || role === "MASTER") && (
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: "입·출고 대기", value: stats?.pendingLogistics, tab: "LOGISTICS" },
-              { label: "지출 대기", value: stats?.pendingExpense, tab: "EXPENSE" },
-            ].map((kpi) => {
+          <div className={`grid gap-2 ${kpiItems.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+            {kpiItems.map((kpi) => {
               const count = kpi.value ?? 0;
               const highlight = count > 0;
               return (

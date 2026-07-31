@@ -29,7 +29,9 @@
     --warn-ink: #7A5510;
     --warn-surface: #F7EBD6;
 
-    --measure: 64ch;
+    /* 본문 폭 — 종이 폭을 다 쓰도록 넓게. 좁히면 오른쪽 여백이 크게 남는다. */
+    --measure: 74ch;
+    --measure-wide: 76ch;   /* 소제목 — 한 줄에 담기도록 본문보다 조금 더 */
     --sheet-pad: 22mm 20mm;
 
     /* 간격 토큰 — print에서 한 번에 줄인다 */
@@ -103,14 +105,14 @@
   }
   .subtitle {
     font-size: 16px; font-weight: 400; color: var(--ink-muted);
-    margin: 10px 0 0; max-width: var(--measure); line-height: 1.65;
+    margin: 10px 0 0; max-width: var(--measure-wide); line-height: 1.65;
   }
   h2 {
     font-size: 22px; font-weight: 700; letter-spacing: -.02em;
     line-height: 1.3; margin: 0; text-wrap: balance;
   }
   h3 { font-size: 16px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
-  p { margin: 0; max-width: var(--measure); }
+  p { margin: 0; max-width: var(--measure); text-wrap: balance; }
   .muted { color: var(--ink-muted); }
   .small { font-size: 14px; }
   .xs { font-size: 13px; line-height: 1.6; }
@@ -121,6 +123,9 @@
     margin-bottom: 22px;
   }
   .sheet-head.plain { border-bottom-width: 1px; border-bottom-color: var(--rule); }
+  /* 표제부 로고 — 제호(SEAERP) 오른쪽에 나란히 둔다 */
+  .title-row { display: flex; align-items: center; gap: 16px; }
+  .logo { width: 58px; height: 58px; flex: none; }
   .sheet-num {
     font-size: 12px; font-weight: 600; letter-spacing: .12em;
     color: var(--ink-muted); font-variant-numeric: tabular-nums;
@@ -155,7 +160,7 @@
 
   /* ── 목록 ── */
   ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
-  ul li { font-size: 15px; padding-left: 14px; position: relative; line-height: 1.55; }
+  ul li { font-size: 15px; padding-left: 14px; position: relative; line-height: 1.55; text-wrap: balance; }
   ul li::before {
     content: ""; position: absolute; left: 0; top: .66em;
     width: 5px; height: 1px; background: var(--ink-muted);
@@ -319,6 +324,8 @@
     h3 { font-size: 11pt; }
     .subtitle { font-size: 10pt; line-height: 1.5; margin-top: 7px; }
     .eyebrow, .sheet-num { font-size: 8.5pt; margin-bottom: 8px; }
+    .title-row { gap: 10px; }
+    .logo { width: 14mm; height: 14mm; }
     .sheet-head { gap: 7px; padding-bottom: 11px; margin-bottom: 15px; }
 
     ul { gap: 5px; }
@@ -374,14 +381,17 @@
 <section class="sheet">
   <header class="sheet-head">
     <p class="eyebrow">사내 설명 자료 · 1면</p>
-    <h1>SEAERP</h1>
-    <p class="subtitle">원물이 들어와서 보관·가공을 거쳐 나가기까지를 상자 묶음 단위로 기록하는 사내 프로그램입니다. 기록한 값에서 재고와 원가가 자동으로 계산됩니다.</p>
+    <div class="title-row">
+      <h1>SEAERP</h1>
+      <img class="logo" src="data:image/png;base64,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" alt="SEAERP 로고" width="192" height="192">
+    </div>
+    <p class="subtitle">원물이 들어와서 보관·가공을 거쳐 나가기까지를 상자 묶음 단위로 기록하는 사내 프로그램입니다. 한 번 기록해 두면 재고와 원가는 그 값에서 자동으로 계산됩니다.</p>
   </header>
 
   <div class="stack">
 
     <div class="callout pri">
-      <p class="small">지금은 <b>예비 버전</b>입니다. 완성된 것을 배포하는 단계가 아니라, 실제로 써 보면서 고쳐 나가는 단계입니다. 쓰시다가 불편한 점이나 실제 업무와 맞지 않는 부분을 알려 주시면 그에 맞춰 고칩니다. 마지막 면에 의견 적는 칸이 있습니다.</p>
+      <p class="small">지금은 <b>예비 버전</b>입니다. 완성된 것을 내놓는 자리가 아니라, 함께 써 보면서 고쳐 나가는 자리입니다. 불편하거나 업무와 맞지 않는 부분은 알려 주시면 그대로 고칩니다.</p>
     </div>
 
     <div class="stack-tight">
@@ -393,8 +403,8 @@
       <div class="step">
         <div class="step-n">1</div>
         <div class="step-body">
-          <h3>입고</h3>
-          <p class="what">현장에서 휴대전화로 등록합니다. 관리자가 승인하면 <b>LOT 번호</b>가 부여되고 입고증이 만들어집니다.</p>
+          <h3>입고 · 생산</h3>
+          <p class="what">들어오는 길이 둘입니다. <b>입고</b>는 현장에서 휴대전화로 등록하고, 관리자가 승인하면 <b>LOT 번호</b>가 붙고 입고증이 만들어집니다. 작업장에서 동결·선별해 상자로 만든 물량은 <b>작업 정산</b>에 사이즈별 수량과 수매단가, 그날의 작업비를 적으시면 됩니다. 확정하는 순간 입고 기록과 LOT이 자동으로 만들어지고, 작업비를 박스 수로 나눈 몫이 수매단가에 더해져 그 LOT의 원가가 됩니다.</p>
         </div>
       </div>
       <div class="step">
@@ -408,21 +418,21 @@
         <div class="step-n">3</div>
         <div class="step-body">
           <h3>이동 · 가공</h3>
-          <p class="what">보관처를 옮기면 새 LOT이 생기되 원래 LOT까지 거슬러 올라갈 수 있습니다. 가공하면 원물 LOT이 줄고 가공품 LOT이 생기며, 그때까지의 원가가 가공품으로 넘어갑니다.</p>
+          <p class="what">보관처를 옮기면 새 LOT이 생기지만 원래 LOT까지 거슬러 올라갈 수 있습니다. 가공하면 그때까지 쌓인 원가가 가공품 LOT으로 그대로 넘어갑니다.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-n">4</div>
         <div class="step-body">
           <h3>출고</h3>
-          <p class="what">출고 시점의 원가와 판매가가 함께 기록되어 남습니다. 출고증이 만들어집니다.</p>
+          <p class="what">출고 시점의 원가와 판매가가 그대로 남고, 출고증이 만들어집니다.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-n">5</div>
         <div class="step-body">
           <h3>집계</h3>
-          <p class="what">품목별·매입처별·선박별·기간별로 모아 봅니다. 매일 아침 9시에 전날 내역이 메일로 발송됩니다.</p>
+          <p class="what">품목·매입처·선박·기간별로 모아 봅니다. 전날 내역은 아침마다 메일로 옵니다.</p>
         </div>
       </div>
     </div>
@@ -435,14 +445,14 @@
   <header class="sheet-head plain">
     <p class="sheet-num">2면</p>
     <h2>LOT 번호와 기준 정보</h2>
-    <p class="subtitle">이 프로그램은 종이 서식을 화면으로 옮겨 놓은 것이 아닙니다. 값을 한 곳에만 등록해 두고 나머지 화면이 그것을 끌어다 쓰는 구조입니다. 그래서 실제 입력하는 양이 적습니다.</p>
+    <p class="subtitle">이 프로그램은 단순히 종이 서식을 화면으로 옮겨 놓은 것이 아닙니다. 값을 한 곳에만 등록해 두면 나머지 화면이 끌어다 쓰는 구조입니다. 그래서 입력하는 양이 적습니다.</p>
   </header>
 
   <div class="stack">
 
     <div class="stack-tight">
       <h3>LOT 번호</h3>
-      <p class="small">한 묶음에 붙는 번호입니다. 이 번호로 그 물건이 지나온 전 과정을 한 화면에서 조회합니다.</p>
+      <p class="small">한 묶음에 붙는 번호입니다. 이 LOT 번호 하나로 그 물건의 정보와 지나온 전 과정을 한번에 파악할 수 있습니다.</p>
     </div>
 
     <div class="tw">
@@ -461,12 +471,12 @@
         </tbody>
       </table>
     </div>
-    <p class="xs muted">번호 자체가 네 가지 정보를 담고 있어, 번호만 보고도 언제 들어온 어떤 물건인지 알 수 있습니다.</p>
+    <p class="xs muted">번호만 보고도 언제 들어온 어떤 물건인지 알 수 있습니다.</p>
 
     <div class="stack-tight">
       <h3>기준 정보(마스터)란</h3>
-      <p class="small">자주 바뀌지 않는 값 — 품목, 매입처, 보관처, 선박, 보관 요율 같은 것 — 을 따로 등록해 두는 표입니다. 거래를 기록할 때는 이 목록에서 <b>고르기만</b> 하고, 나머지 값은 연결을 타고 자동으로 따라옵니다.</p>
-      <p class="small">예를 들어 보관처를 한 번 고르면 그 보관처의 냉장료·입출고비·노조비 요율이 함께 따라옵니다. 요율을 매번 입력하지 않고, 요율이 바뀌면 보관처 비용 이력 한 곳만 고치면 됩니다.</p>
+      <p class="small">자주 바뀌지 않는 값 — 품목, 매입처, 보관처, 선박, 보관 요율 — 을 따로 등록해 두는 표입니다. 거래를 기록할 때는 이 목록에서 <b>고르기만</b> 하시면 되고, 나머지는 연결을 타고 따라옵니다.</p>
+      <p class="small">예를 들어 보관처를 한 번 고르면 그 보관처의 냉장료·입출고비·노조비 요율이 함께 따라옵니다. 요율이 바뀌어도 보관처 비용 이력 한 곳만 고치시면 됩니다.</p>
     </div>
 
     <div class="tw">
@@ -495,7 +505,7 @@
   <header class="sheet-head plain">
     <p class="sheet-num">3면</p>
     <h2>어느 기준 정보가 어디에 쓰이는가</h2>
-    <p class="subtitle">한 기준 정보가 여러 화면에서 함께 쓰입니다. 아래는 실제 연결을 정리한 표입니다.</p>
+    <p class="subtitle">한 기준 정보가 여러 화면에서 함께 쓰입니다. 실제 연결은 아래와 같습니다.</p>
   </header>
 
   <div class="stack">
@@ -532,11 +542,11 @@
     </div>
 
     <div class="callout">
-      <p class="small"><b>보관처 마스터를 예로 들면</b> — 입고할 때 어디에 넣을지 고르고, 이동할 때 어디로 옮길지 고르고, 가공할 때 어느 가공공장인지 고르고, 작업 정산에서 작업장과 행선지로 쓰이고, 재고 조회에서 보관처별로 묶어 보고, 입출고증을 발행할지 말지도 <b>보관처의 구분(자사창고 여부)</b>이 결정합니다. 여섯 군데에서 같은 한 곳을 봅니다.</p>
+      <p class="small"><b>보관처 마스터를 예로 들면</b> — 입고할 때 어디에 넣을지 고르고, 이동할 때 어디로 옮길지 고르고, 가공할 때 어느 가공공장인지 고르고, 작업 정산에서는 작업장과 행선지로 쓰이고, 재고 조회에서는 보관처별로 묶어 볼 수 있습니다. 입출고증을 발행할지 말지도 <b>보관처의 구분(자사창고 여부)</b>으로 정해집니다. 여섯 군데가 같은 한 곳을 봅니다.</p>
     </div>
 
     <div class="callout">
-      <p class="small"><b>가공비 단가는</b> 보관처 마스터 화면 안(가공공장 항목)에서 관리하고, 가공 거래에서 가공공장·가공품·날짜로 해당 단가를 자동으로 찾아 씁니다. 등록된 단가가 없으면 가공 거래가 진행되지 않고 먼저 등록하라는 안내가 나옵니다. 값이 없는 채로 원가가 잘못 계산되는 일을 막기 위한 것입니다.</p>
+      <p class="small"><b>가공비 단가는</b> 보관처 마스터 화면 안(가공공장 항목)에서 관리하고, 가공 거래에서는 가공공장·가공품·날짜로 그 단가를 자동으로 찾아 씁니다. 등록된 단가가 없으면 가공 거래가 진행되지 않고 먼저 등록하라는 안내가 나옵니다. 값이 빈 채로 원가가 잘못 계산되는 일을 막기 위해서입니다.</p>
     </div>
 
   </div>
@@ -547,7 +557,7 @@
   <header class="sheet-head plain">
     <p class="sheet-num">4면</p>
     <h2>한 번 입력하면 어디까지 따라가는가 ①</h2>
-    <p class="subtitle">앞 면의 연결이 실제로 어떻게 작동하는지 거래별로 정리했습니다. 왼쪽이 사람이 직접 넣는 값, 오른쪽이 그로부터 자동으로 채워지거나 계산되는 값입니다.</p>
+    <p class="subtitle">왼쪽이 사람이 직접 넣는 값, 오른쪽이 그로부터 자동으로 따라오는 값입니다.</p>
   </header>
 
   <div class="stack">
@@ -567,7 +577,7 @@
             <li>수량(박스)</li>
             <li>입고일 <span class="src">(오늘 날짜가 기본)</span></li>
           </ul>
-          <p class="xs muted">수매가·비고는 선택 항목입니다. 매입처·보관처·선박·원산지는 컴퓨터 등록 화면에서 목록으로 고릅니다.</p>
+          <p class="xs muted">수매가·비고는 선택 항목입니다. 매입처·보관처·선박·원산지는 컴퓨터 화면에서 고릅니다.</p>
         </div>
         <div class="chain-col">
           <span class="chain-tag tag-auto"><span class="n">11</span> 자동으로 붙는 값</span>
@@ -586,7 +596,7 @@
         </div>
       </div>
     </div>
-    <p class="xs muted">보관처 비용 이력은 <b>입고일 기준</b>으로 조회합니다. 요율이 올해 바뀌었더라도 작년에 들어온 물건에는 작년 요율이 적용됩니다.</p>
+    <p class="xs muted">보관처 비용 이력은 <b>입고일 기준</b>으로 조회합니다. 요율이 올해 바뀌었더라도 작년에 들어온 물건에는 작년 요율이 그대로 적용됩니다.</p>
 
     <div class="chain">
       <div class="chain-head">
@@ -601,14 +611,14 @@
             <li>판매처</li>
             <li>판매가</li>
           </ul>
-          <p class="xs muted">어느 LOT에서 빼는지는 재고 목록에서 고릅니다.</p>
+          <p class="xs muted">빼낼 LOT은 재고 목록에서 고르시면 됩니다.</p>
         </div>
         <div class="chain-col">
           <span class="chain-tag tag-auto"><span class="n">9</span> 자동으로 계산되는 값</span>
           <ul class="tight">
             <li>보관일수 <span class="src">← 입고일 ~ 출고일</span></li>
             <li>냉장료 <span class="src">← 냉장료 단가 × 보관일수 × 출고박스</span></li>
-            <li>입출고비 · 노조비 · 동결비 <span class="src">← LOT에 저장된 단가 × 출고박스</span></li>
+            <li>입출고비 · 노조비 · 동결비 <span class="src">← 저장된 단가 × 출고박스</span></li>
             <li>이월 비용 <span class="src">← 이동 이력이 있으면 그 몫만큼 비례 배분</span></li>
             <li>출고 시점 원가 · 손익 <span class="src">그 시점 값으로 고정 보관</span></li>
             <li>LOT 재고수량 차감 <span class="src">← 다 나가면 상태가 '소진'으로</span></li>
@@ -617,7 +627,7 @@
         </div>
       </div>
     </div>
-    <p class="xs muted">출고 시점의 원가는 그때 값으로 <b>고정해서</b> 보관합니다. 나중에 요율이 바뀌어도 과거 손익이 흔들리지 않습니다.</p>
+    <p class="xs muted">출고 시점의 원가는 그때 값으로 <b>고정해 둡니다.</b> 나중에 요율이 바뀌어도 과거 손익은 흔들리지 않습니다.</p>
 
   </div>
 </section>
@@ -671,7 +681,7 @@
         <div class="chain-col">
           <span class="chain-tag tag-in">사람이 넣는 값</span>
           <ul class="tight">
-            <li>작업장 · 선박 · 매입처 · 작업일 <span class="src">(모두 목록에서 선택)</span></li>
+            <li>작업장 · 선박 · 매입처 · 작업일 <span class="src">(목록에서 선택)</span></li>
             <li>사이즈별 생산내역 <span class="src">품목 · 구분 · 규격 · 수량 · 수매단가</span></li>
             <li>작업비 항목별 금액</li>
           </ul>
@@ -679,8 +689,8 @@
         <div class="chain-col">
           <span class="chain-tag tag-auto">자동으로 붙는 값</span>
           <ul class="tight">
-            <li>입출고비 · 동결비 단가 <span class="src">← 보관처 비용 이력 (작업장 × 작업일)</span></li>
-            <li>동결비는 구분(사료팬 · 베이트大 · 베이트小)별로 다른 단가 적용</li>
+            <li>입출고비 · 동결비 단가 <span class="src">← 보관처 비용 이력</span></li>
+            <li>동결비는 구분(사료팬 · 베이트大 · 베이트小)별 단가 적용</li>
             <li>작업단가 <span class="src">= 작업비 총액 ÷ 총 박스수</span></li>
             <li>실단가 <span class="src">= 수매단가 + 작업단가</span></li>
             <li><b>확정하면 입고 기록 1행과 LOT 1개가 자동 생성</b></li>
@@ -688,7 +698,7 @@
         </div>
       </div>
     </div>
-    <p class="xs muted">작업 정산 한 화면에서 품목 · 매입처 · 보관처 · 선박 · 작업자 다섯 가지 기준 정보와 보관처 비용 이력을 함께 씁니다. 종이 정산서에서 매번 옮겨 적던 값들입니다.</p>
+    <p class="xs muted">작업 정산 한 화면에서 품목 · 매입처 · 보관처 · 선박 · 작업자와 보관처 비용 이력을 함께 씁니다. 종이 정산서에서 매번 옮겨 적던 값들입니다.</p>
 
   </div>
 </section>
@@ -698,7 +708,7 @@
   <header class="sheet-head plain">
     <p class="sheet-num">6면</p>
     <h2>화면 목록과 승인 구조</h2>
-    <p class="subtitle">맡으신 일에 따라 쓰는 기기와 화면이 다릅니다. 현장 화면은 휴대전화에, 관리 화면은 컴퓨터에 맞춰 만들어져 있습니다.</p>
+    <p class="subtitle">맡으신 일에 따라 쓰는 화면이 다릅니다. 현장은 휴대전화, 관리는 컴퓨터입니다.</p>
   </header>
 
   <div class="stack">
@@ -713,9 +723,9 @@
           <li><b>재고 이동</b> · 보관처 간 이동 등록</li>
           <li><b>지출 신청</b> · 자재비 · 경비 결의</li>
           <li><b>신청 내역</b> · 본인이 올린 건의 처리 상태</li>
-          <li><b>QR 스캔</b> · 서류의 QR로 해당 물건 화면 열기</li>
+          <li><b>QR 스캔</b> · 서류의 QR로 물건 조회</li>
         </ul>
-        <p class="xs muted">로그인은 이름 선택 + 숫자 4자리. 30분간 조작이 없으면 자동 로그아웃되며 5분 전에 안내가 표시됩니다.</p>
+        <p class="xs muted">로그인은 이름 선택 + 숫자 4자리. 30분간 조작이 없으면 자동 로그아웃됩니다.</p>
       </div>
 
       <div class="col">
@@ -735,7 +745,7 @@
 
     <div class="stack-tight">
       <h3>승인 구조</h3>
-      <p class="small">현장에서 등록하는 것은 <b>신청</b>까지입니다. 관리자가 승인해야 재고 수량이 변경됩니다. 승인 후에 잘못이 발견되면 반려로 되돌릴 수 있고, 이때 재고 수량과 관련 비용 값도 함께 원래대로 복구됩니다.</p>
+      <p class="small">현장에서 등록하는 것은 <b>신청</b>까지입니다. 관리자가 승인해야 재고 수량이 바뀝니다. 승인 뒤에 잘못을 발견하시면 반려로 되돌릴 수 있고, 재고 수량과 비용도 함께 원래대로 돌아갑니다.</p>
     </div>
 
     <div class="tw">
@@ -755,7 +765,7 @@
       <h3>그밖에 동작하는 것</h3>
       <ul class="tight">
         <li><b>일일 정산 메일</b> · 매일 아침 9시, 전날 입고 · 출고 · 이동 · 지출 내역과 손익 추정</li>
-        <li><b>QR 공개 페이지</b> · 서류에 인쇄된 QR은 로그인 없이 열리며 품목 · 규격 · 원산지 · 입고일을 보여줍니다</li>
+        <li><b>QR 공개 페이지</b> · 서류의 QR은 로그인 없이 열리며 품목 · 규격 · 원산지 · 입고일을 보여줍니다</li>
         <li><b>어황일보 번역</b> · 조업보고서 사진을 일본어 안내문으로 변환 (텔레그램, 현재 운영 중)</li>
         <li><b>이상 감시</b> · 재고가 음수가 되거나 값이 어긋난 건을 매일 점검해 메일에 표시</li>
       </ul>
@@ -769,7 +779,7 @@
   <header class="sheet-head plain">
     <p class="sheet-num">7면</p>
     <h2>현재 범위</h2>
-    <p class="subtitle">지금 동작하는 것과 아직 만들지 않은 것을 구분해 적었습니다. 예비 버전이므로 아래 범위는 앞으로 조정될 수 있습니다.</p>
+    <p class="subtitle">지금 되는 것과 아직 안 되는 것을 나눠 적었습니다. 범위는 앞으로 조정될 수 있습니다.</p>
   </header>
 
   <div class="stack">
@@ -792,13 +802,13 @@
       <h3>아직 만들지 않은 것</h3>
       <ul class="tight">
         <li><b>주문 · 수출 서류 관리</b> — 고객 · 주문 개념이 아직 없습니다</li>
-        <li><b>세금계산서 · 부가세 · 회계 전표</b> — 회계 프로그램 영역으로 보고 넣지 않을 예정입니다. 필요한 자료를 뽑아 넘기는 방식을 검토 중입니다</li>
+        <li><b>세금계산서 · 부가세 · 회계 전표</b> — 회계 프로그램이 맡을 영역으로 보고 넣지 않습니다. 필요한 자료를 뽑아 넘기는 방식을 보고 있습니다</li>
         <li><b>팩스 자동 발송</b></li>
         <li><b>인터넷 없이 등록</b> — 저장하려면 인터넷 연결이 필요합니다</li>
         <li><b>바코드 출고</b> — QR 조회는 되지만 바코드 스캔 출고는 아직입니다</li>
         <li><b>기기별 고정 로그인</b> — 매번 이름을 고르셔야 합니다</li>
       </ul>
-      <p class="small">이 목록에 우선순위를 매기는 것이 다음 단계입니다. 어느 것이 급한지, 또는 여기 없는데 필요한 것이 있는지 알려 주시면 그 순서대로 만듭니다.</p>
+      <p class="small">이 목록에 우선순위를 매기는 것이 다음 단계입니다. 어느 것이 급한지, 여기 없는데 필요한 것이 있는지 알려 주시면 그 순서대로 만듭니다.</p>
     </div>
 
     <div class="stack-tight">
@@ -806,8 +816,8 @@
       <ul class="tight">
         <li>로그인 번호를 5회 연속 잘못 입력하면 5분간 입력이 제한됩니다. 이후 다시 5회 틀리면 30분입니다. 한 번이라도 맞으면 횟수는 초기화됩니다.</li>
         <li>번호를 잊으신 경우 관리자가 새로 발급합니다. 본인이 변경하는 화면은 없습니다.</li>
-        <li>누가 언제 등록하고 승인했는지가 기록됩니다. 수치가 맞지 않을 때 어느 단계에서 어긋났는지 확인하기 위한 기록입니다.</li>
-        <li>원가 관련 값은 컴퓨터 관리 화면에서만 표시되며 현장 휴대전화 화면에는 나오지 않습니다.</li>
+        <li>누가 언제 등록하고 승인했는지가 남습니다. 수치가 맞지 않을 때 어느 단계에서 어긋났는지 찾기 위한 기록입니다.</li>
+        <li>원가 관련 값은 컴퓨터 관리 화면에서만 보이고, 현장 휴대전화 화면에는 나오지 않습니다.</li>
       </ul>
     </div>
 
@@ -819,7 +829,7 @@
   <header class="sheet-head plain">
     <p class="sheet-num">8면</p>
     <h2>접속 방법</h2>
-    <p class="subtitle">예비 버전은 지금 접속해서 쓰실 수 있습니다. 설치 없이 인터넷 주소로도 열리고, 홈 화면에 추가하면 앱처럼 쓰입니다.</p>
+    <p class="subtitle">지금 접속해서 바로 쓰실 수 있습니다. 홈 화면에 추가하시면 앱처럼 열립니다.</p>
   </header>
 
   <div class="stack">
@@ -854,16 +864,16 @@
       <ul class="tight">
         <li>목록에서 본인 이름을 고릅니다.</li>
         <li>숫자 4자리를 누릅니다. <span class="muted">번호는 개별적으로 알려드립니다.</span></li>
-        <li>컴퓨터에서 접속하면 관리 화면이, 휴대전화에서 접속하면 현장 화면이 열립니다. 같은 주소이며 기기에 따라 자동으로 나뉩니다.</li>
+        <li>컴퓨터로 접속하면 관리 화면이, 휴대전화로 접속하면 현장 화면이 열립니다. 주소는 같습니다.</li>
       </ul>
     </div>
 
     <div class="box warn">
       <h3>예비 버전을 쓰실 때</h3>
       <ul class="tight">
-        <li><b>실제 업무 기록으로 쓰시기 전에 확인해 주십시오.</b> 지금 입력하시는 값은 실제 데이터에 반영됩니다. 시험 삼아 넣어 보신 건은 알려 주시면 정리하겠습니다.</li>
-        <li>잘못 등록하셨다면 관리자가 반려하면 원래대로 돌아갑니다.</li>
-        <li>화면이 이상하게 나오거나 오류가 뜨면 <b>그 화면을 사진으로 찍어</b> 알려 주십시오. 어느 화면에서 무엇을 누르셨는지가 있으면 원인을 찾기 쉽습니다.</li>
+        <li><b>실제 업무 기록으로 쓰시기 전에 확인해 주십시오.</b> 지금 입력하시는 값은 실제 데이터에 반영됩니다. 시험 삼아 넣어 보신 건은 알려 주시면 정리해 드립니다.</li>
+        <li>잘못 등록하셨더라도 관리자가 반려하면 원래대로 돌아갑니다.</li>
+        <li>화면이 이상하게 나오거나 오류가 뜨면 <b>그 화면을 사진으로 찍어</b> 알려 주십시오. 어느 화면에서 무엇을 누르셨는지만 있어도 원인을 찾기 쉽습니다.</li>
       </ul>
     </div>
 
@@ -880,7 +890,7 @@
   <header class="sheet-head plain">
     <p class="sheet-num">9면</p>
     <h2>의견</h2>
-    <p class="subtitle">예비 버전을 다듬는 데 쓰입니다. 한 줄이어도 괜찮고, 이름은 적지 않으셔도 됩니다. 작성 후 이 면만 떼어 제출해 주십시오.</p>
+    <p class="subtitle">예비 버전을 다듬는 데 씁니다. 한 줄이어도 괜찮고, 이름은 적지 않으셔도 됩니다. 이 면만 떼어 주시면 됩니다.</p>
   </header>
 
   <div>
@@ -891,7 +901,7 @@
 
     <div class="form-q">
       <p class="form-label">2. 반대로, 이 프로그램으로는 처리가 안 될 것 같은 부분이 있습니까?</p>
-      <p class="form-hint">실제 업무 절차와 화면이 맞지 않는 부분이 있으면 적어 주십시오.</p>
+      <p class="form-hint">실제 업무 절차와 화면이 맞지 않는 부분을 적어 주십시오.</p>
       <div class="lines"><div class="line"></div><div class="line"></div></div>
     </div>
 

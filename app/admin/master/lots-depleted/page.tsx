@@ -13,6 +13,7 @@ import {
   TableColGroup,
   type TableCol,
 } from '@/app/admin/_table-cols';
+import { LotLink } from '@/app/admin/_lot-link';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
 import { isNormalDepletedStatus } from '@/lib/status';
 import { Button } from '@/app/components/ui/Button';
@@ -250,7 +251,7 @@ export default function DepletedLotsPage() {
             <table className="w-full table-fixed" style={{ minWidth: MIN_WIDTH }}>
               <TableColGroup cols={COLS} spacer />
               <thead className="sticky top-0 z-20 bg-surface-alt">
-                <tr className="text-left text-label text-text-muted">
+                <tr className="text-left text-table-head text-text-muted">
                   <th className={cls.cell()}>
                     <input
                       type="checkbox"
@@ -275,23 +276,11 @@ export default function DepletedLotsPage() {
                 {visible.map((l) => (
                   <tr
                     key={l.id}
-                    onClick={
-                      l.lotNumber
-                        ? () =>
-                            router.push(
-                              `/admin/master/lot-timeline?lot=${encodeURIComponent(l.lotNumber)}`,
-                            )
-                        : undefined
-                    }
-                    title={l.lotNumber ? '클릭해 LOT 생애주기 보기' : undefined}
-                    className={`border-t border-border transition-colors hover:bg-surface-alt motion-reduce:transition-none ${
-                      l.lotNumber ? 'cursor-pointer' : ''
-                    }`}
+                    className="border-t border-border transition-colors hover:bg-surface-alt motion-reduce:transition-none"
                   >
                     <td
                       className={cls.pad('cursor-pointer select-none')}
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={() => {
                         setSelected((prev) => {
                           const next = new Set(prev);
                           if (next.has(l.id)) next.delete(l.id);
@@ -308,7 +297,15 @@ export default function DepletedLotsPage() {
                         className="pointer-events-none h-4 w-4 cursor-pointer accent-accent-fill align-middle"
                       />
                     </td>
-                    <td className={cls.cell('text-body text-text')}>{l.lotNumber || '—'}</td>
+                    {/* 링크가 셀 패딩까지 갖는다 → td는 p-0 (근거: _lot-link.tsx).
+                        이 화면은 소진 LOT 전용이라 원가를 안 보여준다 → 툴팁도 원가 문구 제외. */}
+                    <td className="whitespace-nowrap p-0 text-body">
+                      <LotLink
+                        lotNumber={l.lotNumber}
+                        className={cls.pad()}
+                        title="클릭해 LOT 생애주기 보기"
+                      />
+                    </td>
                     <td className={cls.cell('text-body text-text')}>{l.productName || '—'}</td>
                     <td className={cls.cell('text-body text-text-muted')}>{formatSpec(l.spec)}</td>
                     <td className={cls.cell('text-body text-text-muted')}>{formatMisu(l.misu)}</td>
@@ -338,6 +335,7 @@ export default function DepletedLotsPage() {
 // 폭 기준은 재고 조회와 동일(2026-07-28 실측 200건을 14px로 환산). 같은 데이터라 같은 값을 쓴다.
 // 재고 조회와 같은 순서 규칙 — 좌측 정렬(텍스트) 묶음 → 우측 정렬(숫자) → 비고.
 // 전에는 미수(좌) │ 수매가(우) │ 보관처(좌) 로 좌우가 두 번 갈렸다.
+// 2026-07-30: 최초입고일도 재고 조회와 동일하게 128→156(헤더가 하한, 헤더 14px 전환).
 const COLS: TableCol[] = [
   { key: 'check', label: '', px: 48 },
   { key: 'lotNumber', label: 'LOT번호', px: 264 },
@@ -345,7 +343,7 @@ const COLS: TableCol[] = [
   { key: 'spec', label: '규격', px: 104 },
   { key: 'misu', label: '미수', px: 108 },
   { key: 'storageName', label: '보관처', px: 148 },
-  { key: 'firstInboundDate', label: '최초입고일', px: 128 },
+  { key: 'firstInboundDate', label: '최초입고일', px: 156 },
   { key: 'purchasePrice', label: '수매가', px: 108, numeric: true },
   { key: 'memo', label: '비고', px: 240, clamp: true },
 ];

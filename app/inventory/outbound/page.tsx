@@ -281,7 +281,7 @@ export default function OutboundRecordPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F2F4F6] pb-32 font-['Spoqa_Han_Sans_Neo']">
+    <main className="min-h-screen bg-[#F2F4F6] pb-32">
       {/* 헤더 */}
       <PageHeader
         title="물품 출고"

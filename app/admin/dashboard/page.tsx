@@ -12,7 +12,9 @@ type AdminTabKey = "ALL" | "LOGISTICS" | "EXPENSE" | "DONE";
 const ADMIN_TABS: { key: AdminTabKey; label: string }[] = [
   { key: "ALL", label: "전체" },
   { key: "LOGISTICS", label: "입출고" },
-  { key: "EXPENSE", label: "지출" },
+  // 2026-07-31: 비용 관리를 회계 프로그램으로 이관하기로 해 진입 경로만 숨김(처리 로직은 유지 —
+  //   '전체' 탭에서는 계속 섞여 나오고 승인·반려도 그대로 동작한다).
+  // { key: "EXPENSE", label: "지출" },
   { key: "DONE", label: "완료" },
 ];
 import RejectBottomSheet from "@/app/components/RejectBottomSheet";
@@ -382,7 +384,6 @@ export default function AdminDashboardPage() {
     <div
       className="min-h-screen bg-[#F2F4F6] flex flex-col"
       style={{
-        fontFamily: "'Spoqa Han Sans Neo', 'sans-serif'",
         paddingBottom: "calc(88px + env(safe-area-inset-bottom))",
       }}
     >

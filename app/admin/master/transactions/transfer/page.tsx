@@ -13,6 +13,7 @@ import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { formatNum } from '@/lib/number-format';
 import { NumCell, NumHead } from '@/app/admin/_num-cell';
+import { LotLink } from '@/app/admin/_lot-link';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
 import {
   getTransferHistory,
@@ -295,9 +296,9 @@ export default function TransferHistoryPage() {
 
           {/* 원장 표 */}
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-body">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-left text-[12px] font-bold text-gray-500">
+                <tr className="border-b border-gray-100 bg-gray-50 text-left text-table-head text-gray-500">
                   <th className="whitespace-nowrap px-4 py-3">이동일</th>
                   <th className="whitespace-nowrap px-4 py-3">원본 LOT번호</th>
                   <th className="px-4 py-3">품목</th>
@@ -321,22 +322,9 @@ export default function TransferHistoryPage() {
                   rows.map((r) => (
                     <tr key={r.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
                       <td className="whitespace-nowrap px-4 py-3 text-gray-500">{r.date}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium">
-                        {r.lotNumber ? (
-                          <button
-                            onClick={() =>
-                              router.push(
-                                `/admin/master/lot-timeline?lot=${encodeURIComponent(r.lotNumber)}`,
-                              )
-                            }
-                            title="클릭해 LOT 생애주기·원가 보기"
-                            className="text-[#3182F6] hover:underline"
-                          >
-                            {r.lotNumber}
-                          </button>
-                        ) : (
-                          <span className="text-[#191F28]">—</span>
-                        )}
+                      {/* 링크가 셀 패딩까지 갖는다 → td는 p-0 (근거: _lot-link.tsx) */}
+                      <td className="whitespace-nowrap p-0 font-medium">
+                        <LotLink lotNumber={r.lotNumber} className="px-4 py-3" />
                       </td>
                       <td className="px-4 py-3 text-[#191F28]">{r.product}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-500">{formatSpec(r.spec)}</td>

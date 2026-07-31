@@ -29,10 +29,7 @@ export default function StockStatusSummary({
   onHandoff,
 }: Props) {
   return (
-    <main
-      className="min-h-screen bg-[#F2F4F6]"
-      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
-    >
+    <main className="min-h-screen bg-[#F2F4F6]">
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
 
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] max-h-[85vh] flex flex-col shadow-[0_-8px_40px_rgba(0,0,0,0.15)]">

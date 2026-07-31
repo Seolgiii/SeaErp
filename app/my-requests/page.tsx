@@ -16,7 +16,9 @@ type TabKey = "ALL" | "LOGISTICS" | "EXPENSE" | "DONE";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "ALL", label: "전체" },
   { key: "LOGISTICS", label: "입출고" },
-  { key: "EXPENSE", label: "지출" },
+  // 2026-07-31: 비용 관리를 회계 프로그램으로 이관하기로 해 진입 경로만 숨김(기존 지출 신청
+  //   내역은 '전체' 탭에서 계속 보인다).
+  // { key: "EXPENSE", label: "지출" },
   { key: "DONE", label: "완료" },
 ];
 
