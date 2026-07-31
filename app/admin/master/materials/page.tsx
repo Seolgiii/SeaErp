@@ -59,7 +59,7 @@ export default function MaterialsMasterPage() {
   if (!workerId) {
     return (
       <div className="flex min-h-screen items-center justify-center p-8">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-[#3182F6]" />
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-accent-fill" />
       </div>
     );
   }
@@ -69,10 +69,10 @@ export default function MaterialsMasterPage() {
   return (
     <div className="mx-auto min-w-0 max-w-[1100px] p-8">
       <div className="mb-6">
-        <h1 className="text-[22px] font-black tracking-tight text-gray-900">
+        <h1 className="text-page text-text">
           부자재·경비 마스터
         </h1>
-        <p className="mt-1 text-[13px] text-gray-500">
+        <p className="mt-1 text-body text-text-muted">
           판매원가 산정용. 단가는 <b>박스당 원가</b> 기준입니다. (활성 {totalActive}건 / 전체{' '}
           {items.length}건)
         </p>
@@ -80,7 +80,7 @@ export default function MaterialsMasterPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#3182F6]" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-accent-fill" />
         </div>
       ) : (
         <div className="space-y-5">
@@ -92,15 +92,15 @@ export default function MaterialsMasterPage() {
                 className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
               >
                 <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-3">
-                  <h2 className="text-[15px] font-bold text-gray-800">
+                  <h2 className="text-section text-text">
                     {section}{' '}
-                    <span className="text-[13px] font-medium text-gray-400">
+                    <span className="text-body text-text-muted">
                       {rows.length}건
                     </span>
                   </h2>
                   <button
                     onClick={() => setEditing({ section, mat: null })}
-                    className="inline-flex items-center gap-1 rounded-lg bg-[#3182F6] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#1c6ce0]"
+                    className="inline-flex items-center gap-1 rounded-lg bg-accent-fill px-3 py-1.5 text-body text-white hover:bg-accent-fill-hover"
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
                     행 추가
@@ -108,11 +108,11 @@ export default function MaterialsMasterPage() {
                 </div>
 
                 {rows.length === 0 ? (
-                  <div className="px-5 py-8 text-center text-[13px] text-gray-400">
+                  <div className="px-5 py-8 text-center text-body text-text-muted">
                     아직 항목이 없습니다. ‘행 추가’로 등록하세요.
                   </div>
                 ) : (
-                  <table className="w-full text-[13px]">
+                  <table className="w-full text-body">
                     <thead>
                       <tr className="text-left text-table-head text-gray-400">
                         <th className="px-5 py-2">품명</th>
@@ -136,11 +136,11 @@ export default function MaterialsMasterPage() {
                           <td className="px-5 py-2.5 text-gray-500">{m.unit || '—'}</td>
                           <td className="px-5 py-2.5">
                             {m.active ? (
-                              <span className="rounded-md bg-green-50 px-2 py-0.5 text-[12px] font-medium text-green-700">
+                              <span className="rounded-md bg-success-bg px-2 py-0.5 text-caption text-success-ink">
                                 활성
                               </span>
                             ) : (
-                              <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[12px] font-medium text-gray-400">
+                              <span className="rounded-md bg-surface-alt px-2 py-0.5 text-caption text-text-muted">
                                 비활성
                               </span>
                             )}
@@ -240,7 +240,7 @@ function MaterialEditModal({
 
   const labelClass = 'text-xs font-semibold text-gray-500';
   const inputClass =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-[#3182F6]';
+    'w-full rounded-lg border border-gray-300 px-3 py-2 text-body outline-none focus:border-transparent focus:ring-2 focus:ring-accent-fill';
 
   return (
     <div
@@ -252,7 +252,7 @@ function MaterialEditModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900">
+          <h3 className="text-section text-text">
             {editing.section} · {isEdit ? '수정' : '행 추가'}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -300,7 +300,7 @@ function MaterialEditModal({
           <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
-              className="h-4 w-4 accent-[#3182F6]"
+              className="h-4 w-4 accent-accent-fill"
               checked={active}
               onChange={(e) => setActive(e.target.checked)}
             />
@@ -339,7 +339,7 @@ function MaterialEditModal({
             <button
               onClick={() => void save()}
               disabled={saving}
-              className="rounded-lg bg-[#3182F6] px-4 py-2 text-sm font-bold text-white hover:bg-[#1c6ce0] disabled:opacity-40"
+              className="rounded-lg bg-accent-fill px-4 py-2 text-body text-white hover:bg-accent-fill-hover disabled:opacity-40"
             >
               {saving ? '저장 중…' : '저장'}
             </button>

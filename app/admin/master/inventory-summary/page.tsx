@@ -219,7 +219,7 @@ export default function InventorySummaryPage() {
   if (!workerId) {
     return (
       <div className="p-8 flex justify-center items-center min-h-screen">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-accent-fill rounded-full animate-spin" />
       </div>
     );
   }
@@ -228,8 +228,8 @@ export default function InventorySummaryPage() {
     <div className="mx-auto max-w-[1200px] p-8 min-w-0">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">재고 집계</h1>
-          <p className="text-[13px] text-gray-500 mt-1">
+          <h1 className="text-page text-text">재고 집계</h1>
+          <p className="text-body text-text-muted mt-1">
             {isLoading ? '집계 중...' : `${rows.length}행 · 총 ${formatNum(totals.qty, '박스')} · ${totals.lots}LOT`}
             <span className="ml-2 text-gray-400">(승인 완료·소진 LOT 기준)</span>
           </p>
@@ -247,16 +247,14 @@ export default function InventorySummaryPage() {
               onClick={() => setView(opt.value)}
               className={`text-left px-4 py-3 rounded-xl border-2 transition-all ${
                 selected
-                  ? 'border-[#3182F6] bg-[#3182F6]/5'
+                  ? 'border-accent-fill bg-accent-bg'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
               }`}
             >
-              <p
-                className={`text-[14px] font-bold ${selected ? 'text-[#3182F6]' : 'text-gray-800'}`}
-              >
+              <p className={`text-body ${selected ? 'text-accent-ink' : 'text-text'}`}>
                 {opt.label}
               </p>
-              <p className="text-[11px] text-gray-500 mt-0.5">{opt.desc}</p>
+              <p className="text-caption text-text-muted mt-0.5">{opt.desc}</p>
             </button>
           );
         })}
@@ -269,12 +267,12 @@ export default function InventorySummaryPage() {
           placeholder="보관처·품목 검색"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-72 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+          className="w-72 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-body text-text outline-none placeholder:text-text-faint focus:ring-2 focus:ring-accent-fill focus:border-transparent"
         />
         <select
           value={storageFilter}
           onChange={(e) => setStorageFilter(e.target.value)}
-          className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6]"
+          className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-body text-text outline-none focus:ring-2 focus:ring-accent-fill"
         >
           {storageOptions.map((opt) => (
             <option key={opt} value={opt}>
@@ -287,9 +285,9 @@ export default function InventorySummaryPage() {
             type="checkbox"
             checked={includeDepleted}
             onChange={(e) => setIncludeDepleted(e.target.checked)}
-            className="w-4 h-4 accent-[#3182F6]"
+            className="w-4 h-4 accent-accent-fill"
           />
-          <span className="text-[12px] font-bold text-gray-700">소진 LOT 포함</span>
+          <span className="text-label text-text">소진 LOT 포함</span>
         </label>
       </div>
 
@@ -298,11 +296,11 @@ export default function InventorySummaryPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-fit max-w-full min-w-[360px]">
         {isLoading ? (
           <div className="py-20 flex justify-center items-center">
-            <div className="w-8 h-8 border-4 border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-gray-200 border-t-accent-fill rounded-full animate-spin" />
           </div>
         ) : rows.length === 0 ? (
           <div className="py-20 text-center">
-            <p className="text-gray-400 font-bold text-[15px]">집계할 재고가 없습니다</p>
+            <p className="text-body text-text-muted">집계할 재고가 없습니다</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -310,7 +308,7 @@ export default function InventorySummaryPage() {
               ref={tableRef}
               // 콤팩트(table-auto·내용폭) — 이름 컬럼이 남는 폭을 흡수해 벌어지던 여백 제거.
               // 남는 가로 폭은 표 오른쪽 바깥으로 밀리고, 컬럼 사이는 셀 패딩만큼만.
-              className="text-[13px]"
+              className="text-body"
             >
               {/* 보관처/품목 너비는 pairW(측정값)로 동기화 — 둘 중 더 긴 내용에 맞춘
                   최소 너비로 통일. table-auto + 비-w-full이라 내용만큼만 차지(콤팩트),
@@ -349,7 +347,7 @@ export default function InventorySummaryPage() {
                 </colgroup>
               )}
               <thead className="bg-gray-50 sticky top-0">
-                <tr className="text-left font-bold text-gray-500 text-[12px]">
+                <tr className="text-left text-table-head text-text-muted">
                   {/* storage-product 뷰: 보관처/품목을 swap 버튼으로. primary가 먼저 옴.
                       다른 뷰는 기존 단일 열 그대로 (정렬 의미 있음). */}
                   {view === 'storage-product' ? (
@@ -423,7 +421,7 @@ export default function InventorySummaryPage() {
                     )}
                     <NumCell className="px-4 py-3 text-gray-600" value={r.lots} />
                     <NumCell
-                      className={`px-4 py-3 font-bold ${r.qty > 0 ? 'text-[#3182F6]' : 'text-gray-300'}`}
+                      className={`px-4 py-3 font-bold ${r.qty > 0 ? 'text-accent-fill' : 'text-gray-300'}`}
                       value={r.qty}
                       unit="박스"
                     />
@@ -450,7 +448,7 @@ export default function InventorySummaryPage() {
                 ))}
               </tbody>
               <tfoot className="bg-gray-50 border-t-2 border-gray-200">
-                <tr className="text-[13px] font-black text-gray-800">
+                <tr className="text-body text-text">
                   <td
                     className="px-4 py-3"
                     colSpan={view === 'storage-only' ? 1 : view === 'product-only' ? 4 : 5}
@@ -458,7 +456,7 @@ export default function InventorySummaryPage() {
                     합계
                   </td>
                   <NumCell className="px-4 py-3" value={totals.lots} />
-                  <NumCell className="px-4 py-3 text-[#3182F6]" value={totals.qty} unit="박스" />
+                  <NumCell className="px-4 py-3 text-accent-fill" value={totals.qty} unit="박스" />
                   <NumCell
                     className="px-4 py-3 text-gray-700"
                     value={totals.weight > 0 ? totals.weight : null}
@@ -509,12 +507,12 @@ function SwapTh({
     >
       <span
         className={`inline-flex items-center gap-1 ${
-          active ? 'text-[#3182F6]' : 'text-gray-500 group-hover:text-[#3182F6]'
+          active ? 'text-accent-fill' : 'text-text-muted group-hover:text-accent-fill'
         }`}
       >
         {label}
         <ArrowsRightLeftIcon
-          className={`w-3.5 h-3.5 ${active ? 'text-[#3182F6]' : 'text-gray-300 group-hover:text-[#3182F6]'}`}
+          className={`w-3.5 h-3.5 ${active ? 'text-accent-fill' : 'text-gray-300 group-hover:text-accent-fill'}`}
         />
       </span>
     </th>
@@ -548,7 +546,7 @@ function Th({
   return (
     <th
       onClick={() => onToggle(field)}
-      className={`${paddingX} py-3 cursor-pointer select-none hover:text-[#3182F6] transition-colors ${
+      className={`${paddingX} py-3 cursor-pointer select-none hover:text-accent-fill transition-colors ${
         numeric ? NUM_CELL : ''
       }`}
     >
@@ -556,7 +554,7 @@ function Th({
         {label}
         <Icon
           className={`w-3.5 h-3.5 ${
-            sortField === field ? 'text-[#3182F6]' : 'text-gray-300'
+            sortField === field ? 'text-accent-fill' : 'text-gray-300'
           }`}
         />
       </span>

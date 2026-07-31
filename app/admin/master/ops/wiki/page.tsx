@@ -201,8 +201,8 @@ export default function WikiPage() {
   return (
     <div className="mx-auto max-w-[1200px] p-8 min-w-0">
       <div className="mb-6">
-        <h1 className="text-[22px] font-black text-gray-900 tracking-tight">용어 위키</h1>
-        <p className="text-[13px] text-gray-500 mt-1">
+        <h1 className="text-page text-text">용어 위키</h1>
+        <p className="text-body text-text-muted mt-1">
           수산물 ERP 도메인 용어·개념 정리. 헷갈리는 말은 여기서 검색하세요. (출처: docs/업무프로세스.md)
         </p>
       </div>
@@ -215,12 +215,12 @@ export default function WikiPage() {
           placeholder="용어 검색 (예: 미수, 가공원가, 수율, ONE-Frozen)"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="w-full bg-white border border-gray-200 rounded-xl pl-11 pr-4 py-2.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#3182F6] focus:border-transparent"
+          className="w-full bg-white border border-gray-200 rounded-xl pl-11 pr-4 py-2.5 text-body text-text outline-none placeholder:text-text-faint focus:ring-2 focus:ring-accent-fill focus:border-transparent"
         />
       </div>
 
       {nothing && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-[14px] text-gray-400">
+        <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-body text-text-muted">
           &quot;{q}&quot; 에 해당하는 용어가 없어요.
         </div>
       )}
@@ -232,21 +232,21 @@ export default function WikiPage() {
             id="가치사슬"
             className="scroll-mt-20 bg-white rounded-2xl shadow-sm border border-gray-100 p-6"
           >
-            <h2 className="text-[16px] font-black text-gray-900 mb-1">사업 한눈에 — 가치사슬</h2>
-            <p className="text-[13px] text-gray-500 mb-4">
+            <h2 className="text-section text-text mb-1">사업 한눈에 — 가치사슬</h2>
+            <p className="text-body text-text-muted mb-4">
               수산물 <b>유통 + 가공</b> 사업. 단순 사고팔기가 아니라 <b>가공이 핵심 비중</b>.
             </p>
             <div className="flex flex-wrap items-center gap-x-1 gap-y-2">
               {VALUE_CHAIN.map((step, i) => (
                 <span key={step} className="flex items-center gap-1">
-                  <span className="inline-block px-3 py-1.5 rounded-lg bg-[#3182F6]/10 text-[#3182F6] text-[13px] font-bold">
+                  <span className="inline-block px-3 py-1.5 rounded-lg bg-accent-bg text-accent-ink text-body">
                     {step}
                   </span>
                   {i < VALUE_CHAIN.length - 1 && <span className="text-gray-300">→</span>}
                 </span>
               ))}
             </div>
-            <p className="text-[12px] text-gray-400 mt-4 leading-relaxed">
+            <p className="text-label text-text-muted mt-4 leading-relaxed">
               · 수입(사료·냉동물)도 운영 → 보통 부산 선입고 후 제주로 이동.
               <br />· 가공 방식 2종(<b>ONE-Frozen</b> 제주·<b>TWO-Frozen</b> 해외)은 아래 참고.
               <br />· 판매는 가격표 없이 <b>원가 기반 건별 협상</b> → 정확한 원가 계산이 핵심.
@@ -260,13 +260,13 @@ export default function WikiPage() {
             id="원가-사다리"
             className="scroll-mt-20 bg-white rounded-2xl shadow-sm border border-gray-100 p-6"
           >
-            <h2 className="text-[16px] font-black text-gray-900 mb-1">원가 4단 사다리</h2>
-            <p className="text-[13px] text-gray-500 mb-5">
+            <h2 className="text-section text-text mb-1">원가 4단 사다리</h2>
+            <p className="text-body text-text-muted mb-5">
               원물·제품 둘 다 취급하므로 원가는 단계마다 쌓이고, 판매 시 품목 종류에 따라 갈라짐.
             </p>
             <div className="space-y-2">
               <LadderTier
-                accent="border-[#3182F6]"
+                accent="border-accent-fill"
                 name="재고원가"
                 state="원물 보유"
                 formula="수매가 + 창고경비(냉장료·입출고비·노조비·동결비)"
@@ -294,7 +294,7 @@ export default function WikiPage() {
                 formula="판매원가를 출고 시점에 얼린 값 ( = 필드 출고시점 판매원가 )"
               />
             </div>
-            <div className="mt-5 rounded-xl bg-amber-50 border border-amber-100 p-4 text-[12.5px] text-amber-900 leading-relaxed">
+            <div className="mt-5 rounded-xl bg-amber-50 border border-amber-100 p-4 text-label text-amber-900 leading-relaxed">
               <b>수율 계산 핵심</b> — 손실로 부풀리는 건 재료비(원물)뿐. 가장 간단한 식은{' '}
               <code className="font-mono bg-white/70 px-1 rounded">(총투입비 ÷ 실제 산출량)</code> 한 줄.
               <br />예) 원물 10kg(5,000원/kg) + 임가공 1,000원/kg, 산출 7kg →
@@ -310,12 +310,12 @@ export default function WikiPage() {
             id="동결-2종"
             className="scroll-mt-20 bg-white rounded-2xl shadow-sm border border-gray-100 p-6"
           >
-            <h2 className="text-[16px] font-black text-gray-900 mb-1">필렛 2종 — ONE / TWO-Frozen</h2>
-            <p className="text-[13px] text-gray-500 mb-4">
+            <h2 className="text-section text-text mb-1">필렛 2종 — ONE / TWO-Frozen</h2>
+            <p className="text-body text-text-muted mb-4">
               프로젝트 확장의 핵심 개념. 동결 방식이 임가공비 청구 기준까지 결정한다.
             </p>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full text-body">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 text-left">
                     <th className="px-3 py-2 font-bold rounded-l-lg">구분</th>
@@ -351,10 +351,10 @@ export default function WikiPage() {
             id="판매-2모드"
             className="scroll-mt-20 bg-white rounded-2xl shadow-sm border border-gray-100 p-6"
           >
-            <h2 className="text-[16px] font-black text-gray-900 mb-1">판매 2모드</h2>
-            <p className="text-[13px] text-gray-500 mb-4">판매 종류에 따라 판매원가 구성이 다름.</p>
+            <h2 className="text-section text-text mb-1">판매 2모드</h2>
+            <p className="text-body text-text-muted mb-4">판매 종류에 따라 판매원가 구성이 다름.</p>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full text-body">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 text-left">
                     <th className="px-3 py-2 font-bold rounded-l-lg">모드</th>
@@ -385,14 +385,14 @@ export default function WikiPage() {
             id="용어집"
             className="scroll-mt-20 bg-white rounded-2xl shadow-sm border border-gray-100 p-6"
           >
-            <h2 className="text-[16px] font-black text-gray-900 mb-4">용어집</h2>
+            <h2 className="text-section text-text mb-4">용어집</h2>
             <div className="space-y-5">
               {CAT_ORDER.map((cat) => {
                 const rows = visibleEntries.filter((e) => e.cat === cat);
                 if (rows.length === 0) return null;
                 return (
                   <div key={cat}>
-                    <div className="text-[12px] font-black text-gray-400 mb-2 uppercase tracking-wide">
+                    <div className="text-label text-text-muted mb-2 uppercase tracking-wide">
                       {cat}
                     </div>
                     <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
@@ -405,17 +405,17 @@ export default function WikiPage() {
                           }`}
                         >
                           <div>
-                            <span className="text-[14px] font-bold text-gray-900">{e.term}</span>
+                            <span className="text-body text-text">{e.term}</span>
                             {e.important && (
-                              <span className="ml-2 text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                              <span className="ml-2 text-caption text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
                                 중요
                               </span>
                             )}
                             {e.aka && (
-                              <div className="text-[11.5px] text-gray-400 mt-0.5">{e.aka}</div>
+                              <div className="text-caption text-text-muted mt-0.5">{e.aka}</div>
                             )}
                           </div>
-                          <div className="text-[13px] text-gray-600 leading-relaxed">{e.def}</div>
+                          <div className="text-body text-text leading-relaxed">{e.def}</div>
                         </div>
                       ))}
                     </div>
@@ -427,7 +427,7 @@ export default function WikiPage() {
         )}
       </div>
 
-      <p className="text-[12px] text-gray-400 mt-8">
+      <p className="text-label text-text-muted mt-8">
         이 문서는 살아있는 자료입니다. 내용 변경은 docs/업무프로세스.md 와 함께 갱신하세요.
       </p>
     </div>
@@ -451,11 +451,11 @@ function LadderTier({
   return (
     <div className={`rounded-xl border border-gray-200 border-l-4 ${accent} bg-white p-4`}>
       <div className="flex items-baseline gap-2 flex-wrap">
-        <span className="text-[15px] font-black text-gray-900">{name}</span>
-        <span className="text-[11px] font-bold text-gray-400">{state}</span>
+        <span className="text-section text-text">{name}</span>
+        <span className="text-caption text-text-muted">{state}</span>
       </div>
-      <div className="text-[13px] text-gray-700 mt-1 font-medium">{formula}</div>
-      {extra && <div className="text-[11.5px] text-gray-400 mt-1">{extra}</div>}
+      <div className="text-body text-text mt-1">{formula}</div>
+      {extra && <div className="text-caption text-text-muted mt-1">{extra}</div>}
     </div>
   );
 }
@@ -464,8 +464,8 @@ function LadderTier({
 function LadderArrow({ note }: { note: string }) {
   return (
     <div className="flex items-center gap-2 pl-4">
-      <span className="text-gray-300 text-lg leading-none">↓</span>
-      <span className="text-[11.5px] text-gray-400">{note}</span>
+      <span className="text-section text-text-faint leading-none">↓</span>
+      <span className="text-caption text-text-muted">{note}</span>
     </div>
   );
 }

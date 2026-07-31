@@ -76,7 +76,7 @@ export default function WorkSettlementPage() {
   if (!workerId) {
     return (
       <div className="flex min-h-screen items-center justify-center p-8">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-[#3182F6]" />
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-accent-fill" />
       </div>
     );
   }
@@ -88,15 +88,15 @@ export default function WorkSettlementPage() {
     <div className="mx-auto min-w-0 max-w-[1200px] p-8">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-[22px] font-black tracking-tight text-gray-900">작업 정산</h1>
-          <p className="mt-1 text-[13px] text-gray-500">
+          <h1 className="text-page text-text">작업 정산</h1>
+          <p className="mt-1 text-body text-text-muted">
             수협 정산서를 옮겨 원물 매입·원가를 기록합니다. 확정하면 생산내역 한 줄마다 입고·재고(LOT)가
             생성됩니다.
           </p>
         </div>
         <Link
           href="/admin/master/work-settlement/new"
-          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#3182F6] px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-[#1c6ce0]"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-accent-fill px-3.5 py-2 text-body text-white hover:bg-accent-fill-hover"
         >
           <PlusIcon className="h-4 w-4" />
           작업 정산 등록
@@ -105,15 +105,15 @@ export default function WorkSettlementPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#3182F6]" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-accent-fill" />
         </div>
       ) : (
         <div className="space-y-6">
           {draft.length > 0 && (
             <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
               <div className="border-b border-gray-100 bg-gray-50 px-5 py-3">
-                <h2 className="text-[15px] font-bold text-gray-700">
-                  임시저장 <span className="text-[13px] font-medium text-gray-400">{draft.length}건</span>
+                <h2 className="text-section text-text">
+                  임시저장 <span className="text-body text-text-muted">{draft.length}건</span>
                 </h2>
               </div>
               <SettlementTable rows={draft} shipName={shipName} onCancel={cancel} />
@@ -122,12 +122,12 @@ export default function WorkSettlementPage() {
 
           <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
             <div className="border-b border-gray-100 bg-gray-50 px-5 py-3">
-              <h2 className="text-[15px] font-bold text-gray-800">
-                확정·취소 <span className="text-[13px] font-medium text-gray-400">{rest.length}건</span>
+              <h2 className="text-section text-text">
+                확정·취소 <span className="text-body text-text-muted">{rest.length}건</span>
               </h2>
             </div>
             {rest.length === 0 ? (
-              <div className="px-5 py-10 text-center text-[13px] text-gray-400">아직 없습니다.</div>
+              <div className="px-5 py-10 text-center text-body text-text-muted">아직 없습니다.</div>
             ) : (
               <SettlementTable rows={rest} shipName={shipName} onCancel={cancel} />
             )}
@@ -149,7 +149,7 @@ function SettlementTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-[13px]">
+      <table className="w-full text-body">
         <thead>
           <tr className="text-left text-table-head text-gray-400">
             <th className="px-5 py-2.5 text-center">정산번호</th>
@@ -181,7 +181,7 @@ function SettlementTable({
                 {r.status === '임시저장' && (
                   <Link
                     href={`/admin/master/work-settlement/${r.id}`}
-                    className="mr-3 text-[12px] font-semibold text-[#3182F6] hover:text-[#1c6ce0]"
+                    className="mr-3 text-label text-link hover:text-accent-fill-hover"
                   >
                     이어서 작성 →
                   </Link>
@@ -189,7 +189,7 @@ function SettlementTable({
                 {r.status !== '취소' && (
                   <button
                     onClick={() => onCancel(r)}
-                    className="text-[12px] font-medium text-red-500 hover:text-red-600"
+                    className="text-label text-danger-ink hover:text-danger-ink"
                   >
                     {r.status === '임시저장' ? '삭제' : '취소'}
                   </button>
@@ -210,5 +210,5 @@ function StatusBadge({ status }: { status: string }) {
       : status === '임시저장'
         ? 'bg-gray-100 text-gray-500'
         : 'bg-gray-100 text-gray-400';
-  return <span className={`rounded-md px-2 py-0.5 text-[12px] font-medium ${cls}`}>{status}</span>;
+  return <span className={`rounded-md px-2 py-0.5 text-caption ${cls}`}>{status}</span>;
 }

@@ -24,7 +24,16 @@
 
 ## 진행 현황
 
-전체 **57개 파일 · 816곳** (사이즈 521 · 색상 295) · 완료 0
+전체 **57개 파일 · 816곳** (사이즈 521 · 색상 295) · 완료 **4파일 · 92곳**
+
+> **집계가 실제보다 적다.** 2026-07-31 실제 정리에서 파일마다 집계 밖 항목이 나왔다.
+> 정적 검색 정규식이 `border-t/l/r/b-[#…]`·`ring-[#…]`를 빼먹었고, Tailwind **기본** 크기 클래스
+> (`text-lg` 18px 등)는 임의값이 아니라 아예 대상이 아니었는데 스케일 위반은 똑같다.
+> 남은 파일도 표의 숫자보다 몇 곳 더 나온다고 보는 게 맞다.
+
+> **검증 방법(2026-07-31 신설).** 브라우저를 띄워 실제 렌더링을 측정한다 — 타입 스케일 밖 폰트,
+> 컬럼 넘침, 헤더 중앙 쏠림, 가로 스크롤. 13→14px 확대가 컬럼을 깨뜨리는지 눈이 아니라 수치로 잡는다.
+> (측정 스크립트는 세션 임시본이라 저장소에 없다.)
 
 ---
 
@@ -36,7 +45,9 @@
 - [ ] `app/inventory/record/page.tsx` — 43곳 (사이즈 35 · 색상 8)
 - [ ] `app/admin/master/approval/inbox/page.tsx` — 39곳 (사이즈 27 · 색상 12)
 - [ ] `app/my-requests/page.tsx` — 35곳 (사이즈 24 · 색상 11)
-- [ ] `app/admin/master/ops/wiki/page.tsx` — 32곳 (사이즈 29 · 색상 3)
+- [x] `app/admin/master/ops/wiki/page.tsx` — 34곳 정리 완료 (사이즈 30 · 색상 4) · 잔여 0
+      ※ 사용자 지시로 30곳 초과 예외 진행(2026-07-31). 집계 32곳 대비 +2 — `ring-[#3182F6]` 1곳(정규식 밖)과 `text-lg` 1곳(Tailwind 기본 클래스라 임의값 검색에 안 잡힘, 18px로 스케일 밖).
+      ※ 크기 변경 동반: h1 22→20, 소수점 px 3곳(11.5→11)·1곳(12.5→12) 해소(§3 금지), 13→14, 10→11, 15→16(카드 제목 역할), 18→16.
 
 ### 체크리스트 (50개 파일, 개수 많은 순)
 
@@ -44,20 +55,26 @@
 - [ ] `app/admin/dashboard/page.tsx` — 29곳 (사이즈 18 · 색상 11)
 - [ ] `app/admin/master/page.tsx` — 28곳 (사이즈 11 · 색상 17)
 - [ ] `app/admin/master/cost/profit-trend/page.tsx` — 23곳 (사이즈 1 · 색상 22)
-- [ ] `app/admin/master/inventory-summary/page.tsx` — 22곳 (사이즈 11 · 색상 11)
+- [x] `app/admin/master/inventory-summary/page.tsx` — 23곳 정리 완료 (사이즈 11 · 색상 12) · 잔여 0
+      ※ 집계엔 22곳이었으나 `border-t-[#3182F6]` 1곳이 정적 검색 정규식(`border-[#…`)에 안 잡혀 있었다. 다른 파일에도 `border-t/l/r/b-[#…`가 있을 수 있다.
+      ※ 크기 변경 동반: h1 22→20px(`text-page`), 표 본문 13→14px(`text-body`), 표 헤더 12→14px(`text-table-head`), 빈 상태 15→14px. 굵기도 토큰값을 따라 내려갔다(font-black/bold 제거).
 - [ ] `components/WorkerPinLoginDesktop.tsx` — 21곳 (사이즈 15 · 색상 6)
 - [ ] `app/components/StockStatusForm.tsx` — 18곳 (사이즈 15 · 색상 3)
 - [ ] `app/admin/master/health/page.tsx` — 18곳 (사이즈 16 · 색상 2)
 - [ ] `app/admin/master/processing/page.tsx` — 18곳 (사이즈 16 · 색상 2)
 - [ ] `components/WorkerPinLogin.tsx` — 16곳 (사이즈 10 · 색상 6)
-- [ ] `app/admin/master/work-settlement/page.tsx` — 16곳 (사이즈 12 · 색상 4)
+- [x] `app/admin/master/work-settlement/page.tsx` — 18곳 정리 완료 (사이즈 12 · 색상 6) · 잔여 0
+      ※ 집계 16곳 대비 +2 — `border-t-[#…]`×2가 정규식 밖이었다.
+      ※ 행 액션 링크가 `#3182F6`(흰 배경 대비 3.71, §2-4 미달)이었다 → `text-link`(#1C6CE0)로 교체.
 - [ ] `app/inventory/lot/[lotNumber]/page.tsx` — 15곳 (사이즈 10 · 색상 5)
 - [ ] `app/page.tsx` — 14곳 (사이즈 10 · 색상 4)
 - [ ] `app/admin/master/cost/purchase-stats/page.tsx` — 14곳 (사이즈 2 · 색상 12)
 - [ ] `app/components/StockStatusSummary.tsx` — 13곳 (사이즈 12 · 색상 1)
 - [ ] `app/lot/[lotNumber]/page.tsx` — 13곳 (사이즈 10 · 색상 3)
 - [ ] `app/components/ApprovalCard.tsx` — 13곳 (사이즈 6 · 색상 7)
-- [ ] `app/admin/master/materials/page.tsx` — 13곳 (사이즈 9 · 색상 4)
+- [x] `app/admin/master/materials/page.tsx` — 17곳 정리 완료 (사이즈 10 · 색상 7) · 잔여 0
+      ※ 집계 13곳 대비 +4 — `border-t-[#…]`×2·`ring-[#…]`·`accent-[#…]`가 정규식 밖이었다. `bg-[#1c6ce0]`는 accent-fill-hover 값을 직접 적어둔 것.
+      ※ 잔여(정리 안 함): Tailwind 기본 `text-sm`×3·`text-xs`×1 — 14/12px이라 스케일 안이고 임의값도 아니라 대상 밖. 토큰 통일을 원하면 별도 판단.
 - [ ] `app/components/StockStatusResults.tsx` — 12곳 (사이즈 11 · 색상 1)
 - [ ] `app/admin/ledger/page.tsx` — 12곳 (사이즈 9 · 색상 3)
 - [ ] `app/components/OutboundCartSheet.tsx` — 11곳 (사이즈 9 · 색상 2)

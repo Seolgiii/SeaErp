@@ -40,18 +40,19 @@ const ROLE_BADGE: Record<WorkerRole, string> = {
 };
 
 /**
- * 컬럼 폭 — §7-2. 실측(2026-07-28, 작업자 3건) 최댓값 + 여유 8 + 패딩 32.
+ * 컬럼 폭 — §7-2. 실측(2026-07-28, 작업자 3건 / 2026-07-31, 4건) 최댓값 + 여유 8 + 패딩 32.
  * PIN 상태는 문구가 길다 — `평문 (다음 로그인 시 해시화)` 179px이 하한.
+ * 활성·잠금은 비활성/잠금 레코드가 아직 0건이라 배지 최댓값 미실측(추정치 유지).
  */
 const COLS: TableCol[] = [
-  { key: 'name', label: '작업자명', px: 116 }, // max 74 `이경환 본인`
+  { key: 'name', label: '작업자명', px: 140 }, // 실측 99 `QA테스트 본인`
   { key: 'role', label: '권한', px: 92 }, // 배지 49
   { key: 'active', label: '활성', px: 92 }, // 배지 49
-  // 2026-07-31 추가 4컬럼 — 실측 아님(브라우저 렌더 확인 전 산술 추정). 육안 확인 필요.
-  { key: 'affiliation', label: '소속', px: 144 }, // 추정: `한라에스앤에프` 7자
+  // 2026-07-31 추가 4컬럼 — 같은 날 산술 추정으로 넣었다가 Playwright 실측으로 교정(소속/입사일).
+  { key: 'affiliation', label: '소속', px: 200 }, // 실측 158 `제주수산물수출포장가공센터`
   { key: 'position', label: '직급', px: 100 }, // 추정: `대표이사` 4자
   { key: 'phone', label: '연락처', px: 144 }, // 추정: `010-0000-0000`
-  { key: 'hireDate', label: '입사일', px: 108 }, // 거래 이력 날짜 컬럼과 동일 폭(YYYY-MM-DD)
+  { key: 'hireDate', label: '입사일', px: 124 }, // 실측 81 `2021-07-26`
   { key: 'locked', label: '잠금', px: 100 }, // 배지 `잠금 5회` 58
   // PIN 상태를 맨 오른쪽으로 재배치(2026-07-31) — 권한~잠금 가운데 정렬 묶음과 분리.
   { key: 'pin', label: 'PIN 상태', px: 220 }, // max 179
@@ -88,10 +89,11 @@ function groupByAffiliation(list: Worker[]): { key: string; items: Worker[] }[] 
 
 /**
  * 카드·컨트롤·헤더 공통 최대 폭 (§7-9).
- * 표 합계 1116(컬럼 4개 추가로 620→1116) > 컨트롤 행 678 → 이제 표가 폭을 정한다.
+ * 표 합계 1212(2026-07-31 폭 실측 교정으로 1116→1212) > 컨트롤 행 678 → 표가 폭을 정한다.
  * 오버헤드 24px는 이 화면의 기존 704(=678+26)·ships 712(=688+24) 사례를 따름 — 실측 아님.
+ * 잉여 24px는 스페이서 컬럼이 흡수한다(§7-9 — 컬럼을 비례 확대하지 않는다).
  */
-const CONTENT_MAX = 'max-w-[1140px]';
+const CONTENT_MAX = 'max-w-[1236px]';
 
 export default function WorkersMasterPage() {
   const router = useRouter();
@@ -178,8 +180,9 @@ export default function WorkersMasterPage() {
     locked: items.filter((w) => w.isLocked).length,
   };
 
+  // 바깥 폭 = CONTENT_MAX(1236) + p-8 좌우 64 = 1300. 표가 스크롤 없이 들어가는 하한.
   return (
-    <div className="mx-auto max-w-[1200px] p-8 min-w-0">
+    <div className="mx-auto max-w-[1300px] p-8 min-w-0">
       {/* 제목·버튼·컨트롤·카드가 모두 같은 최대 폭에 맞는다 (§7-9) */}
       <div className={`mb-6 flex items-center justify-between gap-4 ${CONTENT_MAX}`}>
         <div>
@@ -315,7 +318,7 @@ export default function WorkersMasterPage() {
                                   {w.pinFailCount > 0 && <span>{w.pinFailCount}회</span>}
                                 </span>
                               ) : (
-                                <span className="text-caption text-text-muted">정상</span>
+                                <span className="text-body text-text-muted">정상</span>
                               )}
                             </td>
                             <td className="whitespace-nowrap px-4 py-2 text-body text-text-muted">
