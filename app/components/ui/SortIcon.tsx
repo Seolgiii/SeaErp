@@ -57,3 +57,14 @@ export function SortIcon({ state }: { state: SortState }) {
     />
   );
 }
+
+/**
+ * 가운데 정렬 헤더용 — 라벨 반대편에 두는 투명 스페이서(§7-8 확장).
+ * `justify-center`는 "라벨+아이콘"을 한 묶음으로 가운데 맞추기 때문에, 아이콘이
+ * 라벨 오른쪽에만 있으면 라벨 자체는 아이콘 폭만큼 왼쪽으로 밀린다. 라벨 반대편에
+ * SortIcon과 동일 크기(16px)의 빈 자리를 둬서 좌우를 대칭으로 만들면 라벨이 실제로
+ * 컬럼 중앙에 온다. 좌/우 정렬 헤더의 "아이콘은 라벨 반대편" 원칙(§7-8)을 중앙 정렬로 확장.
+ */
+export function SortIconSpacer() {
+  return <span className="h-4 w-4 shrink-0" aria-hidden="true" />;
+}

@@ -15,7 +15,7 @@ import WorkerEditModal from '@/app/components/WorkerEditModal';
 import { Button } from '@/app/components/ui/Button';
 import { EmptyState } from '@/app/components/ui/EmptyState';
 import { LoadingState } from '@/app/components/ui/LoadingState';
-import { SortIcon, ariaSort, sortState } from '@/app/components/ui/SortIcon';
+import { SortIcon, SortIconSpacer, ariaSort, sortState } from '@/app/components/ui/SortIcon';
 import { SpacerCell, TableColGroup, tableMinWidth, type TableCol } from '@/app/admin/_table-cols';
 
 type SortField = 'name' | 'role' | 'active';
@@ -410,6 +410,9 @@ function Th({
           align === 'center' ? 'justify-center text-center' : 'text-left'
         }`}
       >
+        {/* 아이콘이 라벨 오른쪽에만 있으면 묶음 전체가 가운데 정렬돼도 라벨은 왼쪽으로 밀린다.
+            반대편에 동일 크기 스페이서를 둬 대칭을 맞춘다(§7-8 확장, SortIcon.tsx 참조). */}
+        {align === 'center' && <SortIconSpacer />}
         {label}
         <SortIcon state={state} />
       </button>
