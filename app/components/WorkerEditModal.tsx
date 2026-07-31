@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { KeyIcon, LockOpenIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { toast } from '@/lib/toast';
+import { formatPhone } from '@/lib/phone-format';
 import { useConfirm } from '@/app/components/ConfirmBottomSheet';
 import { Button } from '@/app/components/ui/Button';
 import { Modal } from '@/app/components/ui/Modal';
@@ -33,6 +34,10 @@ const ROLE_OPTIONS: { value: WorkerRole; label: string; desc: string }[] = [
   { value: 'MASTER', label: '마스터', desc: '관리자 권한 + 권한 변경 가능' },
 ];
 
+// Airtable 작업자 테이블의 소속·직급 singleSelect 옵션과 정확히 일치해야 한다(안 맞으면 저장이 422로 실패).
+const AFFILIATION_OPTIONS = ['한라에스앤에프', '제주에스에프'];
+const POSITION_OPTIONS = ['사원', '주임', '대리', '과장', '차장', '부장', '이사', '상무', '전무', '대표이사'];
+
 export default function WorkerEditModal({
   mode,
   worker,
@@ -46,6 +51,14 @@ export default function WorkerEditModal({
   const [role, setRole] = useState<WorkerRole>(worker?.role ?? 'WORKER');
   const [active, setActive] = useState<boolean>(worker?.active ?? true);
   const [pin, setPin] = useState('');
+  const [affiliation, setAffiliation] = useState(worker?.affiliation ?? '');
+  const [position, setPosition] = useState(worker?.position ?? '');
+  const [hireDate, setHireDate] = useState(worker?.hireDate ?? '');
+  const [birthDate, setBirthDate] = useState(worker?.birthDate ?? '');
+  const [terminationDate, setTerminationDate] = useState(worker?.terminationDate ?? '');
+  const [phone, setPhone] = useState(worker?.phone ?? '');
+  const [emergencyPhone, setEmergencyPhone] = useState(worker?.emergencyPhone ?? '');
+  const [memo, setMemo] = useState(worker?.memo ?? '');
   const [showPinReset, setShowPinReset] = useState(false);
   const [newPin, setNewPin] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -72,6 +85,16 @@ export default function WorkerEditModal({
       (nErr ? nameRef : pinRef).current?.focus();
       return;
     }
+    const hrInput = {
+      affiliation,
+      position,
+      hireDate,
+      birthDate,
+      terminationDate,
+      phone,
+      emergencyPhone,
+      memo,
+    };
     setIsSaving(true);
     const result =
       mode === 'create'
@@ -80,11 +103,13 @@ export default function WorkerEditModal({
             role,
             active,
             pin,
+            ...hrInput,
           } as CreateWorkerInput)
         : await updateWorker(workerId, worker!.id, {
             name,
             role,
             active,
+            ...hrInput,
           } as WorkerInput);
     setIsSaving(false);
     if (result.success) {
@@ -286,6 +311,106 @@ export default function WorkerEditModal({
           </p>
         )}
       </Field>
+
+      <div className="space-y-4 border-t border-border pt-6">
+        <p className="text-label text-text-muted">인사 정보</p>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="소속" htmlFor="worker-affiliation">
+            <select
+              id="worker-affiliation"
+              value={affiliation}
+              onChange={(e) => setAffiliation(e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">선택 안함</option>
+              {AFFILIATION_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="직급" htmlFor="worker-position">
+            <select
+              id="worker-position"
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">선택 안함</option>
+              {POSITION_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="연락처" htmlFor="worker-phone">
+            <input
+              id="worker-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onBlur={(e) => setPhone(formatPhone(e.target.value))}
+              placeholder="010-0000-0000"
+              className={fieldClass(false)}
+            />
+          </Field>
+          <Field label="비상연락처" htmlFor="worker-emergency-phone">
+            <input
+              id="worker-emergency-phone"
+              type="tel"
+              value={emergencyPhone}
+              onChange={(e) => setEmergencyPhone(e.target.value)}
+              onBlur={(e) => setEmergencyPhone(formatPhone(e.target.value))}
+              placeholder="010-0000-0000"
+              className={fieldClass(false)}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="생년월일" htmlFor="worker-birth-date">
+            <input
+              id="worker-birth-date"
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              className={fieldClass(false)}
+            />
+          </Field>
+          <Field label="입사일" htmlFor="worker-hire-date">
+            <input
+              id="worker-hire-date"
+              type="date"
+              value={hireDate}
+              onChange={(e) => setHireDate(e.target.value)}
+              className={fieldClass(false)}
+            />
+          </Field>
+        </div>
+
+        <Field label="퇴사일" htmlFor="worker-termination-date">
+          <input
+            id="worker-termination-date"
+            type="date"
+            value={terminationDate}
+            onChange={(e) => setTerminationDate(e.target.value)}
+            className={fieldClass(false)}
+          />
+        </Field>
+
+        <Field label="메모" htmlFor="worker-memo">
+          <textarea
+            id="worker-memo"
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="인사 관련 메모"
+            rows={3}
+            className={`${fieldClass(false)} h-auto py-2`}
+          />
+        </Field>
+      </div>
 
       {mode === 'create' && (
         <Field label="초기 PIN" required error={pinError} htmlFor="worker-pin">

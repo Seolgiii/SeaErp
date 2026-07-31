@@ -19,6 +19,16 @@ export const WorkerFieldsSchema = z
     pin_hash: z.string().optional(),
     pin_fail_count: z.number().optional(),
     pin_locked_until: z.number().optional(),
+
+    // 인사 정보 (2026-07-31 추가)
+    소속: z.string().optional(),
+    직급: z.string().optional(),
+    입사일: z.string().optional(),
+    출생일: z.string().optional(),
+    퇴사일: z.string().optional(),
+    연락처: z.string().optional(),
+    비상연락처: z.string().optional(),
+    메모: z.string().optional(),
   })
   .loose();
 

@@ -47,16 +47,51 @@ const COLS: TableCol[] = [
   { key: 'name', label: '작업자명', px: 116 }, // max 74 `이경환 본인`
   { key: 'role', label: '권한', px: 92 }, // 배지 49
   { key: 'active', label: '활성', px: 92 }, // 배지 49
-  { key: 'pin', label: 'PIN 상태', px: 220 }, // max 179
+  // 2026-07-31 추가 4컬럼 — 실측 아님(브라우저 렌더 확인 전 산술 추정). 육안 확인 필요.
+  { key: 'affiliation', label: '소속', px: 144 }, // 추정: `한라에스앤에프` 7자
+  { key: 'position', label: '직급', px: 100 }, // 추정: `대표이사` 4자
+  { key: 'phone', label: '연락처', px: 144 }, // 추정: `010-0000-0000`
+  { key: 'hireDate', label: '입사일', px: 108 }, // 거래 이력 날짜 컬럼과 동일 폭(YYYY-MM-DD)
   { key: 'locked', label: '잠금', px: 100 }, // 배지 `잠금 5회` 58
+  // PIN 상태를 맨 오른쪽으로 재배치(2026-07-31) — 권한~잠금 가운데 정렬 묶음과 분리.
+  { key: 'pin', label: 'PIN 상태', px: 220 }, // max 179
 ];
+
+/** 소속 드롭다운(WorkerEditModal)과 동일한 우선순위 — 알려진 소속을 먼저, 새 값은 그 뒤에 정렬. */
+const AFFILIATION_ORDER = ['한라에스앤에프', '제주에스에프'];
+const UNASSIGNED_AFFILIATION = '소속 미지정';
+
+/**
+ * 소속별 그리드 분리 (2026-07-31) — 하드코딩된 소속 목록이 아니라 **실제 데이터에 존재하는 값**만
+ * 그룹으로 뜬다. 새 소속이 나중에 추가돼도 코드 변경 없이 새 그리드가 자동으로 생긴다.
+ */
+function groupByAffiliation(list: Worker[]): { key: string; items: Worker[] }[] {
+  const map = new Map<string, Worker[]>();
+  for (const w of list) {
+    const key = w.affiliation || UNASSIGNED_AFFILIATION;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(w);
+  }
+  return [...map.keys()]
+    .sort((a, b) => {
+      if (a === UNASSIGNED_AFFILIATION) return 1;
+      if (b === UNASSIGNED_AFFILIATION) return -1;
+      const ai = AFFILIATION_ORDER.indexOf(a);
+      const bi = AFFILIATION_ORDER.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b, 'ko');
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    })
+    .map((key) => ({ key, items: map.get(key)! }));
+}
 
 /**
  * 카드·컨트롤·헤더 공통 최대 폭 (§7-9).
- * 표 합계 620 < **컨트롤 행 678**(검색 128 + 칩 7개 538) → 컨트롤이 폭을 정한다. 678 → 704.
- * 이 화면만 표가 아니라 컨트롤이 하한이다 — 필터 칩이 두 그룹(활성·권한)이라 그렇다.
+ * 표 합계 1116(컬럼 4개 추가로 620→1116) > 컨트롤 행 678 → 이제 표가 폭을 정한다.
+ * 오버헤드 24px는 이 화면의 기존 704(=678+26)·ships 712(=688+24) 사례를 따름 — 실측 아님.
  */
-const CONTENT_MAX = 'max-w-[704px]';
+const CONTENT_MAX = 'max-w-[1140px]';
 
 export default function WorkersMasterPage() {
   const router = useRouter();
@@ -113,6 +148,8 @@ export default function WorkersMasterPage() {
     });
     return list;
   })();
+
+  const groups = groupByAffiliation(visible);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -176,6 +213,7 @@ export default function WorkersMasterPage() {
           <Chip label="비활성" active={activeFilter === 'inactive'} count={counts.inactive} onClick={() => setActiveFilter('inactive')} />
           <Chip label="전체" active={activeFilter === 'ALL'} count={counts.ALL} onClick={() => setActiveFilter('ALL')} />
         </div>
+        <span className="h-5 w-px bg-gray-200" />
         <div className="flex items-center gap-2">
           <Chip label="모든 권한" active={roleFilter === 'ALL'} count={counts.ALL} onClick={() => setRoleFilter('ALL')} />
           {(['WORKER', 'ADMIN', 'MASTER'] as WorkerRole[]).map((r) => (
@@ -190,85 +228,115 @@ export default function WorkersMasterPage() {
         </div>
       </div>
 
-      <div className={`overflow-hidden rounded-card border border-border bg-surface ${CONTENT_MAX}`}>
-        {isLoading ? (
+      {isLoading ? (
+        <div className={`overflow-hidden rounded-card border border-border bg-surface ${CONTENT_MAX}`}>
           <LoadingState cols={COLS} rows={8} spacer />
-        ) : visible.length === 0 ? (
+        </div>
+      ) : visible.length === 0 ? (
+        <div className={`overflow-hidden rounded-card border border-border bg-surface ${CONTENT_MAX}`}>
           <EmptyState
             title="조건에 맞는 작업자가 없습니다"
             hint="검색어를 지우거나 활성·권한 필터를 전체로 바꿔보세요."
           />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full table-fixed" style={{ minWidth: tableMinWidth(COLS) }}>
-              <TableColGroup cols={COLS} spacer />
-              <thead className="sticky top-0 bg-surface-alt">
-                <tr className="text-left">
-                  <Th label="작업자명" field="name" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="권한" field="role" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <Th label="활성" field="active" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
-                  <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">PIN 상태</th>
-                  <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">잠금</th>
-                  <SpacerCell as="th" />
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((w) => {
-                  const isSelf = myId === w.id;
-                  return (
-                    <tr
-                      key={w.id}
-                      onClick={() => setEditing(w)}
-                      className="cursor-pointer border-t border-border transition-colors hover:bg-surface-alt"
-                    >
-                      {/* py-2 + body(14×1.5=21) + border 1 = 38px 행 높이 (§7-7) */}
-                      <td className="whitespace-nowrap px-4 py-2 text-body text-text">
-                        {w.name || '—'}
-                        {isSelf && (
-                          <span className="ml-2 rounded-pill bg-warn-bg px-2 text-caption text-warn-ink">
-                            본인
-                          </span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-2">
-                        <span className={`inline-block rounded-pill px-2 text-caption ${ROLE_BADGE[w.role]}`}>
-                          {ROLE_LABEL[w.role]}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-2">
-                        <span
-                          className={`inline-block rounded-pill px-2 text-caption ${w.active ? 'bg-success-bg text-success-ink' : 'bg-surface-alt text-text-muted'}`}
-                        >
-                          {w.active ? '활성' : '비활성'}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-2 text-body text-text-muted">
-                        {w.hasHashedPin
-                          ? '해시 저장됨'
-                          : w.hasPlainPin
-                            ? '평문 (다음 로그인 시 해시화)'
-                            : <span className="text-danger-ink">미설정</span>}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-2">
-                        {w.isLocked ? (
-                          <span className="inline-flex items-center gap-1 rounded-pill bg-danger-bg px-2 text-caption text-danger-ink">
-                            <LockClosedIcon className="h-3 w-3" aria-hidden="true" />
-                            잠금
-                            {w.pinFailCount > 0 && <span>{w.pinFailCount}회</span>}
-                          </span>
-                        ) : (
-                          <span className="text-caption text-text-muted">정상</span>
-                        )}
-                      </td>
-                      <SpacerCell />
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className={`space-y-8 ${CONTENT_MAX}`}>
+          {/* 소속별 그리드 분리 — 소속이 늘어나면 자동으로 그리드가 추가된다(groupByAffiliation). */}
+          {groups.map((g) => (
+            <section key={g.key}>
+              <h2 className="mb-2 text-section text-text">
+                {g.key} <span className="text-label text-text-muted">{g.items.length}건</span>
+              </h2>
+              <div className="overflow-hidden rounded-card border border-border bg-surface">
+                <div className="overflow-x-auto">
+                  <table className="w-full table-fixed" style={{ minWidth: tableMinWidth(COLS) }}>
+                    <TableColGroup cols={COLS} spacer />
+                    <thead className="sticky top-0 bg-surface-alt">
+                      <tr className="text-left">
+                        <Th label="작업자명" field="name" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                        <Th label="권한" field="role" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} align="center" />
+                        <Th label="활성" field="active" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} align="center" />
+                        <th className="whitespace-nowrap px-4 py-2 text-center text-table-head text-text-muted">소속</th>
+                        <th className="whitespace-nowrap px-4 py-2 text-center text-table-head text-text-muted">직급</th>
+                        <th className="whitespace-nowrap px-4 py-2 text-center text-table-head text-text-muted">연락처</th>
+                        <th className="whitespace-nowrap px-4 py-2 text-center text-table-head text-text-muted">입사일</th>
+                        <th className="whitespace-nowrap px-4 py-2 text-center text-table-head text-text-muted">잠금</th>
+                        <th className="whitespace-nowrap px-4 py-2 text-table-head text-text-muted">PIN 상태</th>
+                        <SpacerCell as="th" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.items.map((w) => {
+                        const isSelf = myId === w.id;
+                        return (
+                          <tr
+                            key={w.id}
+                            onClick={() => setEditing(w)}
+                            className="cursor-pointer border-t border-border transition-colors hover:bg-surface-alt"
+                          >
+                            {/* py-2 + body(14×1.5=21) + border 1 = 38px 행 높이 (§7-7) */}
+                            <td className="whitespace-nowrap px-4 py-2 text-body text-text">
+                              {w.name || '—'}
+                              {isSelf && (
+                                <span className="ml-2 rounded-pill bg-warn-bg px-2 text-caption text-warn-ink">
+                                  본인
+                                </span>
+                              )}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-center">
+                              <span className={`inline-block rounded-pill px-2 text-caption ${ROLE_BADGE[w.role]}`}>
+                                {ROLE_LABEL[w.role]}
+                              </span>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-center">
+                              <span
+                                className={`inline-block rounded-pill px-2 text-caption ${w.active ? 'bg-success-bg text-success-ink' : 'bg-surface-alt text-text-muted'}`}
+                              >
+                                {w.active ? '활성' : '비활성'}
+                              </span>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-center text-body text-text">
+                              {w.affiliation || '—'}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-center text-body text-text">
+                              {w.position || '—'}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-center text-body text-text tabular-nums">
+                              {w.phone || '—'}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-center text-body text-text tabular-nums">
+                              {w.hireDate || '—'}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-center">
+                              {w.isLocked ? (
+                                <span className="inline-flex items-center gap-1 rounded-pill bg-danger-bg px-2 text-caption text-danger-ink">
+                                  <LockClosedIcon className="h-3 w-3" aria-hidden="true" />
+                                  잠금
+                                  {w.pinFailCount > 0 && <span>{w.pinFailCount}회</span>}
+                                </span>
+                              ) : (
+                                <span className="text-caption text-text-muted">정상</span>
+                              )}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-body text-text-muted">
+                              {w.hasHashedPin
+                                ? '해시 저장됨'
+                                : w.hasPlainPin
+                                  ? '평문 (다음 로그인 시 해시화)'
+                                  : <span className="text-danger-ink">미설정</span>}
+                            </td>
+                            <SpacerCell />
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
 
       {editing && (
         <WorkerEditModal
@@ -322,12 +390,14 @@ function Th({
   sortField,
   sortDir,
   onToggle,
+  align = 'left',
 }: {
   label: string;
   field: SortField;
   sortField: SortField;
   sortDir: SortDir;
   onToggle: (f: SortField) => void;
+  align?: 'left' | 'center';
 }) {
   const state = sortState(sortField === field, sortDir);
   return (
@@ -336,7 +406,9 @@ function Th({
       <button
         type="button"
         onClick={() => onToggle(field)}
-        className="group flex w-full cursor-pointer select-none items-center gap-1 px-4 py-2 text-left transition-colors hover:text-accent-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-fill motion-reduce:transition-none"
+        className={`group flex w-full cursor-pointer select-none items-center gap-1 px-4 py-2 transition-colors hover:text-accent-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-fill motion-reduce:transition-none ${
+          align === 'center' ? 'justify-center text-center' : 'text-left'
+        }`}
       >
         {label}
         <SortIcon state={state} />

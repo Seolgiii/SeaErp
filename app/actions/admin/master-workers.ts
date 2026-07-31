@@ -46,12 +46,29 @@ export type Worker = {
   pinFailCount: number;
   pinLockedUntil: number;
   isLocked: boolean;
+  // 인사 정보 (2026-07-31 추가)
+  affiliation: string;
+  position: string;
+  hireDate: string;
+  birthDate: string;
+  terminationDate: string;
+  phone: string;
+  emergencyPhone: string;
+  memo: string;
 };
 
 export type WorkerInput = {
   name: string;
   role: WorkerRole;
   active: boolean;
+  affiliation?: string;
+  position?: string;
+  hireDate?: string;
+  birthDate?: string;
+  terminationDate?: string;
+  phone?: string;
+  emergencyPhone?: string;
+  memo?: string;
 };
 
 export type CreateWorkerInput = WorkerInput & {
@@ -84,6 +101,28 @@ function parseWorker(rec: { id: string; fields?: Record<string, unknown> }): Wor
     pinFailCount: failCount,
     pinLockedUntil: lockedUntil,
     isLocked: lockedUntil > Date.now(),
+    affiliation: String(f[WORKER_FIELDS.affiliation] ?? "").trim(),
+    position: String(f[WORKER_FIELDS.position] ?? "").trim(),
+    hireDate: String(f[WORKER_FIELDS.hireDate] ?? "").trim(),
+    birthDate: String(f[WORKER_FIELDS.birthDate] ?? "").trim(),
+    terminationDate: String(f[WORKER_FIELDS.terminationDate] ?? "").trim(),
+    phone: String(f[WORKER_FIELDS.phone] ?? "").trim(),
+    emergencyPhone: String(f[WORKER_FIELDS.emergencyPhone] ?? "").trim(),
+    memo: String(f[WORKER_FIELDS.memo] ?? "").trim(),
+  };
+}
+
+/** 인사 정보 필드를 Airtable PATCH/생성 payload로 변환. select·date는 빈 값이면 null(클리어), 나머지는 빈 문자열 허용. */
+function hrFields(input: WorkerInput): Record<string, unknown> {
+  return {
+    [WORKER_FIELDS.affiliation]: input.affiliation?.trim() || null,
+    [WORKER_FIELDS.position]: input.position?.trim() || null,
+    [WORKER_FIELDS.hireDate]: input.hireDate?.trim() || null,
+    [WORKER_FIELDS.birthDate]: input.birthDate?.trim() || null,
+    [WORKER_FIELDS.terminationDate]: input.terminationDate?.trim() || null,
+    [WORKER_FIELDS.phone]: input.phone?.trim() ?? "",
+    [WORKER_FIELDS.emergencyPhone]: input.emergencyPhone?.trim() ?? "",
+    [WORKER_FIELDS.memo]: input.memo?.trim() ?? "",
   };
 }
 
@@ -203,6 +242,7 @@ export async function createWorker(
       [PIN_HASH_FIELD]: pinHash,
       [PIN_FAIL_COUNT_FIELD]: 0,
       [PIN_LOCKED_UNTIL_FIELD]: 0,
+      ...hrFields(input),
     });
     revalidatePath("/admin/master/workers");
     return { success: true, data: { id } };
@@ -240,6 +280,7 @@ export async function updateWorker(
       [WORKER_FIELDS.name]: input.name.trim(),
       [WORKER_FIELDS.role]: input.role,
       [WORKER_FIELDS.active]: input.active,
+      ...hrFields(input),
     });
     invalidateWorkerCache(id);
     revalidatePath("/admin/master/workers");

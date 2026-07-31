@@ -3,7 +3,10 @@
  * 테이블명은 .env.local 의 AIRTABLE_WORKERS_TABLE 등으로 덮어쓸 수 있음.
  */
 export const AIRTABLE_TABLE = {
-  workers: "작업자",
+  // 2026-07-31: "작업자" → "사용자"로 리네임. DESIGN.md §8-2 "작업자는 역할명(WORKER) 전용" 원칙과
+  // 정합 — 이 테이블은 WORKER뿐 아니라 ADMIN·MASTER 계정도 담아 "작업자"라는 이름이 부정확했다.
+  // Airtable 쪽 테이블명도 동시에 "사용자"로 변경(자동화 없음, 참조는 이 상수 한 곳뿐 확인됨).
+  workers: "사용자",
   products: "품목마스터",
   lots: "LOT별 재고",
   txn: "입출고 내역",
@@ -31,6 +34,15 @@ export const WORKER_FIELDS = {
   pin: "PIN",
   active: "활성",
   role: "권한",
+  // 인사 정보 (2026-07-31 추가) — 소속·직급은 지출결의 신청자 정보 lookup 원천이기도 하다.
+  affiliation: "소속",
+  position: "직급",
+  hireDate: "입사일",
+  birthDate: "출생일",
+  terminationDate: "퇴사일",
+  phone: "연락처",
+  emergencyPhone: "비상연락처",
+  memo: "메모",
 } as const;
 
 /** LOT별 재고 테이블 필드 */
