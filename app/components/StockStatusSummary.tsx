@@ -2,7 +2,7 @@
 
 import { XMarkIcon, ArrowsRightLeftIcon, ArrowUpOnSquareIcon } from '@heroicons/react/24/outline';
 import { formatIntKo } from '@/lib/number-format';
-import { formatSpecKgMisu } from '@/lib/spec-display';
+import { formatSpec, formatSpecKgMisu } from '@/lib/spec-display';
 import { calcAmount, type LotRecord, type Filters } from '@/app/components/stock-status-shared';
 
 interface Props {
@@ -44,7 +44,7 @@ export default function StockStatusSummary({
             <p className="text-[12px] font-bold text-gray-400 mb-1">
               {[
                 applied?.q,
-                applied?.spec && `규격 ${applied.spec}kg`,
+                applied?.spec && `규격 ${formatSpec(applied.spec)}`,
                 applied?.misu && `${applied.misu}미`,
                 applied?.from || applied?.to
                   ? `${applied?.from || '—'}~${applied?.to || '—'}`

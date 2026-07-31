@@ -1,10 +1,13 @@
 /**
  * 규격만 단독 표기: "11" → "11kg", "11kg" → "11kg", 빈 값/"-" → "-".
  * 분리된 컬럼(규격/미수 두 열) 표시용.
+ *
+ * "p/n"(사료 — 중량이 아니라 개수 단위)은 kg 접미사를 붙이지 않고 그대로 표기한다.
  */
 export function formatSpec(specRaw: string): string {
   const t = (specRaw ?? '').trim();
   if (!t || t === '-') return '-';
+  if (t.toLowerCase() === 'p/n') return t;
   return /kg\s*$/i.test(t) ? t : `${t}kg`;
 }
 
@@ -88,9 +91,11 @@ export function formatSpecKgMisu(specRaw: string, misuRaw: string): string {
   const specKg =
     spec === ""
       ? ""
-      : /kg\s*$/i.test(spec)
+      : spec.toLowerCase() === "p/n"
         ? spec
-        : `${spec}kg`;
+        : /kg\s*$/i.test(spec)
+          ? spec
+          : `${spec}kg`;
 
   // 미수 값이 이미 "미"로 끝나면(예: "52/54미") 접미사를 또 붙이지 않는다 (중복 "미미" 방지).
   const misuLabel = misu === "" ? "" : misu.endsWith("미") ? misu : `${misu}미`;

@@ -115,6 +115,9 @@ export default function InventoryRecordPage() {
       itemCategory: opt.category,
       origin: imported ? "수입산" : "국내산",
       shipName: imported ? "" : prev.shipName,
+      // 사료는 규격·미수 표기 대상이 아니라 고정값(p/n · -)으로 자동 채움. 다른 품목 선택 시엔 기존 입력 유지.
+      spec: imported ? "p/n" : prev.spec,
+      count: imported ? "-" : prev.count,
     }));
     setItemOpen(false);
   };

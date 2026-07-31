@@ -112,7 +112,8 @@ export default function LotsMasterPage() {
       list = list.filter(
         (l) =>
           l.lotNumber.toLowerCase().includes(q) ||
-          l.productName.toLowerCase().includes(q),
+          l.productName.toLowerCase().includes(q) ||
+          l.misu.toLowerCase().includes(q),
       );
     }
 
