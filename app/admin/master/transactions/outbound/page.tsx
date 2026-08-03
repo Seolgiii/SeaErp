@@ -15,6 +15,7 @@ import { formatNum } from '@/lib/number-format';
 import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import { LotLink } from '@/app/admin/_lot-link';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
+import { PdfCell } from '../_ledger-cols';
 import {
   getOutboundHistory,
   type OutboundHistory,
@@ -140,7 +141,7 @@ export default function OutboundHistoryPage() {
     }
     const header = [
       '출고일', 'LOT번호', '품목', '규격', '미수', '출고수량',
-      '판매가', '판매금액', '판매처', '보관처', '작업자', '상태',
+      '판매가', '판매금액', '판매처', '보관처', '작업자', '상태', '출고증URL',
     ];
     const esc = (v: string | number) => {
       const s = String(v);
@@ -152,14 +153,14 @@ export default function OutboundHistoryPage() {
         [
           r.date, r.lotNumber, r.product, r.spec, r.misu, r.qty,
           Math.round(r.salePrice), Math.round(r.saleTotal), r.seller,
-          r.storage, r.worker, r.approvalStatus,
+          r.storage, r.worker, r.approvalStatus, r.pdfUrl,
         ]
           .map(esc)
           .join(','),
       );
     }
     lines.push(
-      ['합계', '', '', '', '', shown.qty, '', Math.round(shown.saleTotal), '', '', '', '']
+      ['합계', '', '', '', '', shown.qty, '', Math.round(shown.saleTotal), '', '', '', '', '']
         .map(esc)
         .join(','),
     );
@@ -320,12 +321,13 @@ export default function OutboundHistoryPage() {
                   <th className="px-4 py-3">보관처</th>
                   <th className="whitespace-nowrap px-4 py-3">작업자</th>
                   <th className="whitespace-nowrap px-4 py-3">상태</th>
+                  <th className="whitespace-nowrap px-4 py-3">출고증</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-12 text-center text-sm text-gray-400">
+                    <td colSpan={13} className="px-4 py-12 text-center text-sm text-gray-400">
                       조건에 맞는 출고 건이 없습니다.
                     </td>
                   </tr>
@@ -361,6 +363,11 @@ export default function OutboundHistoryPage() {
                           {r.approvalStatus}
                         </span>
                       </td>
+                      <PdfCell
+                        url={r.pdfUrl}
+                        label={`출고증 ${r.lotNumber || r.date}`}
+                        className="whitespace-nowrap px-4 py-3"
+                      />
                     </tr>
                   ))
                 )}
@@ -374,7 +381,7 @@ export default function OutboundHistoryPage() {
                     <NumCell className="px-4 py-3" value={shown.qty} unit="박스" />
                     <td className="px-4 py-3" />
                     <NumCell className="px-4 py-3" value={shown.saleTotal} unit="원" />
-                    <td className="px-4 py-3" colSpan={4} />
+                    <td className="px-4 py-3" colSpan={5} />
                   </tr>
                 </tfoot>
               )}

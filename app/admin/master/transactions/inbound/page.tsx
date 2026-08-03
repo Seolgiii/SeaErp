@@ -20,6 +20,7 @@ import {
   LedgerColGroup,
   ledgerCell,
   ledgerMinWidth,
+  PdfCell,
   ledgerPad,
 } from '../_ledger-cols';
 import { formatSpec, formatMisu } from '@/lib/spec-display';
@@ -71,12 +72,14 @@ const C = {
   storage: LEDGER_COL.storage,
   worker: LEDGER_COL.worker,
   status: LEDGER_COL.status,
+  pdfInbound: LEDGER_COL.pdfInbound,
 };
 // 순서 = 화면 컬럼 순서. colgroup·헤더·minWidth가 전부 이 배열에서 나온다.
 const COLS = [
   C.date, C.lotNumber, C.product, C.spec, C.misu,
   C.qty, C.unitPrice, C.amount,
   C.partner, C.storage, C.worker, C.status,
+  C.pdfInbound,
 ];
 
 // 승인상태 필터 — 전체 + 베이스 표준 3종.
@@ -170,7 +173,7 @@ export default function InboundHistoryPage() {
     }
     const header = [
       '입고일', 'LOT번호', '품목', '규격', '미수', '원산지', '수량(박스)',
-      '수매가(박스)', '매입액', '매입처', '선박', '보관처', '매입자', '작업자', '상태', '비고',
+      '수매가(박스)', '매입액', '매입처', '선박', '보관처', '매입자', '작업자', '상태', '비고', '입고증URL',
     ];
     const esc = (v: string | number) => {
       const s = String(v);
@@ -182,14 +185,14 @@ export default function InboundHistoryPage() {
         [
           r.date, r.lotNumber, r.product, r.spec, r.misu, r.origin, r.qty,
           Math.round(r.purchasePrice), Math.round(r.purchaseTotal), r.supplier,
-          r.shipName, r.storage, r.purchaser, r.worker, r.approvalStatus, r.memo,
+          r.shipName, r.storage, r.purchaser, r.worker, r.approvalStatus, r.memo, r.pdfUrl,
         ]
           .map(esc)
           .join(','),
       );
     }
     lines.push(
-      ['합계', '', '', '', '', '', shown.qty, '', Math.round(shown.purchaseTotal), '', '', '', '', '', '', '']
+      ['합계', '', '', '', '', '', shown.qty, '', Math.round(shown.purchaseTotal), '', '', '', '', '', '', '', '']
         .map(esc)
         .join(','),
     );
@@ -359,7 +362,7 @@ export default function InboundHistoryPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className={`${CELL_X} py-12 text-center text-sm text-gray-400`}>
+                    <td colSpan={13} className={`${CELL_X} py-12 text-center text-sm text-gray-400`}>
                       조건에 맞는 입고 건이 없습니다.
                     </td>
                   </tr>
@@ -395,6 +398,11 @@ export default function InboundHistoryPage() {
                           {r.approvalStatus}
                         </span>
                       </td>
+                      <PdfCell
+                        url={r.pdfUrl}
+                        label={`입고증 ${r.lotNumber || r.date}`}
+                        className={ledgerCell()}
+                      />
                     </tr>
                   ))
                 )}
@@ -408,7 +416,7 @@ export default function InboundHistoryPage() {
                     <NumCell className={ledgerPad()} value={shown.qty} unit="박스" />
                     <td className={ledgerPad()} />
                     <NumCell className={ledgerPad()} value={shown.purchaseTotal} unit="원" />
-                    <td className={ledgerPad()} colSpan={4} />
+                    <td className={ledgerPad()} colSpan={5} />
                   </tr>
                 </tfoot>
               )}

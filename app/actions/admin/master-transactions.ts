@@ -561,15 +561,28 @@ export async function createExpenseDirect(
 // 거래 이력 — 출고 / 이동 / 지출 (read-only 원장, 입고 이력과 동일 패턴)
 // ═════════════════════════════════════════════════════════════════════════════
 
-/** LOT id → 표시정보 map (이동 이력의 원본 LOT resolve용). */
-type LotInfo = { lotNumber: string; product: string; spec: string; misu: string };
+/**
+ * LOT id → 표시정보 map (이동 이력의 원본 LOT resolve용).
+ *
+ * `inboundId`는 이동 이력의 **입고증**을 찾기 위한 징검다리다 — 이동 입고증은
+ * 재고 이동 레코드가 아니라 이동으로 새로 생긴 입고관리 레코드에 붙는다
+ * (transfer.ts: 신규 입고관리.입고증URL). 재고이동 → 신규 LOT → 입고관리 2홉.
+ */
+type LotInfo = {
+  lotNumber: string;
+  product: string;
+  spec: string;
+  misu: string;
+  inboundId: string;
+};
 async function fetchLotInfoMap(): Promise<Map<string, LotInfo>> {
   const path = encodeURIComponent(AIRTABLE_TABLE.lots);
   const map = new Map<string, LotInfo>();
   let offset: string | undefined;
   do {
     const params = new URLSearchParams({ pageSize: "100" });
-    for (const fld of ["LOT번호", "품목명", "규격", "미수"]) params.append("fields[]", fld);
+    for (const fld of ["LOT번호", "품목명", "규격", "미수", "입고관리링크"])
+      params.append("fields[]", fld);
     if (offset) params.set("offset", offset);
     const data = (await fetchAirtable(`${path}?${params}`)) as {
       records?: { id: string; fields?: Record<string, unknown> }[];
@@ -582,7 +595,30 @@ async function fetchLotInfoMap(): Promise<Map<string, LotInfo>> {
         product: str(fl["품목명"]),
         spec: str(fl["규격"]),
         misu: str(fl["미수"]),
+        inboundId: firstId(fl["입고관리링크"]),
       });
+    }
+    offset = data.offset;
+  } while (offset);
+  return map;
+}
+
+/** 입고관리 id → 입고증URL. 이동 이력의 입고증 resolve 전용(보관처·작업자 map과 같은 패턴). */
+async function fetchInboundPdfMap(): Promise<Map<string, string>> {
+  const path = encodeURIComponent(AIRTABLE_TABLE.inbound);
+  const map = new Map<string, string>();
+  let offset: string | undefined;
+  do {
+    const params = new URLSearchParams({ pageSize: "100" });
+    params.append("fields[]", "입고증URL");
+    if (offset) params.set("offset", offset);
+    const data = (await fetchAirtable(`${path}?${params}`)) as {
+      records?: { id: string; fields?: Record<string, unknown> }[];
+      offset?: string;
+    };
+    for (const rec of data.records ?? []) {
+      const url = str(rec.fields?.["입고증URL"]);
+      if (url) map.set(rec.id, url);
     }
     offset = data.offset;
   } while (offset);
@@ -702,6 +738,10 @@ export type TransferHistoryRow = {
   toStorage: string;
   worker: string;
   approvalStatus: string;
+  /** 이동 출고증 — 재고 이동 레코드에 직접 붙는다. */
+  outboundPdfUrl: string;
+  /** 이동 입고증 — 신규 LOT의 입고관리에 붙는다(2홉). */
+  inboundPdfUrl: string;
 };
 
 export type TransferHistory = {
@@ -724,11 +764,12 @@ export async function getTransferHistory(
   if (from > to) [from, to] = [to, from];
 
   try {
-    const [transfers, storageNames, workerNames, lotInfo] = await Promise.all([
+    const [transfers, storageNames, workerNames, lotInfo, inboundPdfs] = await Promise.all([
       fetchInRange(AIRTABLE_TABLE.transfer, "이동일", from, to),
       fetchNameMap(AIRTABLE_TABLE.storageMaster, "보관처명"),
       fetchNameMap(AIRTABLE_TABLE.workers, "작업자명"),
       fetchLotInfoMap(),
+      fetchInboundPdfMap(),
     ]);
 
     const rows: TransferHistoryRow[] = [];
@@ -743,6 +784,9 @@ export async function getTransferHistory(
       const qty = num(f["이동수량"]);
       const approvalStatus = str(f["승인상태"]) || "(미상)";
       const lot = lotInfo.get(firstId(f["원본 LOT번호"]));
+      // 입고증은 이동으로 새로 생긴 LOT의 입고관리에 붙는다 → 신규 LOT → 입고관리 2홉.
+      const newLot = lotInfo.get(firstId(f["신규 LOT번호"]));
+      const inboundPdfUrl = newLot?.inboundId ? (inboundPdfs.get(newLot.inboundId) ?? "") : "";
 
       byStatus[approvalStatus] = (byStatus[approvalStatus] ?? 0) + 1;
       qtyTotal += qty;
@@ -759,6 +803,8 @@ export async function getTransferHistory(
         toStorage: storageNames.get(firstId(f["이동 후 보관처"])) || "",
         worker: workerNames.get(firstId(f["작업자"])) || "",
         approvalStatus,
+        outboundPdfUrl: str(f["출고증 URL"]),
+        inboundPdfUrl,
       });
     }
 

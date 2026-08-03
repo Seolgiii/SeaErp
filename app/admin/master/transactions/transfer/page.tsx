@@ -9,6 +9,7 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
 } from '@heroicons/react/24/outline';
+import { PdfCell } from '../_ledger-cols';
 import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { formatNum } from '@/lib/number-format';
@@ -132,7 +133,7 @@ export default function TransferHistoryPage() {
     }
     const header = [
       '이동일', '원본 LOT번호', '품목', '규격', '미수', '이동수량(박스)',
-      '이동 전 보관처', '이동 후 보관처', '작업자', '상태',
+      '이동 전 보관처', '이동 후 보관처', '작업자', '상태', '출고증URL', '입고증URL',
     ];
     const esc = (v: string | number) => {
       const s = String(v);
@@ -143,14 +144,14 @@ export default function TransferHistoryPage() {
       lines.push(
         [
           r.date, r.lotNumber, r.product, r.spec, r.misu, r.qty,
-          r.fromStorage, r.toStorage, r.worker, r.approvalStatus,
+          r.fromStorage, r.toStorage, r.worker, r.approvalStatus, r.outboundPdfUrl, r.inboundPdfUrl,
         ]
           .map(esc)
           .join(','),
       );
     }
     lines.push(
-      ['합계', '', '', '', '', shown.qty, '', '', '', '']
+      ['합계', '', '', '', '', shown.qty, '', '', '', '', '', '']
         .map(esc)
         .join(','),
     );
@@ -309,12 +310,14 @@ export default function TransferHistoryPage() {
                   <th className="px-4 py-3">이동 후 보관처</th>
                   <th className="whitespace-nowrap px-4 py-3">작업자</th>
                   <th className="whitespace-nowrap px-4 py-3">상태</th>
+                  <th className="whitespace-nowrap px-4 py-3">출고증</th>
+                  <th className="whitespace-nowrap px-4 py-3">입고증</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-12 text-center text-sm text-gray-400">
+                    <td colSpan={12} className="px-4 py-12 text-center text-sm text-gray-400">
                       조건에 맞는 이동 건이 없습니다.
                     </td>
                   </tr>
@@ -338,6 +341,19 @@ export default function TransferHistoryPage() {
                           {r.approvalStatus}
                         </span>
                       </td>
+                      {/* 이동은 한 건이 출고·입고 양쪽이라 증빙도 둘이다.
+                          발행 여부는 각 끝점이 자사창고인지에 따라 따로 갈린다(2026-05-19 정책) —
+                          한쪽만 있는 행이 정상이다. */}
+                      <PdfCell
+                        url={r.outboundPdfUrl}
+                        label={`이동 출고증 ${r.lotNumber || r.date}`}
+                        className="whitespace-nowrap px-4 py-3"
+                      />
+                      <PdfCell
+                        url={r.inboundPdfUrl}
+                        label={`이동 입고증 ${r.lotNumber || r.date}`}
+                        className="whitespace-nowrap px-4 py-3"
+                      />
                     </tr>
                   ))
                 )}
@@ -349,7 +365,7 @@ export default function TransferHistoryPage() {
                       합계 {formatNum(rows.length, '건')}
                     </td>
                     <NumCell className="px-4 py-3" value={shown.qty} unit="박스" />
-                    <td className="px-4 py-3" colSpan={4} />
+                    <td className="px-4 py-3" colSpan={6} />
                   </tr>
                 </tfoot>
               )}

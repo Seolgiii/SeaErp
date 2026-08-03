@@ -74,4 +74,53 @@ export const LEDGER_COL = {
   worker: col({ key: 'worker', label: '작업자', px: 84 }),
   /** `승인 완료` 배지 = 글자 56 + 배지 px-2 16 = 72. 배지는 12px 고정이라 환산 대상 아님 */
   status: col({ key: 'status', label: '상태', px: 104 }),
+  /**
+   * 증빙 PDF (2026-08-03). 값은 `인쇄`(2자=28) 또는 `—`, 헤더 `입고증`(3자=42)이 하한.
+   * 42 + 여유 8 + 패딩 24 = 74 → 76.
+   */
+  pdfInbound: col({ key: 'pdfInbound', label: '입고증', px: 76 }),
+  pdfOutbound: col({ key: 'pdfOutbound', label: '출고증', px: 76 }),
 };
+
+/**
+ * 증빙 PDF 셀 — 있으면 새 탭으로 열고(거기서 인쇄), 없으면 `—`.
+ *
+ * 왜 링크인가: PDF는 Vercel Blob URL이라 브라우저 뷰어가 곧 인쇄 화면이다.
+ * `window.print()`를 붙이려면 iframe에 실어야 하는데 교차 출처라 막힌다.
+ *
+ * ⚠ 빈 칸이 많은 게 정상이다. 입출고증은 **자사창고 끝점이 있을 때만** 발행하고
+ *   (2026-05-19 정책), 그 이전 데이터는 아예 PDF가 없다. 실측 2026-08-03:
+ *   입고증 2/200 · 출고증 13/20 · 이동 출고증 1/3.
+ *   '왜 없지'를 구분해 보여주려면 보관처 구분까지 끌어와야 해서 지금은 `—` 하나로 둔다.
+ */
+export function PdfCell({
+  url,
+  label,
+  className,
+}: {
+  url: string;
+  /** 스크린리더용 — 표에서 `인쇄`만 읽히면 무엇을 인쇄하는지 알 수 없다. */
+  label: string;
+  className?: string;
+}) {
+  if (!url) {
+    return (
+      <td className={className}>
+        <span className="text-text-muted">—</span>
+      </td>
+    );
+  }
+  return (
+    <td className={className}>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-link underline underline-offset-2 hover:text-accent-fill-hover"
+        onClick={(e) => e.stopPropagation()}
+      >
+        인쇄<span className="sr-only"> — {label}</span>
+      </a>
+    </td>
+  );
+}
