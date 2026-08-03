@@ -8,7 +8,7 @@ import {
   patchAirtableRecord,
 } from "@/lib/airtable";
 import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
-import { ensureAdmin, type Result } from "./_master-helpers";
+import { ensureAdmin, ensureWorker, type Result } from "./_master-helpers";
 
 /**
  * 선박 정보 마스터 (Phase 3 PC 관리 화면용) 서버 액션.
@@ -72,8 +72,12 @@ function buildFields(input: ShipInput): Record<string, unknown> {
   return fields;
 }
 
+/**
+ * 선박 목록 — 읽기 전용이라 WORKER도 허용한다(2026-08-03).
+ * 작업 정산 폼의 선박명 콤보가 쓴다. 생성·수정은 ADMIN 이상 유지.
+ */
 export async function listShips(adminWorkerId: string): Promise<Result<Ship[]>> {
-  const auth = await ensureAdmin(adminWorkerId, TAG);
+  const auth = await ensureWorker(adminWorkerId, TAG);
   if (!auth.success) return { success: false, error: auth.error };
 
   try {

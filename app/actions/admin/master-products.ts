@@ -9,6 +9,7 @@ import {
   patchAirtableRecord,
 } from "@/lib/airtable";
 import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
+import { ensureWorker } from "./_master-helpers";
 
 /**
  * 제품 마스터 (Phase 3 PC 관리 화면용) 서버 액션.
@@ -81,8 +82,14 @@ async function ensureAdmin(adminWorkerId: string): Promise<Result> {
   }
 }
 
+/**
+ * 품목 목록 — 읽기 전용이라 WORKER도 허용한다(2026-08-03).
+ *
+ * 작업 정산이 전원 개방되면서 그 폼의 품목 콤보가 이 목록을 쓴다. 생성·수정·삭제는
+ * 그대로 ADMIN 이상이다 — 여는 건 '어떤 품목이 있는지' 뿐이다.
+ */
 export async function listProducts(adminWorkerId: string): Promise<Result<Product[]>> {
-  const auth = await ensureAdmin(adminWorkerId);
+  const auth = await ensureWorker(adminWorkerId, "master-products");
   if (!auth.success) return { success: false, error: auth.error };
 
   try {

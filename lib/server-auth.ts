@@ -134,6 +134,24 @@ export async function requireAdmin(
 }
 
 /**
+ * requireWorker + MASTER 권한 확인.
+ *
+ * ADMIN도 거부한다. 되돌리기 어려운 파괴적 액션(작업 정산 삭제·확정 취소처럼
+ * 이미 생성된 입고·LOT을 되돌리는 동작) 전용이다.
+ *
+ * @throws {AuthError} 권한 부족 시 FORBIDDEN
+ */
+export async function requireMaster(
+  workerId: string | null | undefined,
+): Promise<VerifiedWorker> {
+  const worker = await requireWorker(workerId);
+  if (worker.role !== "MASTER") {
+    throw new AuthError("FORBIDDEN", "삭제는 MASTER 권한만 가능합니다.");
+  }
+  return worker;
+}
+
+/**
  * 캐시된 작업자 정보를 명시적으로 무효화합니다.
  * 권한 변경·비활성화가 즉시 반영되어야 할 때 사용.
  */

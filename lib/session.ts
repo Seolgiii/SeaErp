@@ -50,6 +50,16 @@ export function isAdminRole(session: WorkerSession | null): boolean {
   return (ADMIN_ROLES as readonly string[]).includes(session.role.toUpperCase());
 }
 
+/**
+ * MASTER 역할이면 true (ADMIN은 false).
+ *
+ * ⚠ 이건 **버튼을 숨기는 용도일 뿐** 권한 검증이 아니다. localStorage 값이라
+ * 사용자가 고칠 수 있다. 실제 차단은 서버(requireMaster)가 한다.
+ */
+export function isMasterRole(session: WorkerSession | null): boolean {
+  return (session?.role ?? "").toUpperCase() === "MASTER";
+}
+
 export function touchSession(): WorkerSession | null {
   const current = readSession();
   if (!current || isSessionExpired(current)) {

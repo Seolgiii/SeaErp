@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { getSeoulTodayISO, tryParseInboundDateInput } from '@/lib/inbound-date-input';
 import { readSession, isSessionExpired, isAdminRole } from '@/lib/session';
+import { formatStamp } from '@/lib/format-datetime';
 import { formatNum } from '@/lib/number-format';
 import { toast } from '@/lib/toast';
 import {
@@ -49,6 +50,10 @@ export default function WorkSettlementStep2Page() {
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState('');
   const [no, setNo] = useState('');
+  // 확정 버튼 노출용(관리자만). 실제 차단은 서버 confirmWorkSettlement → requireAdmin.
+  const [canConfirm, setCanConfirm] = useState(false);
+  // 작성·최종수정 흔적 — 전원이 고칠 수 있는 기록이라 화면에 항상 띄워둔다.
+  const [stamp, setStamp] = useState({ createdAt: '', createdByName: '', updatedAt: '', updatedByName: '' });
 
   const [products, setProducts] = useState<Product[]>([]);
   const [storages, setStorages] = useState<Storage[]>([]);
@@ -76,7 +81,8 @@ export default function WorkSettlementStep2Page() {
   useEffect(() => {
     const s = readSession();
     if (!s || isSessionExpired(s)) return setAuthError('로그인이 필요합니다.');
-    if (!isAdminRole(s)) return setAuthError('관리자 전용 화면입니다.');
+    // 작성·수정은 전원 개방(2026-08-03). 확정만 관리자 — 아래 canConfirm으로 버튼을 가린다.
+    setCanConfirm(isAdminRole(s));
     setReady(true);
     void (async () => {
       const [pr, st, sh, d] = await Promise.all([
@@ -92,6 +98,12 @@ export default function WorkSettlementStep2Page() {
       setHdr(d.data.header);
       setStatus(d.data.status);
       setNo(d.data.no);
+      setStamp({
+        createdAt: d.data.createdAt,
+        createdByName: d.data.createdByName,
+        updatedAt: d.data.updatedAt,
+        updatedByName: d.data.updatedByName,
+      });
       setProd(prodRowsFromLines(d.data.lines, destName));
       const g = groupsFromCosts(d.data.costs);
       // 수수료 편의: 비었으면 어대금 × 3.3% 자동 채움
@@ -265,6 +277,15 @@ export default function WorkSettlementStep2Page() {
     setHdrEdit(true);
   };
 
+  /**
+   * 저장 성공 시 '최종 수정' 표시를 갱신한다.
+   *
+   * 시각은 **서버가 돌려준 값**을 쓴다. 브라우저 시계로 찍으면 서버와 어긋나
+   * 화면에 적힌 시각과 Airtable에 적힌 시각이 다르다(실측 ~9초 차이 있었다).
+   */
+  const markEdited = (updatedAt: string, byName: string) =>
+    setStamp((prev) => ({ ...prev, updatedAt, updatedByName: byName }));
+
   const saveHdrEdit = async () => {
     const s = readSession();
     if (!s || isSessionExpired(s)) return toast('로그인이 필요합니다.', 'error');
@@ -299,6 +320,7 @@ export default function WorkSettlementStep2Page() {
           catchAmount: pn(ewEodae),
           memo: ewMemo,
         });
+        markEdited(res.data.updatedAt, s.workerName);
         toast('사전기입 저장', 'success');
         setHdrEdit(false);
       } else toast(res.error ?? '저장 실패', 'error');
@@ -313,8 +335,10 @@ export default function WorkSettlementStep2Page() {
     setSubmitting(true);
     try {
       const res = await saveWorkSettlement(s.workerId, payload);
-      if (res.success) toast('임시저장 완료', 'success');
-      else toast(res.error ?? '임시저장 실패', 'error');
+      if (res.success) {
+        markEdited(res.data.updatedAt, s.workerName);
+        toast('임시저장 완료', 'success');
+      } else toast(res.error ?? '임시저장 실패', 'error');
     } finally { setSubmitting(false); }
   };
   const doConfirm = async () => {
@@ -368,6 +392,12 @@ export default function WorkSettlementStep2Page() {
           <div className="ci"><span className="ck">선박</span><span className="cv">{shipName}</span></div>
           <div className="ci"><span className="ck">어대금</span><span className="cv">{hdr?.catchAmount ? `${fmt(hdr.catchAmount)}원` : '—'}</span></div>
           <div className="ci"><span className="ck">작업시간</span><span className="cv">{hdr ? `${hdr.startTime || '—'} ~ ${hdr.endTime || '—'}` : '—'}</span></div>
+          {/* 공동 편집 기록 — 누가 만들었고 누가 마지막으로 손댔는지.
+              둘이 같으면 '최종 수정'은 군더더기라 접는다. */}
+          <div className="ci"><span className="ck">작성</span><span className="cv stamp">{formatStamp(stamp.createdAt, stamp.createdByName)}</span></div>
+          {stamp.updatedAt && stamp.updatedAt !== stamp.createdAt && (
+            <div className="ci"><span className="ck">최종 수정</span><span className="cv stamp">{formatStamp(stamp.updatedAt, stamp.updatedByName)}</span></div>
+          )}
           {editable && (
             <button type="button" className="edit" onClick={() => (hdrEdit ? setHdrEdit(false) : openHdrEdit())}>
               {hdrEdit ? '접기 ▴' : '사전기입 수정 ▾'}
@@ -505,8 +535,15 @@ export default function WorkSettlementStep2Page() {
         </section>
 
         <div className="actions">
+          {/* 확정은 관리자만 — 입고관리·LOT을 만들고 재고원가를 확정하는 되돌리기 어려운 동작이다.
+              작업자에게는 버튼을 숨기고 왜 없는지 한 줄로 알린다(사라진 버튼을 찾게 두지 않는다). */}
+          {!canConfirm && editable && (
+            <span className="cap" style={{ margin: 0 }}>확정은 관리자가 합니다. 작성 후 임시저장하세요.</span>
+          )}
           <button className="btn ghost" onClick={() => void doSave()} disabled={submitting || !ready || !editable}>{submitting ? '저장 중…' : '임시저장'}</button>
-          <button className="btn primary" onClick={() => void doConfirm()} disabled={submitting || !ready || !editable}>확정 등록 →</button>
+          {canConfirm && (
+            <button className="btn primary" onClick={() => void doConfirm()} disabled={submitting || !ready || !editable}>확정 등록 →</button>
+          )}
         </div>
       </div>
       <style dangerouslySetInnerHTML={{ __html: WS_CSS }} />

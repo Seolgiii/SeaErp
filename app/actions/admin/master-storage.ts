@@ -9,7 +9,7 @@ import {
 } from "@/lib/airtable";
 import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
 import { STORAGE_KINDS, type StorageKind } from "@/lib/storage-kinds";
-import { ensureAdmin, type Result } from "./_master-helpers";
+import { ensureAdmin, ensureWorker, type Result } from "./_master-helpers";
 
 /**
  * 보관처 마스터 (Phase 3 PC 관리 화면용) 서버 액션.
@@ -72,10 +72,14 @@ function buildFields(input: StorageInput): Record<string, unknown> {
   return fields;
 }
 
+/**
+ * 보관처 목록 — 읽기 전용이라 WORKER도 허용한다(2026-08-03).
+ * 작업 정산 폼의 작업장·행선지 콤보가 쓴다. 생성·수정·비용 이력은 ADMIN 이상 유지.
+ */
 export async function listStorages(
   adminWorkerId: string,
 ): Promise<Result<Storage[]>> {
-  const auth = await ensureAdmin(adminWorkerId, TAG);
+  const auth = await ensureWorker(adminWorkerId, TAG);
   if (!auth.success) return { success: false, error: auth.error };
 
   try {

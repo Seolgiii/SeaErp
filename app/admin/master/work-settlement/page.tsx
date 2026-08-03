@@ -9,8 +9,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PlusIcon } from '@heroicons/react/24/outline';
-import { readSession, isSessionExpired } from '@/lib/session';
+import { readSession, isSessionExpired, isMasterRole } from '@/lib/session';
 import { toast } from '@/lib/toast';
+import { formatStamp } from '@/lib/format-datetime';
 import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import {
   listWorkSettlements,
@@ -22,6 +23,8 @@ import { listShips } from '@/app/actions/admin/master-ships';
 export default function WorkSettlementPage() {
   const router = useRouter();
   const [workerId, setWorkerId] = useState<string | null>(null);
+  // 삭제 버튼 노출용. 실제 차단은 서버(cancelWorkSettlement → requireMaster)가 한다.
+  const [canDelete, setCanDelete] = useState(false);
   const [rows, setRows] = useState<WorkSettlementSummary[]>([]);
   const [shipNames, setShipNames] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +36,7 @@ export default function WorkSettlementPage() {
       return;
     }
     setWorkerId(session.workerId);
+    setCanDelete(isMasterRole(session));
   }, [router]);
 
   const loadData = useCallback(async () => {
@@ -116,7 +120,7 @@ export default function WorkSettlementPage() {
                   임시저장 <span className="text-body text-text-muted">{draft.length}건</span>
                 </h2>
               </div>
-              <SettlementTable rows={draft} shipName={shipName} onCancel={cancel} />
+              <SettlementTable rows={draft} shipName={shipName} onCancel={cancel} canDelete={canDelete} />
             </section>
           )}
 
@@ -129,7 +133,7 @@ export default function WorkSettlementPage() {
             {rest.length === 0 ? (
               <div className="px-5 py-10 text-center text-body text-text-muted">아직 없습니다.</div>
             ) : (
-              <SettlementTable rows={rest} shipName={shipName} onCancel={cancel} />
+              <SettlementTable rows={rest} shipName={shipName} onCancel={cancel} canDelete={canDelete} />
             )}
           </section>
         </div>
@@ -142,10 +146,13 @@ function SettlementTable({
   rows,
   shipName,
   onCancel,
+  canDelete,
 }: {
   rows: WorkSettlementSummary[];
   shipName: (id: string) => string;
   onCancel: (r: WorkSettlementSummary) => void;
+  /** MASTER만 삭제·취소 버튼을 본다. 서버가 재검증하므로 이건 노출 제어일 뿐이다. */
+  canDelete: boolean;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -157,6 +164,7 @@ function SettlementTable({
             <th className="px-5 py-2.5 text-center">선박명</th>
             <NumHead className="px-5 py-2.5">생산내역</NumHead>
             <NumHead className="pl-5 py-2.5 pr-[21px]">어대금</NumHead>
+            <th className="px-5 py-2.5 text-left">작성</th>
             <th className="px-5 py-2.5 text-center">상태</th>
             <th className="px-5 py-2.5" />
           </tr>
@@ -174,6 +182,18 @@ function SettlementTable({
                 unit="원"
                 empty="—"
               />
+              {/* 누가 언제 만들었는지. 최종 수정 흔적은 title로 보조 노출한다 —
+                  한 셀에 두 줄을 넣으면 행 높이가 들쭉날쭉해진다(/admin 표 규칙). */}
+              <td
+                className="whitespace-nowrap px-5 py-2.5 text-left text-label text-text-muted"
+                title={
+                  r.updatedAt
+                    ? `최종 수정 ${formatStamp(r.updatedAt, r.updatedByName)}`
+                    : undefined
+                }
+              >
+                {formatStamp(r.createdAt, r.createdByName)}
+              </td>
               <td className="px-5 py-2.5 text-center">
                 <StatusBadge status={r.status} />
               </td>
@@ -186,7 +206,7 @@ function SettlementTable({
                     이어서 작성 →
                   </Link>
                 )}
-                {r.status !== '취소' && (
+                {canDelete && r.status !== '취소' && (
                   <button
                     onClick={() => onCancel(r)}
                     className="text-label text-danger-ink hover:text-danger-ink"

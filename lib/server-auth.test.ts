@@ -8,6 +8,7 @@ import {
   AuthError,
   invalidateWorkerCache,
   requireAdmin,
+  requireMaster,
   requireWorker,
 } from "./server-auth";
 
@@ -191,6 +192,39 @@ describe("requireWorker — 캐시", () => {
     await requireWorker(VALID_ID);
     await requireWorker(otherId);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+// 작업 정산이 전원 편집으로 열리면서(2026-08-03) 삭제만 MASTER로 잠갔다.
+// 'ADMIN도 거부'가 이 게이트의 존재 이유라 그 경계를 특히 못 박아 둔다.
+describe("requireMaster", () => {
+  test("WORKER → FORBIDDEN", async () => {
+    fetchMock.mockResolvedValueOnce(
+      airtableResponse({ 작업자명: "김", 활성: true, 권한: "WORKER" }),
+    );
+    await expect(requireMaster(VALID_ID)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  test("ADMIN → FORBIDDEN (requireAdmin과 갈리는 지점)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      airtableResponse({ 작업자명: "관리", 활성: true, 권한: "ADMIN" }, ADMIN_ID),
+    );
+    await expect(requireMaster(ADMIN_ID)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  test("MASTER → 통과", async () => {
+    fetchMock.mockResolvedValueOnce(
+      airtableResponse({ 작업자명: "마스터", 활성: true, 권한: "MASTER" }, MASTER_ID),
+    );
+    const w = await requireMaster(MASTER_ID);
+    expect(w.role).toBe("MASTER");
+  });
+
+  test("비활성 MASTER → INACTIVE (권한보다 활성 여부가 먼저다)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      airtableResponse({ 작업자명: "퇴사", 활성: false, 권한: "MASTER" }, INACTIVE_ID),
+    );
+    await expect(requireMaster(INACTIVE_ID)).rejects.toMatchObject({ code: "INACTIVE" });
   });
 });
 

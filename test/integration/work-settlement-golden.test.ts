@@ -1,7 +1,14 @@
 import { describe, expect, test } from "vitest";
 import type { AirtableRecord } from "./airtable-store";
 import { store } from "./airtable-store";
-import { ALL_MASTERS, PRODUCT_MACKEREL, STORAGE_OWN, WORKER_ADMIN } from "./fixtures";
+import {
+  ALL_MASTERS,
+  PRODUCT_MACKEREL,
+  STORAGE_OWN,
+  WORKER_ADMIN,
+  WORKER_MASTER,
+  WORKER_NORMAL,
+} from "./fixtures";
 
 /**
  * 작업 정산 등록 골든패스 — 정산서형 매입·원가 폼.
@@ -163,7 +170,8 @@ describe("작업 정산 등록 골든패스", () => {
     if (!saved.success) return;
     await confirmWorkSettlement(WORKER_ADMIN.id, saved.data.settlementId);
 
-    const rc = await cancelWorkSettlement(WORKER_ADMIN.id, saved.data.settlementId);
+    // 취소는 MASTER 전용(2026-08-03) — ADMIN으로는 안 된다.
+    const rc = await cancelWorkSettlement(WORKER_MASTER.id, saved.data.settlementId);
     expect(rc.success).toBe(true);
 
     for (const lot of store.list("LOT별 재고")) {
@@ -191,9 +199,99 @@ describe("작업 정산 등록 골든패스", () => {
     const someLot = store.list("LOT별 재고")[0];
     store.patch("LOT별 재고", someLot.id, { 재고수량: 5 });
 
-    const rc = await cancelWorkSettlement(WORKER_ADMIN.id, saved.data.settlementId);
+    const rc = await cancelWorkSettlement(WORKER_MASTER.id, saved.data.settlementId);
     expect(rc.success).toBe(false);
     // 헤더는 확정 유지(취소 차단)
     expect(store.get("작업 정산", saved.data.settlementId)!.fields.상태).toBe("확정");
+  });
+
+  // ── 권한 경계 (2026-08-03) ────────────────────────────────────────────────
+  // 작업 정산은 전원이 같이 채우는 기록으로 열렸다. 열린 만큼 경계가 중요해져서
+  // '누가 무엇을 못 하는가'를 여기서 못 박는다.
+  describe("권한 경계 — 작성 전원 / 확정 관리자 / 삭제 MASTER", () => {
+    test("WORKER도 작성·임시저장할 수 있다", async () => {
+      seedBase();
+      const { saveWorkSettlement } = await import(
+        "@/app/actions/admin/master-work-settlement"
+      );
+      const saved = await saveWorkSettlement(WORKER_NORMAL.id, saveInput);
+      expect(saved.success).toBe(true);
+      if (!saved.success) return;
+      const h = store.get("작업 정산", saved.data.settlementId)!.fields;
+      expect(h.상태).toBe("임시저장");
+      // 최초 작성자·작성일시가 남는다
+      expect(h.작업자).toEqual([WORKER_NORMAL.id]);
+      expect(typeof h.작성일시).toBe("string");
+      expect(h.최종수정자).toEqual([WORKER_NORMAL.id]);
+    });
+
+    test("WORKER는 확정할 수 없다 (입고·LOT 미생성)", async () => {
+      seedBase();
+      const { saveWorkSettlement, confirmWorkSettlement } = await import(
+        "@/app/actions/admin/master-work-settlement"
+      );
+      const saved = await saveWorkSettlement(WORKER_NORMAL.id, saveInput);
+      expect(saved.success).toBe(true);
+      if (!saved.success) return;
+
+      const rc = await confirmWorkSettlement(WORKER_NORMAL.id, saved.data.settlementId);
+      expect(rc.success).toBe(false);
+      expect(store.get("작업 정산", saved.data.settlementId)!.fields.상태).toBe("임시저장");
+      expect(store.list("LOT별 재고").length).toBe(0);
+    });
+
+    test("ADMIN은 삭제·취소할 수 없다 (MASTER 전용)", async () => {
+      seedBase();
+      const { saveWorkSettlement, cancelWorkSettlement } = await import(
+        "@/app/actions/admin/master-work-settlement"
+      );
+      const saved = await saveWorkSettlement(WORKER_ADMIN.id, saveInput);
+      expect(saved.success).toBe(true);
+      if (!saved.success) return;
+
+      const rc = await cancelWorkSettlement(WORKER_ADMIN.id, saved.data.settlementId);
+      expect(rc.success).toBe(false);
+      // 임시저장 그대로 살아 있어야 한다 — 거부인데 지워지면 최악이다.
+      expect(store.get("작업 정산", saved.data.settlementId)!.fields.상태).toBe("임시저장");
+    });
+
+    test("WORKER도 삭제할 수 없다", async () => {
+      seedBase();
+      const { saveWorkSettlement, cancelWorkSettlement } = await import(
+        "@/app/actions/admin/master-work-settlement"
+      );
+      const saved = await saveWorkSettlement(WORKER_NORMAL.id, saveInput);
+      expect(saved.success).toBe(true);
+      if (!saved.success) return;
+
+      const rc = await cancelWorkSettlement(WORKER_NORMAL.id, saved.data.settlementId);
+      expect(rc.success).toBe(false);
+      expect(store.get("작업 정산", saved.data.settlementId)!.fields.상태).toBe("임시저장");
+    });
+
+    test("남이 만든 건을 다른 사람이 고쳐도 최초 작성자는 안 바뀐다", async () => {
+      seedBase();
+      const { saveWorkSettlement } = await import(
+        "@/app/actions/admin/master-work-settlement"
+      );
+      const created = await saveWorkSettlement(WORKER_NORMAL.id, saveInput);
+      expect(created.success).toBe(true);
+      if (!created.success) return;
+      const createdAt = String(
+        store.get("작업 정산", created.data.settlementId)!.fields.작성일시,
+      );
+
+      // 다른 사람이 이어서 수정
+      const edited = await saveWorkSettlement(WORKER_ADMIN.id, {
+        ...saveInput,
+        header: { ...saveInput.header, settlementId: created.data.settlementId },
+      });
+      expect(edited.success).toBe(true);
+
+      const h = store.get("작업 정산", created.data.settlementId)!.fields;
+      expect(h.작업자).toEqual([WORKER_NORMAL.id]); // 최초 작성자 보존
+      expect(h.작성일시).toBe(createdAt); // 작성일시도 보존
+      expect(h.최종수정자).toEqual([WORKER_ADMIN.id]); // 최종 수정자만 바뀐다
+    });
   });
 });

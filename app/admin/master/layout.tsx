@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
+import { Suspense, useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -14,6 +14,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { readSession, isSessionExpired, clearSession } from '@/lib/session';
+import { isWorkerAllowedPath } from '@/lib/admin-access';
 import { NAV_GROUPS } from './_nav';
 import AdminTabBar from './_tab-bar';
 
@@ -73,10 +74,13 @@ function MasterAdminLayoutInner({ children }: { children: React.ReactNode }) {
       router.replace('/login');
       return;
     }
-    setAuthorized(session.role === 'ADMIN' || session.role === 'MASTER');
+    // /admin은 기본 ADMIN/MASTER 전용. 단 WORKER도 '작업 정산'만은 들어온다(2026-08-03) —
+    // 현장에서 다 같이 채우는 기록이라서다. 허용 경로는 _nav.ts가 단일 출처.
+    const admin = session.role === 'ADMIN' || session.role === 'MASTER';
+    setAuthorized(admin || isWorkerAllowedPath(pathname));
     setWorkerName(session.workerName ?? '');
     setRole(session.role ?? '');
-  }, [router]);
+  }, [router, pathname]);
 
   // 접힘 상태 복원 — localStorage 저장 키가 있으면 우선
   useEffect(() => {
@@ -179,6 +183,17 @@ function MasterAdminLayoutInner({ children }: { children: React.ReactNode }) {
     router.replace('/login');
   };
 
+  // WORKER는 허용된 항목만 사이드바에 보인다 — 못 여는 화면을 목록에 남겨두면
+  // 클릭할 때마다 '권한 없음'을 만나 길이 막힌 것처럼 느껴진다.
+  const navGroups = useMemo(() => {
+    const admin = role === 'ADMIN' || role === 'MASTER';
+    if (admin) return NAV_GROUPS;
+    return NAV_GROUPS.map((g) => ({
+      ...g,
+      items: g.items.filter((it) => isWorkerAllowedPath(it.href)),
+    })).filter((g) => g.items.length > 0);
+  }, [role]);
+
   if (authorized === null) {
     return (
       <div className="min-h-screen bg-[#F2F4F6] flex items-center justify-center">
@@ -192,7 +207,9 @@ function MasterAdminLayoutInner({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen bg-[#F2F4F6] flex flex-col items-center justify-center gap-5 px-6">
         <ShieldExclamationIcon className="w-16 h-16 text-gray-300" />
         <h1 className="text-[22px] font-bold text-gray-800">접근 권한이 없습니다</h1>
-        <p className="text-gray-500 font-medium text-center">관리자 시스템은 ADMIN 권한이 필요합니다.</p>
+        <p className="text-gray-500 font-medium text-center">
+          이 화면은 관리자 권한이 필요합니다. 작업자는 &lsquo;작업 정산&rsquo;만 이용할 수 있습니다.
+        </p>
         <Link
           href="/"
           className="mt-4 px-8 py-3.5 bg-[#191F28] text-white font-bold text-[16px] rounded-2xl active:scale-95 transition-transform"
@@ -278,7 +295,7 @@ function MasterAdminLayoutInner({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
         <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1">
-          {NAV_GROUPS.map((group) => {
+          {navGroups.map((group) => {
             const isCollapsed = collapsed.has(group.title);
             const activeChild = group.items.some((it) => it.href === pathname);
             return (

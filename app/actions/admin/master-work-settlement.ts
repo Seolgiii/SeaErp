@@ -8,12 +8,12 @@ import {
   createAirtableRecord,
   patchAirtableRecord,
 } from "@/lib/airtable";
-import { AIRTABLE_TABLE, STORAGE_COST_FIELDS } from "@/lib/airtable-schema";
+import { AIRTABLE_TABLE, STORAGE_COST_FIELDS, WORKER_FIELDS } from "@/lib/airtable-schema";
 import { getStorageCostForLot } from "@/lib/storage-cost";
 import { generateUniqueLotNumber } from "@/lib/lot-sequence";
 import { calculateWorkSettlementCost } from "@/lib/cost-calc";
 import { seoulDateString } from "@/lib/date";
-import { ensureAdmin, type Result } from "./_master-helpers";
+import { ensureAdmin, ensureMaster, ensureWorker, type Result } from "./_master-helpers";
 
 /**
  * 작업 정산 등록 서버 액션 — 원물 동결 정산서형 매입·원가 폼.
@@ -22,6 +22,13 @@ import { ensureAdmin, type Result } from "./_master-helpers";
  *   confirmWorkSettlement : 확정 — 작업단가·실단가 롤업 → 생산내역 1줄마다 입고관리 1행+LOT 1개 생성.
  *   cancelWorkSettlement  : 취소 — 생성된 LOT·입고관리 soft delete(미출고 가드), 상태=취소.
  *   listWorkSettlements / getWorkSettlement : 조회.
+ *
+ * 권한 (2026-08-03 재배치) — 한 화면 안에서 세 단계로 갈린다:
+ *   작성·수정·조회 : 전원(WORKER 포함). 현장에서 같이 채우는 공동 기록이다.
+ *   확정           : ADMIN 이상. 입고관리·LOT을 만들고 재고원가를 확정한다.
+ *   삭제·취소       : MASTER 전용. 이미 만들어진 입고·LOT까지 되돌리는 파괴적 액션.
+ * ⚠ 파라미터명이 `adminWorkerId`지만 이제 관리자만 오는 게 아니다. 공개 시그니처라
+ *   이름은 그대로 두었다 — 호출부는 전부 위치 인자로 세션 workerId를 넘긴다.
  *
  * 구조적으로 가공 거래(master-processing.ts)의 2단계 WIP + 입고(inbound.ts) LOT 생성을 합친 것.
  * 원가 배선(설계 docs/작업정산등록-설계.md §2·§4):
@@ -204,6 +211,12 @@ export type WorkSettlementSummary = {
   catchAmount: number;
   lineCount: number;
   memo: string;
+  /** 최초 작성 흔적. 이름은 서버에서 해석해 내려준다(작업자 목록을 클라이언트에 열지 않으려고). */
+  createdAt: string;
+  createdByName: string;
+  /** 최종 수정 흔적. 공동 편집이라 '지금 이 값이 누구 손을 거쳤나'가 작성자보다 중요할 때가 많다. */
+  updatedAt: string;
+  updatedByName: string;
 };
 
 // ── 헤더 필드 빌드 ───────────────────────────────────────────────────────────
@@ -225,16 +238,67 @@ function headerFields(h: WorkSettlementHeaderInput, no?: string): Record<string,
   return f;
 }
 
+// ── 작성·수정 흔적 (2026-08-03) ──────────────────────────────────────────────
+//
+// 작업 정산은 전원(WORKER 포함)이 서로의 건을 고칠 수 있다. 그래서 "누가 만들었나"와
+// "누가 마지막으로 손댔나"를 둘 다 남긴다 — 하나만 남기면 공동 편집에서 책임이 사라진다.
+//
+//   작업자 · 작성일시        = 최초 1회. 이후 저장에서 절대 덮어쓰지 않는다.
+//   최종수정자 · 최종수정일시 = 저장할 때마다 갱신.
+//
+// ⚠ 2026-08-03 이전 레코드의 '작업자'는 매 저장마다 덮어써져 있어 최초 작성자가 아니라
+//   마지막 저장자다. 소급 복원은 불가능하다(이력을 남긴 적이 없다).
+
+/** 신규 생성 때만 붙이는 필드 — 최초 작성자·작성일시. */
+function createStamp(workerId: string, nowIso: string): Record<string, unknown> {
+  return {
+    ...(isRec(workerId) && { 작업자: [workerId] }),
+    작성일시: nowIso,
+  };
+}
+
+/** 저장할 때마다 붙이는 필드 — 최종 수정자·수정일시. */
+function updateStamp(workerId: string, nowIso: string): Record<string, unknown> {
+  return {
+    ...(isRec(workerId) && { 최종수정자: [workerId] }),
+    최종수정일시: nowIso,
+  };
+}
+
+/** 사용자 레코드ID → 작업자명. 목록·상세에서 작성자를 이름으로 보여주기 위한 1회 조회. */
+async function fetchWorkerNames(): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    let offset: string | undefined;
+    do {
+      const params = new URLSearchParams({ pageSize: "100" });
+      params.append("fields[]", WORKER_FIELDS.name);
+      if (offset) params.set("offset", offset);
+      const data = (await fetchAirtable(
+        `${encodeURIComponent(AIRTABLE_TABLE.workers)}?${params}`,
+      )) as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
+      for (const r of data.records ?? []) map.set(r.id, str(r.fields?.[WORKER_FIELDS.name]));
+      offset = data.offset;
+    } while (offset);
+  } catch (e) {
+    // 이름 해석 실패가 정산 목록 자체를 못 보게 만들면 안 된다 — 빈 맵이면 화면이 '—'로 떨어진다.
+    logWarn(`[${TAG}] 작성자 이름 조회 실패(표시만 영향):`, e);
+  }
+  return map;
+}
+
 // ── 임시저장 (초안) ──────────────────────────────────────────────────────────
 export async function saveWorkSettlement(
   adminWorkerId: string,
   input: SaveWorkSettlementInput,
-): Promise<Result<{ settlementId: string; no: string }>> {
-  const auth = await ensureAdmin(adminWorkerId, TAG);
+): Promise<Result<{ settlementId: string; no: string; updatedAt: string }>> {
+  // 작성·수정은 전원(WORKER 포함). 확정만 관리자 — confirmWorkSettlement 참조.
+  const auth = await ensureWorker(adminWorkerId, TAG);
   if (!auth.success) return { success: false, error: auth.error };
 
   const h = input.header;
   if (!h?.date) return { success: false, error: "작업일을 입력하세요." };
+  const nowIso = new Date().toISOString();
 
   try {
     let settlementId = h.settlementId ?? "";
@@ -251,7 +315,7 @@ export async function saveWorkSettlement(
       await patchRecord(HEADER, settlementId, {
         ...headerFields(h),
         상태: "임시저장",
-        ...(isRec(adminWorkerId) && { 작업자: [adminWorkerId] }),
+        ...updateStamp(adminWorkerId, nowIso),
       });
       // 기존 라인 전부 삭제 후 재생성(초안이라 단순 replace)
       const [oldLines, oldCosts] = await Promise.all([
@@ -265,7 +329,8 @@ export async function saveWorkSettlement(
       const created = await createRecord(HEADER, {
         ...headerFields(h, no),
         상태: "임시저장",
-        ...(isRec(adminWorkerId) && { 작업자: [adminWorkerId] }),
+        ...createStamp(adminWorkerId, nowIso),
+        ...updateStamp(adminWorkerId, nowIso),
       });
       if (!created?.id) return { success: false, error: "정산 헤더 생성 실패" };
       settlementId = created.id;
@@ -274,7 +339,7 @@ export async function saveWorkSettlement(
     await writeChildLines(settlementId, no, input.lines, input.costs);
 
     revalidatePath(PATH);
-    return { success: true, data: { settlementId, no } };
+    return { success: true, data: { settlementId, no, updatedAt: nowIso } };
   } catch (e) {
     logError(`[${TAG}] 임시저장 실패:`, e);
     return { success: false, error: e instanceof Error ? e.message : "임시저장 실패" };
@@ -288,10 +353,12 @@ export async function saveWorkSettlement(
 export async function saveWorkSettlementHeader(
   adminWorkerId: string,
   h: WorkSettlementHeaderInput,
-): Promise<Result<{ settlementId: string; no: string }>> {
-  const auth = await ensureAdmin(adminWorkerId, TAG);
+): Promise<Result<{ settlementId: string; no: string; updatedAt: string }>> {
+  // 작성·수정은 전원(WORKER 포함).
+  const auth = await ensureWorker(adminWorkerId, TAG);
   if (!auth.success) return { success: false, error: auth.error };
   if (!h?.date) return { success: false, error: "작업일을 입력하세요." };
+  const nowIso = new Date().toISOString();
 
   try {
     if (isRec(h.settlementId ?? "")) {
@@ -303,20 +370,24 @@ export async function saveWorkSettlementHeader(
       await patchRecord(HEADER, h.settlementId!, {
         ...headerFields(h),
         상태: "임시저장",
-        ...(isRec(adminWorkerId) && { 작업자: [adminWorkerId] }),
+        ...updateStamp(adminWorkerId, nowIso),
       });
       revalidatePath(PATH);
-      return { success: true, data: { settlementId: h.settlementId!, no: str(existing["정산번호"]) } };
+      return {
+        success: true,
+        data: { settlementId: h.settlementId!, no: str(existing["정산번호"]), updatedAt: nowIso },
+      };
     }
     const no = await nextSettlementNo(h.date);
     const created = await createRecord(HEADER, {
       ...headerFields(h, no),
       상태: "임시저장",
-      ...(isRec(adminWorkerId) && { 작업자: [adminWorkerId] }),
+      ...createStamp(adminWorkerId, nowIso),
+      ...updateStamp(adminWorkerId, nowIso),
     });
     if (!created?.id) return { success: false, error: "정산 헤더 생성 실패" };
     revalidatePath(PATH);
-    return { success: true, data: { settlementId: created.id, no } };
+    return { success: true, data: { settlementId: created.id, no, updatedAt: nowIso } };
   } catch (e) {
     logError(`[${TAG}] 헤더 저장 실패:`, e);
     return { success: false, error: e instanceof Error ? e.message : "헤더 저장 실패" };
@@ -516,7 +587,10 @@ export async function confirmWorkSettlement(
       created += 1;
     }
 
-    await patchRecord(HEADER, settlementId, { 상태: "확정" });
+    await patchRecord(HEADER, settlementId, {
+      상태: "확정",
+      ...updateStamp(adminWorkerId, new Date().toISOString()),
+    });
     revalidatePath(PATH);
     revalidatePath("/admin/master/lots");
     return { success: true, data: { lotCount: created } };
@@ -536,7 +610,9 @@ export async function cancelWorkSettlement(
   adminWorkerId: string,
   settlementId: string,
 ): Promise<Result> {
-  const auth = await ensureAdmin(adminWorkerId, TAG);
+  // MASTER 전용(ADMIN도 거부). 전원이 수정할 수 있는 구조라 지우는 권한까지 열면
+  // 남의 기록이 조용히 사라진다. 임시저장 '삭제'와 확정 '취소' 둘 다 이 함수를 탄다.
+  const auth = await ensureMaster(adminWorkerId, TAG);
   if (!auth.success) return { success: false, error: auth.error };
   if (!isRec(settlementId)) return { success: false, error: "정산 건이 지정되지 않았습니다." };
 
@@ -581,7 +657,10 @@ export async function cancelWorkSettlement(
         if (inbId) await patchRecord(INBOUND, inbId, { 잔여수량: 0, 승인상태: "취소" });
       }
     }
-    await patchRecord(HEADER, settlementId, { 상태: "취소" });
+    await patchRecord(HEADER, settlementId, {
+      상태: "취소",
+      ...updateStamp(adminWorkerId, new Date().toISOString()),
+    });
     revalidatePath(PATH);
     revalidatePath("/admin/master/lots");
     return { success: true, data: undefined };
@@ -595,9 +674,11 @@ export async function cancelWorkSettlement(
 export async function listWorkSettlements(
   adminWorkerId: string,
 ): Promise<Result<WorkSettlementSummary[]>> {
-  const auth = await ensureAdmin(adminWorkerId, TAG);
+  const auth = await ensureWorker(adminWorkerId, TAG);
   if (!auth.success) return { success: false, error: auth.error };
   try {
+    const workerNames = await fetchWorkerNames();
+    const nameOf = (v: unknown) => workerNames.get(firstLink(v)) ?? "";
     const items: WorkSettlementSummary[] = [];
     let offset: string | undefined;
     do {
@@ -620,6 +701,10 @@ export async function listWorkSettlements(
           catchAmount: num(f["어대금"]),
           lineCount: Array.isArray(lineLinks) ? lineLinks.length : 0,
           memo: str(f["비고"]),
+          createdAt: str(f["작성일시"]),
+          createdByName: nameOf(f["작업자"]),
+          updatedAt: str(f["최종수정일시"]),
+          updatedByName: nameOf(f["최종수정자"]),
         });
       }
       offset = data.offset;
@@ -637,6 +722,11 @@ export type WorkSettlementDetail = {
   id: string;
   no: string;
   status: string;
+  /** 작성·수정 흔적 (목록과 같은 값). 상세 화면 상단 컨텍스트 바에 표시한다. */
+  createdAt: string;
+  createdByName: string;
+  updatedAt: string;
+  updatedByName: string;
   header: {
     date: string;
     workplaceId: string;
@@ -680,7 +770,7 @@ export async function getWorkSettlementDetail(
   adminWorkerId: string,
   settlementId: string,
 ): Promise<Result<WorkSettlementDetail>> {
-  const auth = await ensureAdmin(adminWorkerId, TAG);
+  const auth = await ensureWorker(adminWorkerId, TAG);
   if (!auth.success) return { success: false, error: auth.error };
   if (!isRec(settlementId)) return { success: false, error: "정산 건이 지정되지 않았습니다." };
 
@@ -726,12 +816,19 @@ export async function getWorkSettlementDetail(
     .sort((a, b) => a._id.localeCompare(b._id, undefined, { numeric: true }))
     .map(({ _id, ...rest }) => rest); // eslint-disable-line @typescript-eslint/no-unused-vars
 
+  const workerNames = await fetchWorkerNames();
+  const nameOf = (v: unknown) => workerNames.get(firstLink(v)) ?? "";
+
   return {
     success: true,
     data: {
       id: settlementId,
       no: str(h["정산번호"]),
       status: selectName(h["상태"]),
+      createdAt: str(h["작성일시"]),
+      createdByName: nameOf(h["작업자"]),
+      updatedAt: str(h["최종수정일시"]),
+      updatedByName: nameOf(h["최종수정자"]),
       header: {
         date: str(h["작업일"]),
         workplaceId: firstLink(h["작업장"]),
@@ -769,7 +866,8 @@ export async function getStorageBoxTypeFees(
   storageId: string,
   date: string,
 ): Promise<Result<StorageBoxTypeFees>> {
-  const auth = await ensureAdmin(adminWorkerId, TAG);
+  // 정산 폼이 입력 중 호출한다 — 작성 권한과 같아야 한다(WORKER 포함).
+  const auth = await ensureWorker(adminWorkerId, TAG);
   if (!auth.success) return { success: false, error: auth.error };
   if (!isRec(storageId)) return { success: false, error: "보관처를 선택하세요." };
 

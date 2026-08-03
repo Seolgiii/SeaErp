@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { readSession, isSessionExpired, isAdminRole } from '@/lib/session';
+import { readSession, isSessionExpired } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import {
   saveWorkSettlementHeader,
@@ -44,7 +44,7 @@ export default function WorkSettlementStep1Page() {
   useEffect(() => {
     const s = readSession();
     if (!s || isSessionExpired(s)) return setAuthError('로그인이 필요합니다.');
-    if (!isAdminRole(s)) return setAuthError('관리자 전용 화면입니다.');
+    // 작성은 전원 개방(2026-08-03) — 확정만 관리자, 삭제만 MASTER.
     setReady(true);
     const editId = new URLSearchParams(window.location.search).get('id') ?? '';
     void (async () => {

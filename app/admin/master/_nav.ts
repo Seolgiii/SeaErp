@@ -19,6 +19,9 @@ export type NavGroup = {
   items: NavItem[];
 };
 
+// WORKER 예외 경로는 lib/admin-access.ts가 단일 출처다 — 게이트가 두 겹이라
+// nav와 AdminAuthGate가 같은 규칙을 봐야 한다.
+
 export const NAV_GROUPS: NavGroup[] = [
   {
     title: '결재',

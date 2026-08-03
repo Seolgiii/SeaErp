@@ -446,6 +446,8 @@ export const WS_CSS = `
 .ws-page .ctxbar .ci{display:flex;flex-direction:column;gap:2px;}
 .ws-page .ctxbar .ck{font-size:11px;font-weight:600;color:var(--muted);}
 .ws-page .ctxbar .cv{font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+/* 작성·최종수정 흔적 — 작업일·어대금 같은 '값'이 아니라 메타라 한 톤 낮춘다(굵기·색). */
+.ws-page .ctxbar .cv.stamp{font-weight:500;color:var(--muted);white-space:nowrap;}
 .ws-page .ctxbar .edit{margin-left:auto;border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;cursor:pointer;padding:0;}
 .ws-page .ctxbar .edit:hover{opacity:.75;}
 .ws-page .ctx-edit{margin:10px 0 22px;}
