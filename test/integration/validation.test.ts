@@ -17,7 +17,7 @@ import {
 
 describe("시나리오 16 — 음수 / 0 수량 거부", () => {
   test("입고 신청에 0박스 → 거부", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
 
@@ -39,7 +39,7 @@ describe("시나리오 16 — 음수 / 0 수량 거부", () => {
   });
 
   test("입고 신청에 음수 수량 → 거부", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
 
@@ -61,7 +61,7 @@ describe("시나리오 16 — 음수 / 0 수량 거부", () => {
   });
 
   test("출고 신청에 음수 수량 → 거부", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
 
@@ -97,7 +97,7 @@ describe("시나리오 16 — 음수 / 0 수량 거부", () => {
 
 describe("시나리오 17 — 재고보다 많은 출고 거부", () => {
   test("LOT 50박스 잔여인데 100박스 출고 신청 → 신청 단계 거부", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
 
@@ -136,7 +136,7 @@ describe("시나리오 17 — 재고보다 많은 출고 거부", () => {
   });
 
   test("정확히 잔여수량만큼 출고 → 통과", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
 
@@ -173,7 +173,7 @@ describe("시나리오 18 — zod 스키마 검증 모니터링", () => {
   test("작업자 fields가 형식 위반이면 [SCHEMA-MISMATCH] console.warn", async () => {
     // 비정상 작업자: 활성 필드 타입 위반은 schema의 union으로 통과되지만,
     // PIN을 객체로 넣으면 union(string|number)에 해당 안 됨 → mismatch
-    store.seed("작업자", [
+    store.seed("사용자", [
       {
         id: WORKER_NORMAL.id,
         fields: {
@@ -200,7 +200,7 @@ describe("시나리오 18 — zod 스키마 검증 모니터링", () => {
   });
 
   test("정상 형식이면 [SCHEMA-MISMATCH] 로그 없음 (모니터링이 노이즈를 만들지 않음)", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
 
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 

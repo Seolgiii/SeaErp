@@ -326,6 +326,20 @@ async function airtableHandler(
     return jsonResponse(200, store.get(table, recordId) ?? rec);
   }
 
+  // DELETE — Airtable은 { deleted: true, id }를 돌려준다.
+  // 링크 반대편 정리까지 하고 lookup을 다시 세운다. 안 그러면 지운 레코드의 id가
+  // 부모의 link 배열에 남아 이후 조회가 유령 레코드를 가리킨다.
+  if (method === "DELETE" && recordId) {
+    const prevRec = store.get(table, recordId);
+    if (!prevRec) return jsonResponse(404, { error: { type: "NOT_FOUND" } });
+    const prevFields = { ...prevRec.fields };
+    store.patch(table, recordId, Object.fromEntries(Object.keys(prevFields).map((k) => [k, null])));
+    syncBidirectionalLinks(table, recordId, prevFields); // 반대편 link에서 이 id 제거
+    store.remove(table, recordId);
+    rebuildAllLookups();
+    return jsonResponse(200, { deleted: true, id: recordId });
+  }
+
   return jsonResponse(400, { error: "Unsupported" });
 }
 

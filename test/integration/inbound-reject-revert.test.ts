@@ -20,7 +20,7 @@ import {
  */
 
 async function setupApprovedInbound() {
-  store.seed("작업자", ALL_MASTERS.workers);
+  store.seed("사용자", ALL_MASTERS.workers);
   store.seed("품목마스터", ALL_MASTERS.products);
   store.seed("보관처 마스터", ALL_MASTERS.storages);
   store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);

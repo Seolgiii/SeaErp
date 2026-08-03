@@ -35,7 +35,7 @@ async function createExpense(
 
 describe("시나리오 8 — ADMIN 100만원 미만 즉시 승인", () => {
   test("ADMIN이 50만원 지출 → 즉시 승인 완료", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     const expenseId = await createExpense(WORKER_NORMAL.id, 500_000);
 
     const { updateApprovalStatus } = await import("@/app/actions/admin/admin");
@@ -53,7 +53,7 @@ describe("시나리오 8 — ADMIN 100만원 미만 즉시 승인", () => {
 
 describe("시나리오 9 — ADMIN 100만원 이상 차단 (FORBIDDEN)", () => {
   test("ADMIN이 200만원 지출을 즉시 승인 시도 → 거부", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     const expenseId = await createExpense(WORKER_NORMAL.id, 2_000_000);
 
     const { updateApprovalStatus } = await import("@/app/actions/admin/admin");
@@ -71,7 +71,7 @@ describe("시나리오 9 — ADMIN 100만원 이상 차단 (FORBIDDEN)", () => {
   });
 
   test("정확히 100만원 → ADMIN 즉시 승인 차단 (>= 1,000,000)", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     const expenseId = await createExpense(WORKER_NORMAL.id, 1_000_000);
 
     const { updateApprovalStatus } = await import("@/app/actions/admin/admin");
@@ -85,7 +85,7 @@ describe("시나리오 9 — ADMIN 100만원 이상 차단 (FORBIDDEN)", () => {
   });
 
   test("ADMIN이 200만원 지출을 '최종 승인 대기'로 → 통과 (1차 결재)", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     const expenseId = await createExpense(WORKER_NORMAL.id, 2_000_000);
 
     const { updateApprovalStatus } = await import("@/app/actions/admin/admin");
@@ -104,7 +104,7 @@ describe("시나리오 9 — ADMIN 100만원 이상 차단 (FORBIDDEN)", () => {
 
 describe("시나리오 10 — MASTER 2단계 승인", () => {
   test("MASTER가 200만원 지출을 즉시 '승인 완료' → 통과", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     const expenseId = await createExpense(WORKER_NORMAL.id, 2_000_000);
 
     const { updateApprovalStatus } = await import("@/app/actions/admin/admin");
@@ -119,7 +119,7 @@ describe("시나리오 10 — MASTER 2단계 승인", () => {
   });
 
   test("ADMIN '최종 승인 대기' → MASTER '승인 완료' 흐름", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     const expenseId = await createExpense(WORKER_NORMAL.id, 2_000_000);
 
     const { updateApprovalStatus } = await import("@/app/actions/admin/admin");

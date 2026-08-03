@@ -25,7 +25,7 @@ describe("이동 새 LOT/입고관리 — 원본 매입정보 복사", () => {
   });
 
   test("매입자/매입처/입고자/선박명/원산지가 원본에서 복사되고 비고는 원본 LOT 비고가 복사됨", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -34,7 +34,7 @@ describe("이동 새 LOT/입고관리 — 원본 매입정보 복사", () => {
     const STOCKER_ID = "recSTOCKER0000001";
     const SUPPLIER_ID = "recSUPPLIER000001";
 
-    store.seed("작업자", [
+    store.seed("사용자", [
       {
         id: PURCHASER_ID,
         fields: { 작업자명: "매입자A", 활성: 1, 권한: "WORKER" },
@@ -121,7 +121,7 @@ describe("이동 새 LOT/입고관리 — 원본 매입정보 복사", () => {
   });
 
   test("원본에 비고/선박명이 비어있으면 새 LOT에도 채우지 않음 (입고자는 입고관리.작업자로 fallback)", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);

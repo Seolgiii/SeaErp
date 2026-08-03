@@ -17,7 +17,7 @@ import { drainAfter } from "./setup";
 
 describe("시나리오 13 — 비활성 작업자 차단", () => {
   test("활성=0 작업자가 입고 신청 시도 → INACTIVE 거부", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
 
@@ -42,7 +42,7 @@ describe("시나리오 13 — 비활성 작업자 차단", () => {
   });
 
   test("server-auth requireWorker가 INACTIVE 코드로 throw", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
 
     const { requireWorker, AuthError } = await import("@/lib/server-auth");
     await expect(requireWorker(WORKER_INACTIVE.id)).rejects.toThrow(AuthError);
@@ -55,7 +55,7 @@ describe("시나리오 13 — 비활성 작업자 차단", () => {
 describe("시나리오 14 — PIN 5회 실패 잠금 (Airtable 영속화)", () => {
   test("5회 실패 시 1단계 5분 잠금 → Airtable에 영속화", async () => {
     // 평문 PIN '1111'을 가진 활성 작업자
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
 
     const {
       checkLockout,
@@ -81,7 +81,7 @@ describe("시나리오 14 — PIN 5회 실패 잠금 (Airtable 영속화)", () =
     }
 
     // Airtable 작업자 레코드에 pin_fail_count, pin_locked_until 영속화
-    const worker = store.get("작업자", WORKER_NORMAL.id)!;
+    const worker = store.get("사용자", WORKER_NORMAL.id)!;
     expect(Number(worker.fields.pin_fail_count)).toBe(5);
     expect(Number(worker.fields.pin_locked_until)).toBeGreaterThan(Date.now());
 
@@ -91,13 +91,13 @@ describe("시나리오 14 — PIN 5회 실패 잠금 (Airtable 영속화)", () =
 
     // 인증 성공 시 카운터 완전 초기화
     await recordSuccess(WORKER_NORMAL.id);
-    const workerAfter = store.get("작업자", WORKER_NORMAL.id)!;
+    const workerAfter = store.get("사용자", WORKER_NORMAL.id)!;
     expect(Number(workerAfter.fields.pin_fail_count)).toBe(0);
     expect(Number(workerAfter.fields.pin_locked_until)).toBe(0);
   });
 
   test("verifyWorkerPin — 평문 PIN 매칭 시 자동 해시 마이그레이션", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
 
     const { verifyWorkerPin } = await import("@/lib/airtable");
     // 정확한 PIN
@@ -108,13 +108,13 @@ describe("시나리오 14 — PIN 5회 실패 잠금 (Airtable 영속화)", () =
     // 마이그레이션은 next/server.after()로 등록 — 테스트에선 명시적으로 drain
     await drainAfter();
 
-    const workerAfter = store.get("작업자", WORKER_NORMAL.id)!;
+    const workerAfter = store.get("사용자", WORKER_NORMAL.id)!;
     // pin_hash가 채워져 있어야 함 (scrypt:salt:hash 형태)
     expect(String(workerAfter.fields.pin_hash ?? "")).toMatch(/^scrypt:[0-9a-f]+:[0-9a-f]+$/);
   });
 
   test("verifyWorkerPin — 잘못된 PIN → null", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
 
     const { verifyWorkerPin } = await import("@/lib/airtable");
     const result = await verifyWorkerPin(WORKER_NORMAL.id, "9999");
@@ -132,7 +132,7 @@ describe("시나리오 15 — 작업자 ID 위조 시도 차단", () => {
   });
 
   test("존재하지 않는 record ID → INVALID_WORKER", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
 
     const { requireWorker, AuthError } = await import("@/lib/server-auth");
     await expect(requireWorker("recFAKEID00000000")).rejects.toThrow(AuthError);
@@ -142,7 +142,7 @@ describe("시나리오 15 — 작업자 ID 위조 시도 차단", () => {
   });
 
   test("server action: 위조된 workerId로 입고 신청 → 거부", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
 
@@ -164,7 +164,7 @@ describe("시나리오 15 — 작업자 ID 위조 시도 차단", () => {
   });
 
   test("requireAdmin — WORKER role이 ADMIN 작업 시도 → FORBIDDEN", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
 
     const { requireAdmin, AuthError } = await import("@/lib/server-auth");
     await expect(requireAdmin(WORKER_NORMAL.id)).rejects.toThrow(AuthError);

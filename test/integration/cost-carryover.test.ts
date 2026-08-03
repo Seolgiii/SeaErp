@@ -33,7 +33,7 @@ import {
 
 describe("동결비 통합", () => {
   test("입고 승인 시 LOT에 보관처 동결비 자동 저장", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -74,7 +74,7 @@ describe("동결비 통합", () => {
   });
 
   test("입고 반려 시 동결비도 null로 클리어", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -125,7 +125,7 @@ describe("동결비 통합", () => {
   });
 
   test("출고 승인 시 출고시점 동결비가 LOT.동결비로 저장됨", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -176,7 +176,7 @@ describe("동결비 통합", () => {
   });
 
   test("출고 반려 시 출고시점 동결비도 null 복구", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -239,7 +239,7 @@ describe("동결비 통합", () => {
 
 describe("재고 이동 — C안 + 동결비 특례 (이월 경비 박스당×이동박스수)", () => {
   test("이동 승인 시 새 LOT에 최초입고일 보존 + 수매가 박스당 그대로 + 이월 4개 총액", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -326,7 +326,7 @@ describe("재고 이동 — C안 + 동결비 특례 (이월 경비 박스당×�
   });
 
   test("D2 재이동 — 박스당 cost basis 누적해서 다시 이동 (sourceInboxQty=입고박스수)", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -409,7 +409,7 @@ describe("재고 이동 — C안 + 동결비 특례 (이월 경비 박스당×�
   });
 
   test("이동 후 출고 — 출고시점 비용은 박스당×출고박스 + 이월×비율 (총액)", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -493,7 +493,7 @@ describe("재고 이동 — C안 + 동결비 특례 (이월 경비 박스당×�
   });
 
   test("수매가 박스당 그대로 — 원본 LOT 이동 시 비례 분할 X (이전 버그 fix)", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -546,7 +546,7 @@ describe("재고 이동 — C안 + 동결비 특례 (이월 경비 박스당×�
   });
 
   test("동결비 특례 — 이동된 LOT은 동결비=0, 이월동결비만 cost basis 보존", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -606,7 +606,7 @@ describe("재고 이동 — C안 + 동결비 특례 (이월 경비 박스당×�
 
 describe("판매금액 자동 계산 (Airtable formula)", () => {
   test("정상 — 판매금액(formula) = 판매가 × 출고요청수량, 손익 = 판매금액 − 판매원가", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -664,7 +664,7 @@ describe("판매금액 자동 계산 (Airtable formula)", () => {
   });
 
   test("판매가 누락 — 판매금액 = 0, 재고 차감/판매원가 PATCH는 정상", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);

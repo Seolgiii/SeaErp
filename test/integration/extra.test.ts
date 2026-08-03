@@ -115,7 +115,7 @@ describe("시나리오 19 — Idempotency 중복 제출 방어", () => {
 
 describe("시나리오 20 — 양방향 변경 멱등성 (승인↔반려 토글)", () => {
   test("입고 승인↔반려 5회 토글 — 매번 정합성 유지", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -155,7 +155,7 @@ describe("시나리오 20 — 양방향 변경 멱등성 (승인↔반려 토글
   });
 
   test("같은 상태로 두 번 PATCH (멱등) — 재고 처리 skip", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -196,7 +196,7 @@ describe("시나리오 20 — 양방향 변경 멱등성 (승인↔반려 토글
 
 describe("시나리오 21 — PDF 생성 실패해도 승인 성공", () => {
   test("입고 승인 — generateInboundPdf 실패해도 success: true + 재고 정상 반영", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -242,7 +242,7 @@ describe("시나리오 21 — PDF 생성 실패해도 승인 성공", () => {
   });
 
   test("출고 승인 — generateOutboundPdf 실패해도 차감 정상 + success", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);

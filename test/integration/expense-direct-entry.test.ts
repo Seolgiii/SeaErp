@@ -12,7 +12,7 @@ import { ALL_MASTERS, WORKER_ADMIN, WORKER_MASTER, WORKER_NORMAL } from "./fixtu
  * '승인 대기'로 남고(committed=false), MASTER는 즉시 승인 가능.
  */
 
-const seed = () => store.seed("작업자", ALL_MASTERS.workers);
+const seed = () => store.seed("사용자", ALL_MASTERS.workers);
 
 describe("지출 PC 직접 등록", () => {
   test("commit=true, 100만원 미만 → 즉시 승인 완료 + 신청자=입력 관리자", async () => {

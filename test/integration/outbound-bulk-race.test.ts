@@ -77,7 +77,7 @@ async function seedAndCreateOutbound(opts: {
 describe("시나리오 E2 — 출고 승인 race 감지 모니터링", () => {
   test("정상 승인 — inbound/lot 모니터링 로그 mismatch:false 두 건", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -132,7 +132,7 @@ describe("시나리오 E2 — 출고 승인 race 감지 모니터링", () => {
 
   test("LOT 재고 PATCH 실패 시 → mismatch 감지 + INTEGRITY-ALERT 로그", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -178,7 +178,7 @@ describe("시나리오 E2 — 출고 승인 race 감지 모니터링", () => {
 
   test("Promise.all 동시 승인 2건 — 모니터링 로그 4건 emit (per-approval × 2 PATCH)", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);

@@ -26,7 +26,7 @@ import {
 describe("입고 골든패스", () => {
   test("신청 → 승인 → LOT 재고 반영", async () => {
     // ── 1. 마스터 데이터 seed ──
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);

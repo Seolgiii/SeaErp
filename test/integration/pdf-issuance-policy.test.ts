@@ -178,7 +178,7 @@ async function approveTransferFlow(sourceStorageId: string, destStorageId: strin
 
 describe("입출고증 발행 정책 — 자사창고 끝점 분기", () => {
   beforeEach(() => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", PDF_POLICY_STORAGES.storages);
     store.seed("보관처 비용 이력", PDF_POLICY_STORAGES.storageCosts);

@@ -28,7 +28,7 @@ import {
 describe("재고 이동 골든패스", () => {
   test("이동 신청 → 승인 → 새 LOT 생성 + 원본 차감", async () => {
     // ── 1. 마스터 + 원본 입고/LOT seed (한림냉동) ──
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);

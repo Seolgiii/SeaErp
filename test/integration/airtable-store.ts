@@ -6,7 +6,7 @@
  */
 
 export type Tables =
-  | "작업자"
+  | "사용자"
   | "품목마스터"
   | "LOT별 재고"
   | "입고 관리"
@@ -79,6 +79,17 @@ class AirtableStore {
     if (!existing) return null;
     existing.fields = { ...existing.fields, ...fields };
     return existing;
+  }
+
+  /**
+   * 레코드 삭제. 없으면 false.
+   *
+   * 2026-08-03 추가 — 이전엔 store에 삭제가 없었고 fetch-mock도 DELETE를 400으로 돌려줬다.
+   * 그래서 초안을 다시 저장하는 경로(작업 정산 saveWorkSettlement의 "옛 라인 전부 삭제 후
+   * 재생성")가 통합 테스트로 한 번도 실행되지 못했다.
+   */
+  remove(table: Tables, id: string): boolean {
+    return this.data.get(table)?.delete(id) ?? false;
   }
 
   /** 테스트에서 raw map 접근이 필요할 때 */

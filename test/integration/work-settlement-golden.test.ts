@@ -35,7 +35,7 @@ const STORAGE_COST_OWN: AirtableRecord = {
 };
 
 function seedBase() {
-  store.seed("작업자", ALL_MASTERS.workers);
+  store.seed("사용자", ALL_MASTERS.workers);
   store.seed("품목마스터", [PRODUCT_MACKEREL]);
   store.seed("보관처 마스터", [STORAGE_OWN]);
   store.seed("보관처 비용 이력", [STORAGE_COST_OWN]);

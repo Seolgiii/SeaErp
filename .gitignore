@@ -25,3 +25,6 @@ obsidian-vault/.obsidian/cache
 obsidian-vault/.trash/
 obsidian-vault/.obsidian/plugins/*/data.json
 .env*.local
+
+# Playwright MCP 검증 산출물(스냅샷·콘솔 로그) — 세션 임시본
+.playwright-mcp/

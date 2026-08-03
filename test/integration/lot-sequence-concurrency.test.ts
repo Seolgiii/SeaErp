@@ -21,7 +21,7 @@ import {
 
 describe("시나리오 11 — LOT 일련번호 동시 생성", () => {
   test("순차 입고 — 일련번호가 0001 → 0002 로 증가", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -75,7 +75,7 @@ describe("시나리오 11 — LOT 일련번호 동시 생성", () => {
     //   2. 두 LOT 레코드 모두 생성 (POST 자체는 둘 다 성공)
     //
     // LOT번호 unique 여부는 검증하지 않음 — race가 발생할 수도, 안 할 수도 있음.
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -114,7 +114,7 @@ describe("시나리오 11 — LOT 일련번호 동시 생성", () => {
   });
 
   test("기존 LOT이 있을 때 — 다음 일련번호 정확히 채번", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);

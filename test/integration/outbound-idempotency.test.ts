@@ -19,7 +19,7 @@ import {
 
 describe("시나리오 12 — 출고 중복 클릭 방지", () => {
   test("같은 출고 두 번 승인 — 차감은 1회만 발생", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
@@ -91,7 +91,7 @@ describe("시나리오 12 — 출고 중복 클릭 방지", () => {
   });
 
   test("Promise.all 동시 승인 2회 — 한쪽만 차감", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
     store.seed("품목마스터", ALL_MASTERS.products);
     store.seed("보관처 마스터", ALL_MASTERS.storages);
     store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);

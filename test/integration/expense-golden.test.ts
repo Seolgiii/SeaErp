@@ -16,7 +16,7 @@ import { ALL_MASTERS, WORKER_ADMIN, WORKER_NORMAL } from "./fixtures";
 
 describe("지출결의 골든패스", () => {
   test("100만원 미만 신청 → 즉시 승인 → PDF 저장", async () => {
-    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("사용자", ALL_MASTERS.workers);
 
     // ── 1. 지출 신청 ──
     const { createExpenseRecord } = await import(
