@@ -104,9 +104,11 @@ export default function WorkSettlementSplitPage() {
 
   if (authError) {
     return (
-      <div style={{ padding: 24 }}>
-        <Link href="/admin/master/work-settlement" style={{ fontSize: 13, color: '#6A7480' }}>← 작업 정산</Link>
-        <div style={{ marginTop: 40, textAlign: 'center', color: '#9AA4B0', fontSize: 14 }}>{authError}</div>
+      // .ws-page 밖이라 로컬 var()가 없다 → Tailwind 토큰 클래스를 쓴다.
+      // 안내 문구를 text-faint(대비 2.61)로 두지 않는다 — DESIGN §2-2.
+      <div className="p-6">
+        <Link href="/admin/master/work-settlement" className="text-label text-text-muted">← 작업 정산</Link>
+        <div className="mt-10 text-center text-body text-text-muted">{authError}</div>
       </div>
     );
   }
@@ -137,7 +139,7 @@ export default function WorkSettlementSplitPage() {
         </div>
 
         {status && status !== '임시저장' && (
-          <p className="cap" style={{ color: '#8A5A00' }}>이 정산은 ‘{status}’ 상태입니다. 배분·확정할 수 없습니다.</p>
+          <p className="cap" style={{ color: 'var(--amber-ink)' }}>이 정산은 ‘{status}’ 상태입니다. 배분·확정할 수 없습니다.</p>
         )}
 
         {/* 기본 비율 */}
@@ -212,7 +214,7 @@ export default function WorkSettlementSplitPage() {
             </table>
           </div>
           {!allMatch && lines.length > 0 && (
-            <p className="cap" style={{ color: '#C0392B' }}>합계가 전체수량과 다른 줄이 있습니다. 박스가 생기거나 사라지지 않도록 맞춰야 확정됩니다.</p>
+            <p className="cap" style={{ color: 'var(--danger-ink)' }}>합계가 전체수량과 다른 줄이 있습니다. 박스가 생기거나 사라지지 않도록 맞춰야 확정됩니다.</p>
           )}
         </section>
 
@@ -245,33 +247,35 @@ export default function WorkSettlementSplitPage() {
       </div>
 
       <style>{WS_CSS}</style>
+      {/* 이 블록은 .ws-page 안쪽이라 _shared.ts가 선언한 로컬 var()를 그대로 쓴다.
+          색은 전부 거기서 오고, 여기에 hex를 다시 적지 않는다(DESIGN §2-1). */}
       <style>{`
         .ws-page .ratiobar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:10px 0 4px; }
         .ws-page .ratiobar .ri { display:flex; align-items:center; gap:6px; }
-        .ws-page .ratiobar .rk { font-size:12px; color:#5C6270; }
+        .ws-page .ratiobar .rk { font-size:12px; color:var(--muted); }
         .ws-page .ratiobar .rv { width:56px; text-align:right; font-variant-numeric:tabular-nums;
-          border:1px solid #DDE1E6; border-radius:6px; padding:4px 6px; font-size:13px; }
-        .ws-page .ratiobar .rp { font-size:12px; color:#8A9099; }
+          border:1px solid var(--line); border-radius:6px; padding:4px 6px; font-size:14px; }
+        .ws-page .ratiobar .rp { font-size:12px; color:var(--muted); }
         .ws-page .ratiobar .rsum { font-size:12px; padding:2px 8px; border-radius:10px; }
-        .ws-page .ratiobar .rsum.ok { background:#EAF6EE; color:#1E7B43; }
-        .ws-page .ratiobar .rsum.warn { background:#FDF2E3; color:#8A5A00; }
-        .ws-page #split th.oi { text-align:center; color:#1F4E79; }
+        .ws-page .ratiobar .rsum.ok { background:var(--green-soft); color:var(--green-ink); }
+        .ws-page .ratiobar .rsum.warn { background:var(--amber-soft); color:var(--amber-ink); }
+        .ws-page #split th.oi { text-align:center; color:var(--accent-ink); }
         .ws-page #split td.oc { text-align:center; }
         .ws-page #split td.oc .oin { width:64px; text-align:right; font-variant-numeric:tabular-nums;
-          border:1px solid #DDE1E6; border-radius:6px; padding:4px 6px; font-size:13px; background:#F7FAFF; }
+          border:1px solid var(--line); border-radius:6px; padding:4px 6px; font-size:14px; background:var(--band); }
         .ws-page #split td.n, .ws-page #split th.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
         .ws-page #split th.ni { text-align:right; }
-        .ws-page #split .okn { color:#1E7B43; }
-        .ws-page #split .badn { color:#C0392B; font-weight:600; }
-        .ws-page #split td.dimtxt { color:#8A9099; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .ws-page #split td.empty { text-align:center; color:#8A9099; padding:22px 0; }
+        .ws-page #split .okn { color:var(--green-ink); }
+        .ws-page #split .badn { color:var(--danger-ink); font-weight:600; }
+        .ws-page #split td.dimtxt { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .ws-page #split td.empty { text-align:center; color:var(--muted); padding:22px 0; }
         .ws-page .ownsum { display:flex; gap:10px; flex-wrap:wrap; padding-top:8px; }
-        .ws-page .oscard { border:1px solid #E6E9ED; border-radius:10px; padding:10px 14px; min-width:150px; }
-        .ws-page .oscard.total { background:#F7F8FA; }
-        .ws-page .oscard .osn { font-size:12px; color:#5C6270; margin-bottom:4px; }
-        .ws-page .oscard .osb { font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; }
-        .ws-page .oscard .osw { font-size:13px; color:#5C6270; font-variant-numeric:tabular-nums; margin-top:2px; }
-        .ws-page .oscard .osu { font-size:11px; font-weight:400; color:#8A9099; }
+        .ws-page .oscard { border:1px solid var(--line); border-radius:10px; padding:10px 14px; min-width:150px; }
+        .ws-page .oscard.total { background:var(--band); }
+        .ws-page .oscard .osn { font-size:12px; color:var(--muted); margin-bottom:4px; }
+        .ws-page .oscard .osb { font-size:16px; font-weight:600; font-variant-numeric:tabular-nums; }
+        .ws-page .oscard .osw { font-size:14px; color:var(--muted); font-variant-numeric:tabular-nums; margin-top:2px; }
+        .ws-page .oscard .osu { font-size:11px; font-weight:400; color:var(--muted); }
         .ws-page .actions { display:flex; gap:10px; justify-content:flex-end; padding:14px 0 4px; }
       `}</style>
     </div>

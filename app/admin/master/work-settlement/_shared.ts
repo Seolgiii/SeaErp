@@ -301,16 +301,29 @@ export function buildInoutRows(
 }
 
 export const WS_CSS = `
-.ws-page{--bg:#FFFFFF;--surface:#FFFFFF;--line:#E7EBF0;--line-2:#D9DFE7;--ink:#1E2530;--muted:#6A7480;--faint:#9AA4B0;--accent:#2E75B6;--accent-ink:#1B4E7F;--accent-soft:#EAF2FA;--green-soft:#E4F3E9;--green-ink:#256B3E;--amber-soft:#FBF0DA;--amber-ink:#8A5A00;--auto:#F4F7FA;--footer:#EFF5FB;--hover:#F5F7F9;--band:#F7F9FB;--shadow:0 1px 2px rgba(20,30,45,.06),0 6px 20px rgba(20,30,45,.05);background:var(--bg);color:var(--ink);font-family:var(--font-pretendard),"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",-apple-system,sans-serif;}
+/* DESIGN.md 토큰 정렬 (2026-08-03) — 로컬 변수 '이름'은 두고 '값'만 토큰에 맞춘다.
+   이름까지 바꾸려면 var() 참조 200곳을 함께 고쳐야 해서, 값 정렬을 먼저 한다.
+     --bg → --bg          --surface → --surface     --line·--line-2 → --border
+     --ink → --text       --muted → --text-muted    --faint → --text-faint
+     --accent → --accent-fill(#1C6CE0)              --accent-hover → --accent-fill-hover
+     --accent-ink → --accent-ink                    --accent-soft → --accent-bg
+     --green-* → --success-*                        --amber-* → --warn-*
+     --auto·--footer·--hover·--band → --surface-alt (DESIGN의 중립 보조면은 1종뿐)
+   ⚠ --line과 --line-2가 같은 값이 됐다. 원래 2단계 테두리 위계(thead 밑줄·그룹 구분선을
+     더 진하게)를 만들던 것인데 DESIGN §2-2에 --border 1종뿐이라 위계가 사라진다.
+   ⚠ 옛 --accent(#2E75B6)는 흰 글자 대비 4.84로 미달이 아니었다. 이 교체는 접근성 수정이
+     아니라 토큰 일원화다 — 파랑 계열이 살짝 선명해진다.
+   font-family를 선언하지 않는다 — globals.css의 body 한 줄이 유일한 출처다(§3). */
+.ws-page{--bg:#FBFBFC;--surface:#FFFFFF;--line:#E3E5E9;--line-2:#E3E5E9;--ink:#14171C;--muted:#646B78;--faint:#98A0AC;--accent:#1C6CE0;--accent-hover:#1A61CC;--accent-ink:#235C82;--accent-soft:#DCEAF5;--green-soft:#DDEFE4;--green-ink:#1F6644;--amber-soft:#F7EBD6;--amber-ink:#7A5510;--danger-soft:#F7DFE0;--danger-ink:#8A2A35;--auto:#F4F5F7;--footer:#F4F5F7;--hover:#F4F5F7;--band:#F4F5F7;background:var(--bg);color:var(--ink);}
 .ws-page *{box-sizing:border-box;}
 .ws-page .page{max-width:1180px;margin:0 auto;padding:22px 4px 90px;}
 .ws-page .title-row{display:flex;align-items:center;gap:12px;margin:8px 0 2px;}
-.ws-page h1{font-size:24px;font-weight:750;letter-spacing:-.01em;margin:0;}
-.ws-page .lede{color:var(--muted);font-size:13px;max-width:82ch;margin:8px 0 0;}
+.ws-page h1{font-size:20px;font-weight:600;letter-spacing:-.01em;margin:0;}
+.ws-page .lede{color:var(--muted);font-size:14px;max-width:82ch;margin:8px 0 0;}
 .ws-page .lede b{color:var(--ink);font-weight:600;}
-.ws-page .fields{display:grid;grid-template-columns:repeat(4,1fr);gap:2px 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 4px;margin:18px 0 6px;box-shadow:var(--shadow);}
+.ws-page .fields{display:grid;grid-template-columns:repeat(4,1fr);gap:2px 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 4px;margin:18px 0 6px;}
 .ws-page .f{display:flex;flex-direction:column;gap:2px;padding:9px 14px;min-width:0;}
-.ws-page .f label{font-size:11px;font-weight:600;color:var(--faint);}
+.ws-page .f label{font-size:12px;font-weight:500;color:var(--muted);}
 .ws-page .f label .dim{font-weight:400;}
 .ws-page .f > input, .ws-page .f select{border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:600;padding:3px 2px;border-radius:5px;width:100%;outline:none;transition:background .1s;}
 .ws-page .f > input:hover, .ws-page .f select:hover{background:var(--hover);}
@@ -320,29 +333,40 @@ export const WS_CSS = `
 .ws-page .time-range input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:600;padding:3px 2px;border-radius:5px;outline:none;}
 .ws-page .time-range input:hover{background:var(--hover);}
 .ws-page .time-range input:focus{background:var(--accent-soft);box-shadow:inset 0 0 0 1.5px var(--accent);}
-.ws-page .time-range .tl{color:var(--muted);font-weight:600;font-size:13px;}
+.ws-page .time-range .tl{color:var(--muted);font-weight:600;font-size:14px;}
 .ws-page .chk{display:inline-flex;align-items:center;gap:9px;cursor:pointer;padding-top:4px;user-select:none;}
 .ws-page .chk input{position:absolute;opacity:0;width:1px;height:1px;}
 .ws-page .chk-box{width:20px;height:20px;border:1.5px solid var(--line-2);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;background:var(--surface);flex:none;}
 .ws-page .chk input:checked + .chk-box{background:var(--accent);border-color:var(--accent);}
 .ws-page .chk input:checked + .chk-box::after{content:"";width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);margin-top:-2px;}
 .ws-page .chk-txt{font-size:14px;font-weight:700;color:var(--ink);min-width:12px;}
-.ws-page .cap{font-size:11px;color:var(--faint);margin:8px 4px 26px;}
+.ws-page .cap{font-size:11px;color:var(--muted);margin:8px 4px 26px;}
 .ws-page .wsblock{margin:0 0 24px;}
 .ws-page .sec-title{display:flex;align-items:baseline;gap:9px;margin:0 2px 11px;flex-wrap:wrap;}
-.ws-page .sec-title h2{font-size:15.5px;font-weight:700;margin:0;letter-spacing:-.005em;}
-.ws-page .sec-title .sub{font-size:12px;color:var(--faint);font-weight:500;}
-.ws-page .table-wrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow-x:auto;box-shadow:var(--shadow);}
-.ws-page table{border-collapse:collapse;width:100%;font-size:13px;}
+.ws-page .sec-title h2{font-size:16px;font-weight:600;margin:0;letter-spacing:-.005em;}
+.ws-page .sec-title .sub{font-size:12px;color:var(--muted);font-weight:500;}
+.ws-page .table-wrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow-x:auto;}
+.ws-page table{border-collapse:collapse;width:100%;font-size:14px;}
+/* min-width 실측 (2026-08-03, 표 본문 13→14px 전환 후 Chromium 1280px 측정).
+   DESIGN §7-1은 "minWidth를 colgroup 합계에서 파생시켜라(하드코딩 금지)"인데 여기는 아직
+   하드코딩이다. 다만 지금 값이 우연히 실측치와 맞아 손대지 않았다 — 근거를 남겨둔다.
+     #prod : colgroup 합계 1114 / 실제 필요 1120 / min-width 1120 → 정확히 일치(구속력 없음)
+             헤더가 배정폭을 넘긴 컬럼 5개(지방도 56→64, 규격 68→81, 중량 58→72,
+             금액 96→112, 실금액 100→112)를 짧은 컬럼들이 상쇄해 총합이 유지된다.
+     #cost : colgroup 합계 704(+비고 auto) / min-width 820 → 자연폭이 더 작아 구속력 없음
+   1280px에서 잘린 헤더 0·잘린 셀 0, 표 래퍼 안 가로 스크롤만 발생(§1이 명시한 동작).
+   ⚠ 금액·실금액 112px는 **현재 데이터 최댓값**(57,495,000원) 기준이다. 자릿수가 늘면
+     auto 레이아웃이 표를 넓히고 스크롤이 길어진다 — 폭을 고정하려면 DESIGN §10의
+     '입력 상한 자릿수' 결정이 선행돼야 한다(table-fixed 도입도 같은 조건). */
 .ws-page #prod{min-width:1120px;}
 .ws-page #cost{min-width:820px;}
-.ws-page thead th{background:var(--surface);text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:11px 10px 9px;border-bottom:1px solid var(--line-2);white-space:nowrap;}
+.ws-page thead th{background:var(--surface);text-align:left;font-size:14px;font-weight:500;color:var(--muted);padding:11px 10px 9px;border-bottom:1px solid var(--line-2);white-space:nowrap;}
 .ws-page th.n{text-align:right;}
 .ws-page th.ni{text-align:center;}
-.ws-page th .dim{font-weight:400;color:var(--faint);}
+.ws-page th .dim{font-weight:400;color:var(--muted);}
 .ws-page tbody td{border-bottom:1px solid var(--line);padding:0;vertical-align:middle;}
 .ws-page tr.p-row:hover,.ws-page tr.c-row:hover{background:var(--hover);}
-.ws-page td.txt input, .ws-page td.n input{border:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;width:100%;padding:10px 11px;outline:none;transition:box-shadow .1s,background .1s;}
+.ws-page td.txt input, .ws-page td.n input{border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px;width:100%;padding:10px 11px;outline:none;transition:box-shadow .1s,background .1s;}
 .ws-page td.n input{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;padding:10px 10px;}
 .ws-page td.txt input{font-weight:500;}
 .ws-page td input:hover{background:var(--hover);}
@@ -353,13 +377,13 @@ export const WS_CSS = `
 .ws-page td.del-cell{text-align:center;padding:0 4px;}
 .ws-page .del{border:0;background:transparent;color:var(--faint);cursor:pointer;font-size:16px;line-height:1;width:26px;height:26px;border-radius:6px;opacity:0;transition:opacity .1s,background .1s,color .1s;}
 .ws-page tr:hover .del{opacity:1;}
-.ws-page .del:hover{background:#e5484d1a;color:#e5484d;}
+.ws-page .del:hover{background:var(--danger-soft);color:var(--danger-ink);}
 .ws-page td.pct-cell{padding:0;}
 .ws-page .pctw{display:flex;align-items:center;justify-content:center;padding:8px 4px;gap:1px;}
-.ws-page .pct-in{border:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;font-weight:500;outline:none;padding:2px 3px;border-radius:5px;text-align:center;max-width:44px;transition:background .1s;}
+.ws-page .pct-in{border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:500;outline:none;padding:2px 3px;border-radius:5px;text-align:center;max-width:44px;transition:background .1s;}
 .ws-page .pct-in:hover{background:var(--hover);}
 .ws-page .pct-in:focus{box-shadow:inset 0 0 0 1.6px var(--accent);background:var(--accent-soft);}
-.ws-page .pct{color:var(--faint);font-size:12px;font-weight:600;}
+.ws-page .pct{color:var(--muted);font-size:12px;font-weight:600;}
 /* 텍스트 컬럼은 목업대로 가운데. 숫자 컬럼(중량·수량·단가·금액)은 우측 정렬 통일 —
    앱 전체 표 규칙과 동일(우측 정렬 + tabular-nums + 천단위 콤마 + 단위 값 뒤). */
 .ws-page #prod thead th{text-align:center;}
@@ -369,23 +393,23 @@ export const WS_CSS = `
 .ws-page #cost thead th.n, .ws-page #cost thead th.ni{text-align:right;}
 .ws-page #cost td.txt input, .ws-page #cost td .combo > input{text-align:center;}
 .ws-page #cost td.fixed-name .fx{text-align:center;}
-.ws-page td .roval{display:block;padding:10px 10px;font-size:13px;text-align:center;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.ws-page td .roval{display:block;padding:10px 10px;font-size:14px;text-align:center;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap;}
 .ws-page td.n .roval{text-align:right;}
 .ws-page td .roval.robigo{color:var(--amber-ink);font-size:11px;font-weight:600;white-space:normal;}
-.ws-page #cost .phcell{padding:14px;text-align:center;color:var(--faint);font-size:12px;}
+.ws-page #cost .phcell{padding:14px;text-align:center;color:var(--muted);font-size:12px;}
 .ws-page #cost .phcell b{color:var(--muted);font-weight:600;}
-.ws-page .autotag{font-size:10.5px;font-weight:600;color:var(--accent);}
+.ws-page .autotag{font-size:11px;font-weight:600;color:var(--accent);}
 .ws-page td.use, .ws-page td.gubun{padding:0;}
-.ws-page td.use select, .ws-page td.gubun select{margin:6px 8px;width:calc(100% - 16px);border:0;font:inherit;font-size:11.5px;font-weight:700;padding:5px 6px;border-radius:7px;cursor:pointer;outline:none;}
+.ws-page td.use select, .ws-page td.gubun select{margin:6px 8px;width:calc(100% - 16px);border:0;font:inherit;font-size:12px;font-weight:600;padding:5px 6px;border-radius:7px;cursor:pointer;outline:none;}
 .ws-page select.u-frozen{background:var(--accent-soft);color:var(--accent-ink);}
 .ws-page select.u-proc{background:var(--amber-soft);color:var(--amber-ink);}
 .ws-page select.u-fresh{background:var(--green-soft);color:var(--green-ink);}
-.ws-page select.u-none{background:var(--band);color:var(--faint);}
+.ws-page select.u-none{background:var(--band);color:var(--muted);}
 .ws-page td.gubun select{background:var(--band);color:var(--ink);}
 .ws-page td.io-dogam, .ws-page td .io-dogam{width:calc(100% - 4px);margin:4px 2px;border:0;background:var(--band);color:var(--ink);font:inherit;font-size:12px;font-weight:600;padding:8px 8px;border-radius:7px;outline:none;cursor:pointer;}
 .ws-page td.fixed-name{background:var(--band);}
 .ws-page tr.c-row > td:first-child{box-shadow:inset 3px 0 0 var(--accent);background:var(--band);}
-.ws-page td.fixed-name .fx{display:block;padding:10px 12px;font-weight:600;color:var(--ink);font-size:13px;white-space:nowrap;}
+.ws-page td.fixed-name .fx{display:block;padding:10px 12px;font-weight:600;color:var(--ink);font-size:14px;white-space:nowrap;}
 .ws-page tr.grp td{background:var(--band);padding:0;border-bottom:1px solid var(--line);}
 .ws-page .grp-bar{display:flex;justify-content:space-between;align-items:center;padding:9px 13px 8px;}
 .ws-page .grp-name{font-size:12px;font-weight:700;color:var(--ink);}
@@ -398,36 +422,36 @@ export const WS_CSS = `
 .ws-page tr.c-row[data-g="운임"]{counter-increment:runno;}
 .ws-page tr.c-row[data-g="운임"] > td:first-child > input{padding-left:30px;}
 .ws-page tr.c-row[data-g="운임"] > td:first-child{position:relative;}
-.ws-page tr.c-row[data-g="운임"] > td:first-child::before{content:counter(runno,decimal) ".";position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--accent);font-weight:700;font-size:13px;pointer-events:none;}
-.ws-page .add{margin:9px 2px 0;border:1px dashed var(--line-2);background:transparent;color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;}
+.ws-page tr.c-row[data-g="운임"] > td:first-child::before{content:counter(runno,decimal) ".";position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--accent);font-weight:700;font-size:14px;pointer-events:none;}
+.ws-page .add{margin:9px 2px 0;border:1px dashed var(--line-2);background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;}
 .ws-page .add:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);}
-.ws-page .summary{display:flex;flex-wrap:wrap;gap:2px;background:var(--footer);border:1px solid var(--line-2);border-radius:13px;padding:6px;margin:6px 0 22px;box-shadow:var(--shadow);}
+.ws-page .summary{display:flex;flex-wrap:wrap;gap:2px;background:var(--footer);border:1px solid var(--line-2);border-radius:13px;padding:6px;margin:6px 0 22px;}
 .ws-page .sum-item{flex:1 1 150px;display:flex;flex-direction:column;gap:5px;padding:15px 18px;position:relative;}
 .ws-page .sum-item + .sum-item::before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:1px;background:var(--line-2);}
-.ws-page .sum-item .k{font-size:11.5px;font-weight:600;color:var(--muted);}
-.ws-page .sum-item .k em{font-style:normal;color:var(--faint);font-weight:500;font-size:10.5px;}
-.ws-page .sum-item .v{font-size:20px;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+.ws-page .sum-item .k{font-size:12px;font-weight:600;color:var(--muted);}
+.ws-page .sum-item .k em{font-style:normal;color:var(--muted);font-weight:500;font-size:11px;}
+.ws-page .sum-item .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
 .ws-page .sum-item.hl .v{color:var(--accent);}
-.ws-page .sum-item.hl .v .u{font-size:12px;font-weight:600;color:var(--faint);margin-left:3px;}
+.ws-page .sum-item.hl .v .u{font-size:12px;font-weight:600;color:var(--muted);margin-left:3px;}
 .ws-page .actions{display:flex;justify-content:flex-end;gap:10px;align-items:center;}
-.ws-page .btn{font:inherit;font-size:13.5px;font-weight:650;padding:10px 20px;border-radius:9px;cursor:pointer;transition:.12s;}
+.ws-page .btn{font:inherit;font-size:14px;font-weight:600;padding:10px 20px;border-radius:9px;cursor:pointer;transition:.12s;}
 .ws-page .btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink);}
 .ws-page .btn.ghost:hover{background:var(--hover);border-color:var(--accent);color:var(--accent);}
 .ws-page .btn.primary{background:var(--accent);border:1px solid var(--accent);color:#fff;}
-.ws-page .btn.primary:hover{filter:brightness(1.06);}
+.ws-page .btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover);}
 .ws-page .btn:disabled{opacity:.5;cursor:default;}
-.ws-page .backlink{font-size:12.5px;font-weight:600;color:var(--muted);text-decoration:none;}
+.ws-page .backlink{font-size:12px;font-weight:600;color:var(--muted);text-decoration:none;}
 .ws-page .backlink:hover{color:var(--accent);}
 .ws-page .ctxbar{display:flex;flex-wrap:wrap;gap:18px;align-items:center;background:var(--band);border:1px solid var(--line);border-radius:11px;padding:12px 16px;margin:12px 0 22px;}
 .ws-page .ctxbar .ci{display:flex;flex-direction:column;gap:2px;}
-.ws-page .ctxbar .ck{font-size:10.5px;font-weight:600;color:var(--faint);}
+.ws-page .ctxbar .ck{font-size:11px;font-weight:600;color:var(--muted);}
 .ws-page .ctxbar .cv{font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
 .ws-page .ctxbar .edit{margin-left:auto;border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;cursor:pointer;padding:0;}
 .ws-page .ctxbar .edit:hover{opacity:.75;}
 .ws-page .ctx-edit{margin:10px 0 22px;}
 .ws-page .ctx-edit .fields{margin:0;}
 .ws-page .fields-actions{grid-column:1/-1;display:flex;justify-content:flex-end;padding:10px 14px 6px;margin-top:4px;border-top:1px solid var(--line);}
-.ws-page .steps{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600;color:var(--faint);margin:10px 0 0;}
+.ws-page .steps{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 0;}
 .ws-page .steps .on{color:var(--accent);}
 .ws-page .steps .sep{color:var(--line-2);}
 .ws-page .steps a{color:var(--accent);text-decoration:underline;text-underline-offset:3px;}
@@ -439,9 +463,12 @@ export const WS_CSS = `
 .ws-page .combo > input::placeholder{color:var(--faint);font-weight:400;}
 .ws-page .time-range{gap:4px;}
 .ws-page .time-range .combo{flex:none;width:60px;}
-.ws-page td .combo > input{font-size:13px;font-weight:500;padding:10px 11px;}
-.ws-combo-portal{z-index:9999;background:#fff;border:1px solid #D9DFE7;border-radius:9px;box-shadow:0 8px 24px rgba(20,30,45,.14);max-height:172px;overflow-y:auto;max-width:280px;padding:4px;font-family:var(--font-pretendard),"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",-apple-system,sans-serif;}
-.ws-combo-opt{padding:7px 11px;font-size:13px;font-weight:600;border-radius:6px;cursor:pointer;color:#1E2530;white-space:nowrap;font-variant-numeric:tabular-nums;}
-.ws-combo-opt:hover,.ws-combo-opt.active{background:#EAF2FA;color:#1B4E7F;}
-@media (max-width:720px){.ws-page .fields{grid-template-columns:repeat(2,1fr);}.ws-page h1{font-size:21px;}}
+.ws-page td .combo > input{font-size:14px;font-weight:500;padding:10px 11px;}
+/* 콤보 드롭다운은 document.body 포털이라 .ws-page 스코프 밖이다(DESIGN §6-5 포털 주의).
+   로컬 var()를 못 쓰므로 토큰 '값'을 직접 적는다 — 위 .ws-page 블록과 같이 고칠 것.
+   font-family는 선언하지 않는다: body 밑에 붙으므로 전역 폰트를 그대로 상속받는다(§3). */
+.ws-combo-portal{z-index:9999;background:#FFFFFF;border:1px solid #E3E5E9;border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.10);max-height:172px;overflow-y:auto;max-width:280px;padding:4px;}
+.ws-combo-opt{padding:7px 11px;font-size:14px;font-weight:600;border-radius:6px;cursor:pointer;color:#14171C;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.ws-combo-opt:hover,.ws-combo-opt.active{background:#DCEAF5;color:#235C82;}
+@media (max-width:720px){.ws-page .fields{grid-template-columns:repeat(2,1fr);}}
 `;

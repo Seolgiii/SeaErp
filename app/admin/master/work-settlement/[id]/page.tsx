@@ -335,9 +335,11 @@ export default function WorkSettlementStep2Page() {
 
   if (authError) {
     return (
-      <div style={{ padding: 24 }}>
-        <Link href="/admin/master/work-settlement" style={{ fontSize: 13, color: '#6A7480' }}>← 작업 정산</Link>
-        <div style={{ marginTop: 40, textAlign: 'center', color: '#9AA4B0', fontSize: 14 }}>{authError}</div>
+      // .ws-page 밖이라 로컬 var()가 없다 → Tailwind 토큰 클래스를 쓴다.
+      // 안내 문구를 text-faint(대비 2.61)로 두지 않는다 — DESIGN §2-2.
+      <div className="p-6">
+        <Link href="/admin/master/work-settlement" className="text-label text-text-muted">← 작업 정산</Link>
+        <div className="mt-10 text-center text-body text-text-muted">{authError}</div>
       </div>
     );
   }
@@ -401,7 +403,7 @@ export default function WorkSettlementStep2Page() {
         )}
 
         {status && status !== '임시저장' && (
-          <p className="cap" style={{ color: '#8A5A00' }}>이 정산은 ‘{status}’ 상태입니다. 수정·확정할 수 없습니다.</p>
+          <p className="cap" style={{ color: 'var(--amber-ink)' }}>이 정산은 ‘{status}’ 상태입니다. 수정·확정할 수 없습니다.</p>
         )}
 
         {/* ① 생산내역 (위) */}
