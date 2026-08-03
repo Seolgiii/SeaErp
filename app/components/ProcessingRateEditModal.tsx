@@ -18,7 +18,7 @@ import { fromGroupedIntegerInput, formatIntKo } from '@/lib/number-format';
 import { useConfirm } from '@/app/components/ConfirmBottomSheet';
 import { Button } from '@/app/components/ui/Button';
 import { Modal } from '@/app/components/ui/Modal';
-import { RATE_BASES, type RateBasis } from '@/lib/processing-rate-basis';
+import { RATE_BASES, rateBasisLabel, type RateBasis } from '@/lib/processing-rate-basis';
 import {
   createProcessingRate,
   updateProcessingRate,
@@ -277,7 +277,7 @@ export default function ProcessingRateEditModal({
         required
         error={errors.basis}
         htmlFor="rate-basis"
-        hint="ONE-Frozen(제주)=투입kg당 · TWO-Frozen(부산·해외)=산출kg당"
+        hint="ONE-Frozen(제주)=원물 중량 기준 · TWO-Frozen(부산·해외)=산출kg당"
       >
         <select
           id="rate-basis"
@@ -287,9 +287,10 @@ export default function ProcessingRateEditModal({
           className={fieldClass(Boolean(errors.basis))}
         >
           <option value="">선택하세요</option>
+          {/* value는 Airtable 저장값 그대로, 보이는 글자만 라벨로 바꾼다. */}
           {RATE_BASES.map((b) => (
             <option key={b} value={b}>
-              {b}
+              {rateBasisLabel(b)}
             </option>
           ))}
         </select>

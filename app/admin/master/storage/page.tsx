@@ -26,6 +26,7 @@ import { LoadingState } from '@/app/components/ui/LoadingState';
 import { NumCell, NumHead } from '@/app/admin/_num-cell';
 import { SpacerCell, TableColGroup, tableMinWidth, type TableCol } from '@/app/admin/_table-cols';
 import { SortIcon, ariaSort, sortState } from '@/app/components/ui/SortIcon';
+import { rateBasisLabel } from '@/lib/processing-rate-basis';
 
 type SortDir = 'asc' | 'desc';
 
@@ -51,7 +52,8 @@ const COST_COLS: TableCol[] = [
 const RATE_COLS: TableCol[] = [
   { key: 'product', label: '가공품', px: 132 }, // max `가시제거고등어`
   { key: 'price', label: '단가', px: 92, numeric: true },
-  { key: 'basis', label: '기준', px: 104 }, // 배지 `투입kg당`
+  // 배지 `원물 중량 기준`(저장값은 `투입kg당`) — 실측 79 + 여유 8 + 셀 패딩 32 = 119 (§7-2)
+  { key: 'basis', label: '기준', px: 120 },
   { key: 'period', label: '적용기간', px: 188 },
   { key: 'memo', label: '비고', px: 200, clamp: true }, // 자유 텍스트 → 상한 + 말줄임(§7-2 예외)
 ];
@@ -584,7 +586,7 @@ function FactorySection({
                         <td className="whitespace-nowrap px-4 py-2">
                           {r.basis ? (
                             <span className="inline-block rounded-pill bg-info-bg px-2 text-caption text-info-ink">
-                              {r.basis}
+                              {rateBasisLabel(r.basis)}
                             </span>
                           ) : (
                             <span className="text-body text-text-muted">—</span>
