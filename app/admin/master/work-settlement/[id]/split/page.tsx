@@ -8,15 +8,20 @@
 // 화주를 LOT 속성으로 붙이면 나머지 로직이 그대로 작동한다. 반대로 LOT 1개에 지분만 붙이면
 // 출고할 때마다 지분이 재계산돼 모든 계산을 뜯어야 한다.
 //
-// ⚠ 현재 화면 프로토타입 — 배분 저장·확정은 미연결(화주 마스터/Airtable 필드 미신설).
+// ⚠ 2026-08-03 현재 — **확정은 연결됐고 배분 저장만 미연결**이다(화주 마스터/Airtable 화주 필드 미신설).
+//    즉 확정을 누르면 생산내역 줄당 LOT 1개가 생기고, 위에서 나눈 화주별 박스는 반영되지 않는다.
+//    배분표는 지금 '검산용'이다. 화주별 LOT 분할은 화주 마스터 신설 후.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { readSession, isSessionExpired } from '@/lib/session';
+import { useParams, useRouter } from 'next/navigation';
+import { readSession, isSessionExpired, isAdminRole } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { getWorkSettlementDetail } from '@/app/actions/admin/master-work-settlement';
+import {
+  getWorkSettlementDetail,
+  confirmWorkSettlement,
+} from '@/app/actions/admin/master-work-settlement';
 import { formatNum } from '@/lib/number-format';
 import {
   WS_CSS, BOX_LABEL, USE_LABEL, pn, fmt,
@@ -27,10 +32,14 @@ import {
 type Hdr = { date: string; startTime: string; endTime: string; catchAmount: number; shipId: string };
 
 export default function WorkSettlementSplitPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const settlementId = String(params?.id ?? '');
 
   const [, setWorkerId] = useState('');
+  // 확정 버튼 노출용(관리자만). 실제 차단은 서버 confirmWorkSettlement → requireAdmin.
+  const [canConfirm, setCanConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [no, setNo] = useState('');
@@ -49,6 +58,7 @@ export default function WorkSettlementSplitPage() {
     const s = readSession();
     if (!s || isSessionExpired(s)) return setAuthError('로그인이 필요합니다.');
     // 작성은 전원 개방(2026-08-03) — 확정만 관리자, 삭제만 MASTER.
+    setCanConfirm(isAdminRole(s));
     setWorkerId(s.workerId);
     void (async () => {
       const d = await getWorkSettlementDetail(s.workerId, settlementId);
@@ -102,6 +112,40 @@ export default function WorkSettlementSplitPage() {
 
   const ratioSum = ratios.reduce((s, r) => s + pn(r), 0);
 
+  const editable = status === '임시저장' || status === '';
+
+  /**
+   * 확정 — 생산내역 한 줄마다 입고관리 1행 + 재고(LOT) 1개를 만든다.
+   *
+   * 2026-08-03: ② 작업비·생산내역에 있던 확정 버튼을 이리로 옮겼다. 실무 흐름이
+   * ①→②→③이고 확정은 마지막에 오는데, ②에 확정이 배분과 나란히 있으면 무엇이 다른지
+   * 읽히지 않았다(확정 이력 0건 — 실제로 아무도 안 눌렀다).
+   *
+   * ⚠ 위 배분표는 **아직 저장되지 않는다.** 화주 마스터·Airtable 화주 필드가 없어서
+   *   확정은 화주 구분 없이 줄당 LOT 1개를 만든다. 배분한 대로 쪼개진 걸로 오해하면
+   *   재고가 틀어지므로 확인 문구에 그 사실을 반드시 넣는다.
+   */
+  const doConfirm = async () => {
+    const s = readSession();
+    if (!s || isSessionExpired(s)) return toast('로그인이 필요합니다.', 'error');
+    if (!lines.length) return toast('생산내역이 없습니다. ② 단계에서 먼저 채우세요.', 'error');
+    if (
+      !confirm(
+        `확정하면 생산내역 ${lines.length}줄마다 재고(LOT)가 생성됩니다.\n\n` +
+          '⚠ 위 화주별 배분은 아직 저장되지 않습니다 — 화주 구분 없이 줄당 LOT 1개가 생깁니다.\n\n' +
+          '진행할까요?',
+      )
+    ) return;
+    setSubmitting(true);
+    try {
+      const res = await confirmWorkSettlement(s.workerId, settlementId);
+      if (res.success) {
+        toast(`확정 완료 — LOT ${res.data.lotCount}개 생성`, 'success');
+        router.push('/admin/master/work-settlement');
+      } else toast(res.error ?? '확정 실패', 'error');
+    } finally { setSubmitting(false); }
+  };
+
   if (authError) {
     return (
       // .ws-page 밖이라 로컬 var()가 없다 → Tailwind 토큰 클래스를 쓴다.
@@ -122,11 +166,13 @@ export default function WorkSettlementSplitPage() {
           <div className="steps">
             <span>① 사전기입</span><span className="sep">→</span>
             <span>② 작업비 · 생산내역</span><span className="sep">→</span>
-            <span className="on">③ 배분</span>
+            {/* 화주가 여럿일 때만 거치는 선택 단계 — 2단계 스텝 표기와 맞춘다. */}
+            <span className="on">③ 배분 (선택)</span>
           </div>
           <p className="lede">
             생산내역 물량을 <b>화주별로 나눕니다.</b> 기본 비율로 채운 뒤 <b>박스 수를 직접 조정</b>하세요(“더 끊어주기”).
-            각 줄의 합계가 전체수량과 맞아야 확정됩니다. 확정 시 <b>생산내역 × 화주</b>만큼 입고·LOT이 생성됩니다.
+            각 줄의 합계가 전체수량과 맞는지 검산하세요.
+            {' '}<b>지금은 배분이 저장되지 않아</b> 확정 시 생산내역 <b>한 줄당 LOT 하나</b>가 생깁니다(화주 구분 없음).
           </p>
         </header>
 
@@ -164,6 +210,14 @@ export default function WorkSettlementSplitPage() {
         <section className="wsblock">
           <div className="sec-title"><h2>배분</h2><span className="sub">왼쪽은 생산내역 그대로(읽기 전용) · 오른쪽 화주 칸만 입력</span></div>
           <div className="table-wrap">
+            {/* ⚠ 아래 colgroup 폭은 **실제와 다르다.** 이 표는 table-fixed가 아니라
+                auto-layout이므로 브라우저가 내용에 맞춰 늘린다 — 지금은 그게 더 잘 맞아 그대로 둔다.
+                2026-08-03 실측(필요폭, 패딩 10px 포함):
+                  품목명 92 · 구분 87 · 규격 89 · 중량 79 · 수매단가 86 · 실단가 86 ·
+                  용도 79 · 비고 96 · 전체수량 90 · 화주 114/101/83 · 합계 90  → 합 1172
+                배정 합은 942라 전 컬럼이 7~38px씩 모자란다. DESIGN §7-4는 입력칸이 있는 표에
+                table-fixed를 요구하는데(이 표엔 화주 입력칸이 있다), 그때 이 값이 실제로 구속하므로
+                위 실측치로 갈아야 한다. 그러면 총폭이 1170을 넘어 래퍼 안 가로 스크롤이 생긴다. */}
             <table id="split">
               <colgroup>
                 <col style={{ width: 84 }} /><col style={{ width: 72 }} /><col style={{ width: 68 }} /><col style={{ width: 58 }} />
@@ -173,7 +227,7 @@ export default function WorkSettlementSplitPage() {
                 <col style={{ width: 60 }} />
               </colgroup>
               <thead><tr>
-                <th>품목명</th><th>구분</th><th>규격 <span className="dim">(미수)</span></th><th className="ni">중량 <span className="dim">(kg)</span></th>
+                <th>품목명</th><th>구분</th><th>규격 <span className="dim">(미수)</span></th><th className="ni">단위</th>
                 <th className="n">수매단가</th><th className="n">실단가</th><th>용도</th><th>비고</th>
                 <th className="n">전체수량</th>
                 {owners.map((o) => <th key={o} className="oi">{o}</th>)}
@@ -238,12 +292,25 @@ export default function WorkSettlementSplitPage() {
         </section>
 
         <div className="actions">
-          <Link href={`/admin/master/work-settlement/${settlementId}`} className="btn">← 돌아가기</Link>
-          <button className="btn primary" disabled={!allMatch} onClick={() => toast('배분 저장·확정은 아직 미연결입니다(화주 마스터·Airtable 필드 신설 후).', 'info')}>
-            확정 (LOT 생성)
-          </button>
+          <Link href={`/admin/master/work-settlement/${settlementId}`} className="btn ghost">← 작업비 · 생산내역</Link>
+          {!canConfirm && editable && (
+            <span className="cap" style={{ margin: 0 }}>확정은 관리자가 합니다.</span>
+          )}
+          {canConfirm && (
+            <button
+              className="btn primary"
+              onClick={() => void doConfirm()}
+              disabled={submitting || !editable || !lines.length}
+            >
+              {submitting ? '확정 중…' : '확정 등록 →'}
+            </button>
+          )}
         </div>
-        <p className="cap">⚠ 화면 프로토타입입니다 — 배분 저장과 LOT 생성은 아직 연결되지 않았습니다.</p>
+        <p className="cap">
+          확정하면 생산내역 한 줄마다 재고(LOT)가 생깁니다.
+          {' '}⚠ <b>위 화주별 배분은 아직 저장되지 않습니다</b> — 화주 마스터·Airtable 화주 필드가 신설되기 전까지는
+          {' '}화주 구분 없이 줄당 LOT 1개로 생성됩니다. 지금 배분표는 <b>검산용</b>입니다.
+        </p>
       </div>
 
       <style>{WS_CSS}</style>
@@ -253,18 +320,40 @@ export default function WorkSettlementSplitPage() {
         .ws-page .ratiobar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:10px 0 4px; }
         .ws-page .ratiobar .ri { display:flex; align-items:center; gap:6px; }
         .ws-page .ratiobar .rk { font-size:12px; color:var(--muted); }
-        .ws-page .ratiobar .rv { width:56px; text-align:right; font-variant-numeric:tabular-nums;
-          border:1px solid var(--line); border-radius:6px; padding:4px 6px; font-size:14px; }
+        /* 비율은 두 자리(40·20)가 기본. 실측 14px tabular: 2자리 19.7 / 3자리 29.5,
+           padding 8 + border 2 = 10 → 42px면 2자리는 넉넉하고 100(3자리)도 잘리지 않는다. */
+        .ws-page .ratiobar .rv { width:42px; text-align:center; font-variant-numeric:tabular-nums;
+          border:1px solid var(--line); border-radius:6px; padding:4px; font-size:14px; }
         .ws-page .ratiobar .rp { font-size:12px; color:var(--muted); }
         .ws-page .ratiobar .rsum { font-size:12px; padding:2px 8px; border-radius:10px; }
         .ws-page .ratiobar .rsum.ok { background:var(--green-soft); color:var(--green-ink); }
         .ws-page .ratiobar .rsum.warn { background:var(--amber-soft); color:var(--amber-ink); }
         .ws-page #split th.oi { text-align:center; color:var(--accent-ink); }
         .ws-page #split td.oc { text-align:center; }
-        .ws-page #split td.oc .oin { width:64px; text-align:right; font-variant-numeric:tabular-nums;
-          border:1px solid var(--line); border-radius:6px; padding:4px 6px; font-size:14px; background:var(--band); }
+        /* 배분 박스수는 네 자리(1,000박스대)까지. 실측 4자리 39.3 + padding 8 + border 2 = 49.3
+           → 54px(여유 4.7). 실제 값은 대개 3자리라 그만큼 헐렁해 보이던 것을 줄였다. */
+        .ws-page #split td.oc .oin { width:54px; text-align:center; font-variant-numeric:tabular-nums;
+          border:1px solid var(--line); border-radius:6px; padding:4px; font-size:14px; background:var(--band); }
+        /* 읽기 전용 평문 셀에 좌우 패딩 — WS_CSS의 tbody td는 padding:0이고 입력칸·.roval이
+           안에서 패딩을 갖는 구조다. 배분표 왼쪽 절반은 평문이라 값이 셀 경계에 딱 붙어,
+           우측정렬 숫자와 좌측정렬 텍스트가 만나는 자리에서 '57,495원원프로즌'처럼 붙어 읽혔다.
+           헤더(thead th)가 좌우 10px이므로 같은 10px로 맞춰 헤더-값 세로선을 일치시킨다.
+           컬럼 간격은 가운데 정렬이 아니라 패딩으로 맞춘다(CLAUDE.md 표 규칙 §여백). */
+        .ws-page #split tbody td.txt, .ws-page #split tbody td.n { padding:10px; white-space:nowrap; }
         .ws-page #split td.n, .ws-page #split th.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
         .ws-page #split th.ni { text-align:right; }
+
+        /* 지시 정렬(2026-08-03) — 구분·규격·단위·용도·비고는 헤더와 값을 함께 가운데로,
+           합계는 헤더만 가운데(값은 다른 숫자 컬럼과 우측선을 맞춘다).
+           DESIGN §7-6은 중앙 정렬을 금하지만, 이 컬럼들은 값 길이가 짧고 일정해 자릿수가
+           깨지지 않는다는 판단 — 2026-07-31 작업 정산 목록에서 이미 허용한 좁은 예외와 같다.
+           td.txt/td.n이 여러 컬럼에 겹쳐 붙어 있어 클래스로는 못 고르므로 nth-child로 짚는다. */
+        .ws-page #split thead th:nth-child(2), .ws-page #split tbody td:nth-child(2),
+        .ws-page #split thead th:nth-child(3), .ws-page #split tbody td:nth-child(3),
+        .ws-page #split thead th:nth-child(4), .ws-page #split tbody td:nth-child(4),
+        .ws-page #split thead th:nth-child(7), .ws-page #split tbody td:nth-child(7),
+        .ws-page #split thead th:nth-child(8), .ws-page #split tbody td:nth-child(8) { text-align:center; }
+        .ws-page #split thead th:last-child { text-align:center; }
         .ws-page #split .okn { color:var(--green-ink); }
         .ws-page #split .badn { color:var(--danger-ink); font-weight:600; }
         .ws-page #split td.dimtxt { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

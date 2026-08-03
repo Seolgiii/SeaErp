@@ -154,6 +154,7 @@ function SettlementTable({
   /** MASTER만 삭제·취소 버튼을 본다. 서버가 재검증하므로 이건 노출 제어일 뿐이다. */
   canDelete: boolean;
 }) {
+  const router = useRouter();
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-body">
@@ -165,13 +166,38 @@ function SettlementTable({
             <NumHead className="px-5 py-2.5">생산내역</NumHead>
             <NumHead className="pl-5 py-2.5 pr-[21px]">어대금</NumHead>
             <th className="px-5 py-2.5 text-left">작성</th>
+            <th className="px-5 py-2.5 text-left">최종 수정</th>
             <th className="px-5 py-2.5 text-center">상태</th>
             <th className="px-5 py-2.5" />
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="border-t border-gray-50">
+          {rows.map((r) => {
+            // 임시저장 = 아직 쓰는 중인 건 → 행 어디를 눌러도 이어서 작성으로.
+            // 확정·취소 건은 더 쓸 게 없어 행 클릭을 주지 않는다(빈 반응이 더 헷갈린다).
+            const resumable = r.status === '임시저장';
+            const open = () => router.push(`/admin/master/work-settlement/${r.id}`);
+            return (
+            <tr
+              key={r.id}
+              className={`border-t border-gray-50 ${
+                resumable ? 'cursor-pointer transition-colors hover:bg-surface-alt' : ''
+              }`}
+              {...(resumable && {
+                onClick: open,
+                // 행 클릭은 마우스 전용이 되기 쉬워 키보드 진입로를 같이 연다.
+                // 표 안 유일한 이동 수단이라 tabIndex=-1(행 액션 규칙)의 예외로 둔다.
+                tabIndex: 0,
+                role: 'link',
+                'aria-label': `${r.no || r.date} 이어서 작성`,
+                onKeyDown: (e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    open();
+                  }
+                },
+              })}
+            >
               <td className="px-5 py-2.5 text-center font-medium tabular-nums text-gray-900">{r.no || '—'}</td>
               <td className="px-5 py-2.5 text-center tabular-nums text-gray-700">{r.date || '—'}</td>
               <td className="px-5 py-2.5 text-center text-gray-800">{shipName(r.shipId)}</td>
@@ -182,33 +208,30 @@ function SettlementTable({
                 unit="원"
                 empty="—"
               />
-              {/* 누가 언제 만들었는지. 최종 수정 흔적은 title로 보조 노출한다 —
-                  한 셀에 두 줄을 넣으면 행 높이가 들쭉날쭉해진다(/admin 표 규칙). */}
+              {/* 작성 ⟂ 최종 수정 — 전원이 고칠 수 있는 기록이라 '누가 만들었나'와
+                  '지금 누구 손을 거쳤나'가 다르다. 한 셀에 두 줄을 넣으면 행 높이가
+                  들쭉날쭉해지므로(/admin 표 규칙) 컬럼을 나눈다. */}
+              <td className="whitespace-nowrap px-5 py-2.5 text-left text-label text-text-muted">
+                {formatStamp(r.createdAt, r.createdByName)}
+              </td>
               <td
                 className="whitespace-nowrap px-5 py-2.5 text-left text-label text-text-muted"
-                title={
-                  r.updatedAt
-                    ? `최종 수정 ${formatStamp(r.updatedAt, r.updatedByName)}`
-                    : undefined
-                }
+                // 저장된 적이 없으면 빈다 — 2026-08-03 이전 건은 한 번 저장해야 채워진다.
+                title={r.updatedAt ? undefined : '저장된 적이 없습니다 (2026-08-03 이전 등록 건)'}
               >
-                {formatStamp(r.createdAt, r.createdByName)}
+                {formatStamp(r.updatedAt, r.updatedByName)}
               </td>
               <td className="px-5 py-2.5 text-center">
                 <StatusBadge status={r.status} />
               </td>
               <td className="px-5 py-2.5 text-right whitespace-nowrap">
-                {r.status === '임시저장' && (
-                  <Link
-                    href={`/admin/master/work-settlement/${r.id}`}
-                    className="mr-3 text-label text-link hover:text-accent-fill-hover"
-                  >
-                    이어서 작성 →
-                  </Link>
-                )}
                 {canDelete && r.status !== '취소' && (
                   <button
-                    onClick={() => onCancel(r)}
+                    // 행 클릭(이어서 작성)이 함께 발동하면 지우려다 편집 화면으로 끌려간다.
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCancel(r);
+                    }}
                     className="text-label text-danger-ink hover:text-danger-ink"
                   >
                     {r.status === '임시저장' ? '삭제' : '취소'}
@@ -216,7 +239,8 @@ function SettlementTable({
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -52,8 +52,8 @@ const COST_COLS: TableCol[] = [
 const RATE_COLS: TableCol[] = [
   { key: 'product', label: '가공품', px: 132 }, // max `가시제거고등어`
   { key: 'price', label: '단가', px: 92, numeric: true },
-  // 배지 `원물 중량 기준`(저장값은 `투입kg당`) — 실측 79 + 여유 8 + 셀 패딩 32 = 119 (§7-2)
-  { key: 'basis', label: '기준', px: 120 },
+  // 배지 `가공품 중량 기준`(저장값은 `산출kg당`)이 최댓값 — 실측 88 + 여유 8 + 셀 패딩 32 = 128 (§7-2)
+  { key: 'basis', label: '기준', px: 128 },
   { key: 'period', label: '적용기간', px: 188 },
   { key: 'memo', label: '비고', px: 200, clamp: true }, // 자유 텍스트 → 상한 + 말줄임(§7-2 예외)
 ];

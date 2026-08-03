@@ -10,14 +10,13 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { getSeoulTodayISO, tryParseInboundDateInput } from '@/lib/inbound-date-input';
-import { readSession, isSessionExpired, isAdminRole } from '@/lib/session';
+import { readSession, isSessionExpired } from '@/lib/session';
 import { formatStamp } from '@/lib/format-datetime';
 import { formatNum } from '@/lib/number-format';
 import { toast } from '@/lib/toast';
 import {
   saveWorkSettlement,
   saveWorkSettlementHeader,
-  confirmWorkSettlement,
   getWorkSettlementDetail,
   getStorageBoxTypeFees,
   type SaveWorkSettlementInput,
@@ -50,8 +49,6 @@ export default function WorkSettlementStep2Page() {
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState('');
   const [no, setNo] = useState('');
-  // 확정 버튼 노출용(관리자만). 실제 차단은 서버 confirmWorkSettlement → requireAdmin.
-  const [canConfirm, setCanConfirm] = useState(false);
   // 작성·최종수정 흔적 — 전원이 고칠 수 있는 기록이라 화면에 항상 띄워둔다.
   const [stamp, setStamp] = useState({ createdAt: '', createdByName: '', updatedAt: '', updatedByName: '' });
 
@@ -81,8 +78,7 @@ export default function WorkSettlementStep2Page() {
   useEffect(() => {
     const s = readSession();
     if (!s || isSessionExpired(s)) return setAuthError('로그인이 필요합니다.');
-    // 작성·수정은 전원 개방(2026-08-03). 확정만 관리자 — 아래 canConfirm으로 버튼을 가린다.
-    setCanConfirm(isAdminRole(s));
+    // 작성·수정은 전원 개방(2026-08-03). 확정은 ③ 배분 화면에서, 관리자만.
     setReady(true);
     void (async () => {
       const [pr, st, sh, d] = await Promise.all([
@@ -341,19 +337,29 @@ export default function WorkSettlementStep2Page() {
       } else toast(res.error ?? '임시저장 실패', 'error');
     } finally { setSubmitting(false); }
   };
-  const doConfirm = async () => {
+  /**
+   * ③ 배분으로 이동 — 저장부터 하고 넘어간다. **확정으로 가는 유일한 길이다.**
+   *
+   * 2026-08-03: 확정 등록 버튼을 이 화면에서 빼고 ③ 배분으로 옮겼다. 실무 흐름이
+   * ①→②→③이고 확정은 마지막에 오는데, ②에 확정이 같이 있으면 배분과 나란히 놓여
+   * 무엇이 다른지 읽히지 않았다(확정 이력 0건 — 실제로 아무도 안 눌렀다).
+   *
+   * 배분 화면은 `getWorkSettlementDetail`로 생산내역을 **서버에서 다시 읽는다.**
+   * 저장 없이 이동하면 방금 입력한 줄이 빠진 채 배분표가 그려져, 화면상 수량과
+   * 실제 저장된 수량이 어긋난 상태로 박스를 나누게 된다.
+   * 저장 검증(생산내역 필수)에 걸리면 이동하지 않는다 — 생산내역 없는 배분은 의미가 없다.
+   */
+  const doSplit = async () => {
     const s = readSession();
     if (!s || isSessionExpired(s)) return toast('로그인이 필요합니다.', 'error');
     const payload = buildPayload();
     if (!payload) return;
-    if (!confirm('확정하면 생산내역별로 재고(LOT)가 생성됩니다. 진행할까요?')) return;
     setSubmitting(true);
     try {
-      const saved = await saveWorkSettlement(s.workerId, payload);
-      if (!saved.success) { toast(saved.error ?? '저장 실패', 'error'); return; }
-      const res = await confirmWorkSettlement(s.workerId, settlementId);
-      if (res.success) { toast(`확정 완료 — LOT ${res.data.lotCount}개 생성`, 'success'); router.push('/admin/master/work-settlement'); }
-      else toast(res.error ?? '확정 실패', 'error');
+      const res = await saveWorkSettlement(s.workerId, payload);
+      if (!res.success) return toast(res.error ?? '저장 실패', 'error');
+      markEdited(res.data.updatedAt, s.workerName);
+      router.push(`/admin/master/work-settlement/${settlementId}/split`);
     } finally { setSubmitting(false); }
   };
 
@@ -381,7 +387,8 @@ export default function WorkSettlementStep2Page() {
           <div className="steps">
             <span>① 사전기입</span><span className="sep">→</span>
             <span className="on">② 작업비 · 생산내역</span><span className="sep">→</span>
-            <Link href={`/admin/master/work-settlement/${settlementId}/split`}>③ 배분</Link>
+            {/* ③은 화주가 여럿일 때만 거치는 선택 단계다 — ①②처럼 반드시 밟는 길이 아니다. */}
+            <Link href={`/admin/master/work-settlement/${settlementId}/split`}>③ 배분 (선택)</Link>
           </div>
           <p className="lede">정산서 나온 뒤 <b>생산내역</b>과 <b>작업비</b>를 채웁니다. 생산내역 <b>구분</b>을 고르면 작업비 수량이 자동 합산되고, <b>지급처</b> 선택 시 동결비·입출고비 단가가 자동 채워집니다. <b>확정</b> 시 생산내역별 재고(LOT)가 생성됩니다.</p>
         </header>
@@ -443,7 +450,7 @@ export default function WorkSettlementStep2Page() {
             <table id="prod">
               <colgroup><col style={{ width: 84 }} /><col style={{ width: 92 }} /><col style={{ width: 56 }} /><col style={{ width: 68 }} /><col style={{ width: 58 }} /><col style={{ width: 60 }} /><col style={{ width: 84 }} /><col style={{ width: 96 }} /><col style={{ width: 88 }} /><col style={{ width: 100 }} /><col style={{ width: 96 }} /><col style={{ width: 108 }} /><col style={{ width: 90 }} /><col style={{ width: 34 }} /></colgroup>
               <thead><tr>
-                <th>품목명</th><th>구분</th><th>지방도</th><th>규격 <span className="dim">(미수)</span></th><th className="ni">중량 <span className="dim">(kg)</span></th><th className="ni">수량</th><th className="ni">수매단가</th>
+                <th>품목명</th><th>구분</th><th>지방도</th><th>규격 <span className="dim">(미수)</span></th><th className="ni">단위</th><th className="ni">수량</th><th className="ni">수매단가</th>
                 <th className="n">금액</th><th className="n">실단가</th><th className="n">실금액</th><th>용도</th><th>행선지 <span className="dim">(용도별)</span></th><th>비고</th><th />
               </tr></thead>
               <tbody>
@@ -534,16 +541,18 @@ export default function WorkSettlementStep2Page() {
           <div className="sum-item hl"><span className="k">총 재고원가 <em>실금액</em></span><span className="v">{fmt(buyTotal + costTotal)}</span></div>
         </section>
 
+        {editable && (
+          <p className="cap" style={{ margin: '0 2px 8px' }}>
+            다 채웠으면 <b>화주 배분</b>으로 넘어가세요. 저장하고 이동하며, <b>확정은 배분 화면에서</b> 합니다.
+          </p>
+        )}
+
         <div className="actions">
-          {/* 확정은 관리자만 — 입고관리·LOT을 만들고 재고원가를 확정하는 되돌리기 어려운 동작이다.
-              작업자에게는 버튼을 숨기고 왜 없는지 한 줄로 알린다(사라진 버튼을 찾게 두지 않는다). */}
-          {!canConfirm && editable && (
-            <span className="cap" style={{ margin: 0 }}>확정은 관리자가 합니다. 작성 후 임시저장하세요.</span>
-          )}
           <button className="btn ghost" onClick={() => void doSave()} disabled={submitting || !ready || !editable}>{submitting ? '저장 중…' : '임시저장'}</button>
-          {canConfirm && (
-            <button className="btn primary" onClick={() => void doConfirm()} disabled={submitting || !ready || !editable}>확정 등록 →</button>
-          )}
+          {/* 전진 버튼은 하나뿐 — 확정은 ③ 배분에서 한다. 저장하고 넘어간다. */}
+          <button className="btn primary" onClick={() => void doSplit()} disabled={submitting || !ready || !editable}>
+            화주 배분 →
+          </button>
         </div>
       </div>
       <style dangerouslySetInnerHTML={{ __html: WS_CSS }} />

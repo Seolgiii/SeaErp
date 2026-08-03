@@ -79,13 +79,13 @@ const GLOSSARY: Entry[] = [
   {
     term: 'ONE-Frozen',
     aka: '원프로즌 · 1회 동결',
-    def: '제주 내 가공. 원물을 그대로 가공공장으로 옮겨 바로 작업 후 1회 동결. 임가공비는 투입 kg당 청구.',
+    def: '제주 내 가공. 원물을 그대로 가공공장으로 옮겨 바로 작업 후 1회 동결. 임가공비는 원물 중량 기준으로 청구.',
     cat: '가공',
   },
   {
     term: 'TWO-Frozen',
     aka: '투프로즌 · 재동결',
-    def: '부산·해외 가공. 냉동(1차) → 해동 → 가공(가시제거 등) → 재동결 → 수출 후 재수입. 국내 임가공비가 비싸 해외에서 가시제거. 임가공비는 산출 kg당 청구.',
+    def: '부산·해외 가공. 냉동(1차) → 해동 → 가공(가시제거 등) → 재동결 → 수출 후 재수입. 국내 임가공비가 비싸 해외에서 가시제거. 임가공비는 가공품 중량 기준으로 청구.',
     cat: '가공',
   },
   // 원가
@@ -277,7 +277,7 @@ export default function WikiPage() {
                 name="가공원가"
                 state="제품(필렛) 보유"
                 formula="(투입 원물의 재고원가 + 총임가공비) ÷ 산출kg"
-                extra="임가공비: ONE-Frozen=투입kg당 · TWO-Frozen=산출kg당 / 가공공장행 운임 포함"
+                extra="임가공비: ONE-Frozen=원물 중량 기준 · TWO-Frozen=가공품 중량 기준 / 가공공장행 운임 포함"
               />
               <LadderArrow note="출고 · 판매" />
               <LadderTier
@@ -329,7 +329,7 @@ export default function WikiPage() {
                     <td className="px-3 py-2.5 font-bold text-amber-700">ONE-Frozen</td>
                     <td className="px-3 py-2.5">제주 내</td>
                     <td className="px-3 py-2.5 text-gray-600">원물 그대로 이동 → 바로 작업 후 1회 동결</td>
-                    <td className="px-3 py-2.5 font-medium">투입 kg당</td>
+                    <td className="px-3 py-2.5 font-medium">원물 중량 기준</td>
                   </tr>
                   <tr className="border-t border-gray-100">
                     <td className="px-3 py-2.5 font-bold text-amber-700">TWO-Frozen</td>
@@ -337,7 +337,7 @@ export default function WikiPage() {
                     <td className="px-3 py-2.5 text-gray-600">
                       냉동 → 해동 → 가공(가시제거) → 재동결 → 수출 후 재수입
                     </td>
-                    <td className="px-3 py-2.5 font-medium">산출 kg당</td>
+                    <td className="px-3 py-2.5 font-medium">가공품 중량 기준</td>
                   </tr>
                 </tbody>
               </table>

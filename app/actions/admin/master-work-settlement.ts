@@ -265,6 +265,29 @@ function updateStamp(workerId: string, nowIso: string): Record<string, unknown> 
   };
 }
 
+/**
+ * 헤더 레코드를 Airtable `createdTime`까지 함께 가져온다.
+ *
+ * `작성일시` 필드는 2026-08-03에 생겼다. 그 이전 레코드는 값이 없어 화면이 이름만 덩그러니
+ * 보여주는데, Airtable이 모든 레코드에 붙여주는 createdTime이 곧 그 건이 만들어진 시각이라
+ * 폴백으로 쓴다(추정이 아니라 실제 생성 시각이다).
+ * 공용 `getAirtableRecord`는 createdTime을 버리므로 여기서만 직접 읽는다.
+ */
+async function fetchHeaderMeta(
+  id: string,
+): Promise<{ fields: Record<string, unknown>; createdTime: string } | null> {
+  try {
+    const data = (await fetchAirtable(`${encodeURIComponent(HEADER)}/${id}`)) as {
+      fields?: Record<string, unknown>;
+      createdTime?: string;
+    };
+    return { fields: data.fields ?? {}, createdTime: str(data.createdTime) };
+  } catch (e) {
+    logError(`[${TAG}] ${HEADER}/${id} 조회 실패:`, e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 /** 사용자 레코드ID → 작업자명. 목록·상세에서 작성자를 이름으로 보여주기 위한 1회 조회. */
 async function fetchWorkerNames(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
@@ -685,7 +708,8 @@ export async function listWorkSettlements(
       const params = new URLSearchParams({ pageSize: "100" });
       if (offset) params.set("offset", offset);
       const data = (await fetchAirtable(`${encodeURIComponent(HEADER)}?${params}`)) as {
-        records?: { id: string; fields?: Record<string, unknown> }[];
+        // createdTime = 작성일시 폴백(2026-08-03 이전 레코드는 그 필드가 비어 있다).
+        records?: { id: string; fields?: Record<string, unknown>; createdTime?: string }[];
         offset?: string;
       };
       for (const r of data.records ?? []) {
@@ -701,7 +725,7 @@ export async function listWorkSettlements(
           catchAmount: num(f["어대금"]),
           lineCount: Array.isArray(lineLinks) ? lineLinks.length : 0,
           memo: str(f["비고"]),
-          createdAt: str(f["작성일시"]),
+          createdAt: str(f["작성일시"]) || str(r.createdTime),
           createdByName: nameOf(f["작업자"]),
           updatedAt: str(f["최종수정일시"]),
           updatedByName: nameOf(f["최종수정자"]),
@@ -774,8 +798,9 @@ export async function getWorkSettlementDetail(
   if (!auth.success) return { success: false, error: auth.error };
   if (!isRec(settlementId)) return { success: false, error: "정산 건이 지정되지 않았습니다." };
 
-  const h = await fetchRecord(HEADER, settlementId);
-  if (!h) return { success: false, error: "정산 건을 찾을 수 없습니다." };
+  const meta = await fetchHeaderMeta(settlementId);
+  if (!meta) return { success: false, error: "정산 건을 찾을 수 없습니다." };
+  const h = meta.fields;
 
   const [lineRecs, costRecs] = await Promise.all([
     fetchLinesByField(LINE, "정산ID", settlementId),
@@ -825,7 +850,7 @@ export async function getWorkSettlementDetail(
       id: settlementId,
       no: str(h["정산번호"]),
       status: selectName(h["상태"]),
-      createdAt: str(h["작성일시"]),
+      createdAt: str(h["작성일시"]) || meta.createdTime,
       createdByName: nameOf(h["작업자"]),
       updatedAt: str(h["최종수정일시"]),
       updatedByName: nameOf(h["최종수정자"]),

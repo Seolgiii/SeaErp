@@ -310,6 +310,17 @@ function KpiCard({
 // 카테고리 카드
 // ──────────────────────────────────────────────────────────────────────────────
 
+/**
+ * 카테고리 카드 — 제목 + 그 안의 화면 목록.
+ *
+ * 2026-08-03: 카드 **전체**가 하나의 `<Link href={firstEnabled}>`이었다. 그래서 목록의
+ * 어느 항목을 눌러도 카테고리의 첫 화면 한 곳으로만 갔다(재고 집계를 눌러도 재고 조회로).
+ * 항목마다 제 링크를 갖도록 쪼갠다 — 링크 중첩은 불가라 카드는 평범한 div가 되고,
+ * 카드 제목만 첫 화면 링크를 유지한다(기존 "카드 클릭 = 카테고리 진입" 감각 보존).
+ *
+ * 준비중 항목도 클릭 가능하다 — 사이드바(`_nav.ts` + `[...slug]` catch-all)와 같은 규약이고,
+ * CLAUDE.md가 "IA 전체 구도 시각화"를 위한 의도된 동작으로 기록해 둔 것이다.
+ */
 function CategoryCard({ group }: { group: NavGroup }) {
   const Icon = CATEGORY_ICONS[group.title] ?? CubeIcon;
   const iconClass = CATEGORY_COLORS[group.title] ?? 'text-gray-600 bg-gray-100';
@@ -317,53 +328,56 @@ function CategoryCard({ group }: { group: NavGroup }) {
   const totalCount = group.items.length;
   const firstEnabled = group.items.find((i) => i.enabled);
 
-  const inner = (
-    <>
-      <div className="flex items-start gap-3 mb-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconClass} shrink-0`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-black text-gray-900">{group.title}</p>
-          <p className="text-[11px] font-bold text-gray-400 mt-0.5">
-            {enabledCount}/{totalCount} 활성
-          </p>
-        </div>
+  const header = (
+    <div className="flex items-start gap-3">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconClass} shrink-0`}>
+        <Icon className="w-5 h-5" />
       </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[15px] font-black text-gray-900">{group.title}</p>
+        <p className="text-[11px] font-bold text-gray-400 mt-0.5">
+          {enabledCount}/{totalCount} 활성
+        </p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      className={`bg-white rounded-2xl p-5 shadow-sm border border-transparent transition-all ${
+        firstEnabled ? 'hover:border-[#3182F6]/30 hover:shadow-md' : 'opacity-70'
+      }`}
+    >
+      {/* 제목 — 카테고리 첫 활성 화면으로. 활성 화면이 하나도 없으면 링크 없이 텍스트만. */}
+      {firstEnabled ? (
+        <Link href={firstEnabled.href} className="block mb-3 rounded-lg hover:opacity-80">
+          {header}
+        </Link>
+      ) : (
+        <div className="mb-3">{header}</div>
+      )}
+
       <ul className="space-y-1.5">
         {group.items.map((item) => (
-          <li
-            key={item.href}
-            className={`flex items-center justify-between text-[12px] font-bold ${
-              item.enabled ? 'text-gray-700' : 'text-gray-300'
-            }`}
-          >
-            <span className="truncate">{item.label}</span>
-            {!item.enabled && (
-              <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 shrink-0 ml-2">
-                준비중
-              </span>
-            )}
+          <li key={item.href}>
+            {/* 항목마다 제 링크. -mx-2 px-2로 hover 배경이 카드 padding까지 넓게 깔린다. */}
+            <Link
+              href={item.href}
+              className={`-mx-2 flex items-center justify-between rounded-lg px-2 py-1 text-[12px] font-bold transition-colors hover:bg-gray-50 ${
+                item.enabled ? 'text-gray-700 hover:text-[#3182F6]' : 'text-gray-300'
+              }`}
+              title={item.enabled ? undefined : '준비 중 — 클릭하면 안내 화면이 표시됩니다'}
+            >
+              <span className="truncate">{item.label}</span>
+              {!item.enabled && (
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 shrink-0 ml-2">
+                  준비중
+                </span>
+              )}
+            </Link>
           </li>
         ))}
       </ul>
-    </>
-  );
-
-  if (!firstEnabled) {
-    return (
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-transparent opacity-70 cursor-not-allowed">
-        {inner}
-      </div>
-    );
-  }
-
-  return (
-    <Link
-      href={firstEnabled.href}
-      className="group block bg-white rounded-2xl p-5 shadow-sm border border-transparent hover:border-[#3182F6]/30 hover:shadow-md transition-all"
-    >
-      {inner}
-    </Link>
+    </div>
   );
 }

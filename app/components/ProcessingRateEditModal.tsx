@@ -277,7 +277,7 @@ export default function ProcessingRateEditModal({
         required
         error={errors.basis}
         htmlFor="rate-basis"
-        hint="ONE-Frozen(제주)=원물 중량 기준 · TWO-Frozen(부산·해외)=산출kg당"
+        hint="ONE-Frozen(제주)=원물 중량 기준 · TWO-Frozen(부산·해외)=가공품 중량 기준"
       >
         <select
           id="rate-basis"
