@@ -1,11 +1,14 @@
 ---
-description: 오늘 작업을 journal.md에 정리하고 CLAUDE.md를 갱신한 뒤 코드 변경과 함께 커밋·푸시
+description: 오늘 작업을 docs/journal.md에 정리한 뒤 코드 변경과 함께 커밋·푸시
 ---
 
 # /wrap-up
 
-오늘 세션의 작업을 journal.md에 추가하고 CLAUDE.md "최근 변경" 섹션을 갱신한 뒤,
+오늘 세션의 작업을 docs/journal.md에 추가한 뒤,
 사용자 확인을 거쳐 **그날 세션에서 남은 코드 변경까지 함께** git에 기록합니다.
+
+> 2026-08-04 변경: CLAUDE.md에 "최근 변경" 섹션을 쌓던 4단계를 폐지했다. CLAUDE.md는 규칙만
+> 담고, 이력은 docs/journal.md 단독으로 간다(CLAUDE.md 「이 파일의 쓰기 정책」 참조).
 
 > 2026-07-31 변경: 예전엔 journal.md·CLAUDE.md만 커밋·푸시하고 코드 변경은 항상 로컬에
 > 남았다(로컬↔배포 화면 불일치의 원인). 지금은 5단계에서 코드 변경 목록도 사용자 확인에
@@ -25,9 +28,9 @@ description: 오늘 작업을 journal.md에 정리하고 CLAUDE.md를 갱신한 
 - 보조 자료로 `git log --since="<오늘 00:00 KST>" --pretty=format:"%h %s"` 호출
 - 한 줄짜리 fix·typo 같은 것은 묶어서 1줄로 압축
 
-## 3. journal.md에 새 섹션 추가
+## 3. docs/journal.md에 새 섹션 추가
 
-파일 위치: 프로젝트 루트 `journal.md`
+파일 위치: `docs/journal.md`
 
 규칙:
 - 파일 최상단의 헤더·기간 표시는 건드리지 않는다
@@ -54,24 +57,18 @@ description: 오늘 작업을 journal.md에 정리하고 CLAUDE.md를 갱신한 
 - 항목 (우선순위 높은 것부터)
 ```
 
-## 4. CLAUDE.md "최근 변경" 섹션 갱신
+## 4. CLAUDE.md — 원칙적으로 건드리지 않는다
 
-파일 위치: 프로젝트 루트 `CLAUDE.md`
+CLAUDE.md는 규칙이 바뀐 경우에만 해당 줄을 고친다. "최근 변경" 섹션을 만들지 않는다.
+세션 요약·변경 이력은 docs/journal.md에만 쓴다.
 
-규칙:
-- `■ 최근 변경 (YYYY-MM-DD)` 섹션이 없으면 헤더 직후(첫 줄 빈 줄 뒤)에 새로 추가
-- 이미 있으면 통째로 교체
-- 본문은 1~3줄로 오늘 작업 헤드라인만 (상세 X)
-- 다른 섹션은 절대 건드리지 않음
+- 오늘 **규칙 자체가 바뀐 게 없으면 이 단계는 스킵한다** (대부분의 날이 여기 해당).
+- 규칙이 바뀌었으면 CLAUDE.md의 해당 줄을 고친다. 파일 아래에 덧붙이지 않는다.
+- 작업 이력·진행률·완성도·측정 수치(테스트 개수·파일 수·건수)는 어떤 경우에도 쓰지 않는다.
+- 판단이 서지 않으면 쓰지 말고 사용자에게 묻는다.
 
-**형식:**
-
-```
-■ 최근 변경 (YYYY-MM-DD)
-- 핵심 변경 1
-- (선택) 핵심 변경 2
-- (선택) 핵심 변경 3
-```
+근거: CLAUDE.md는 매 세션 컨텍스트에 통째로 들어간다. 이력이 쌓이면 규칙이 묻히고,
+낡은 상태 기록이 현재 규칙인 것처럼 읽힌다.
 
 ## 4.5. 옵시디언 vault 동기화
 
@@ -79,18 +76,11 @@ description: 오늘 작업을 journal.md에 정리하고 CLAUDE.md를 갱신한 
 
 이 단계는 격리 실행 — 4.5 안의 어떤 동기화가 실패하더라도 이어지는 5~6단계는 정상 진행한다. 절대 /wrap-up 자체를 멈추지 않는다.
 
-### 4.5-A: CLAUDE.md → 00_프로젝트_현황.md 미러링
+### 4.5-A: (폐지)
 
-조건: 4단계에서 CLAUDE.md가 변경됐을 때만 (변경 없으면 스킵)
-동작:
-- 대상 파일: `<repo-root>/obsidian-vault/00_프로젝트_현황.md`
-- 첫 줄 미러 안내문구는 항상 유지:
-
-```
-> 이 노트는 CLAUDE.md의 미러 (자동 동기화)
-
-[CLAUDE.md 전체 내용 그대로]
-```
+CLAUDE.md → `00_프로젝트_현황.md` 미러링은 2026-08-04에 폐지했다. **되살리지 않는다.**
+vault에 규칙 사본이 생기면 사용자가 옵시디언에서 낡은 규칙을 읽게 된다.
+`00_프로젝트_현황.md`에는 저장소 CLAUDE.md를 가리키는 포인터 한 줄만 둔다.
 
 ### 4.5-B: z.Mission_for_all_term.md → 01_비전과_미해결결정.md 미러링
 
@@ -105,11 +95,11 @@ description: 오늘 작업을 journal.md에 정리하고 CLAUDE.md를 갱신한 
 [z.Mission_for_all_term.md 전체 내용 그대로]
 ```
 
-### 4.5-C: journal.md 오늘 항목 → 10_작업일지/{YYYY-MM-DD}.md 분리 저장
+### 4.5-C: docs/journal.md 오늘 항목 → 10_작업일지/{YYYY-MM-DD}.md 분리 저장
 
-조건: 항상 (3단계에서 journal.md에 오늘 날짜 섹션이 추가/보강된 경우)
+조건: 항상 (3단계에서 docs/journal.md에 오늘 날짜 섹션이 추가/보강된 경우)
 동작:
-- `journal.md` 에서 `### {오늘날짜}` 섹션부터 다음 `---` 또는 다음 `### ` 직전까지 추출
+- `docs/journal.md` 에서 `### {오늘날짜}` 섹션부터 다음 `---` 또는 다음 `### ` 직전까지 추출
 - 대상 파일: `<repo-root>/obsidian-vault/10_작업일지/{YYYY-MM-DD}.md`
 - 형식 변환:
   - `### 2026-05-07` → `# 2026-05-07`
@@ -117,7 +107,7 @@ description: 오늘 작업을 journal.md에 정리하고 CLAUDE.md를 갱신한 
   - `**결정 사항**` → `## 결정`
   - `**미해결 이슈**` → `## 미해결`
   - `**다음 작업 후보**` → `## 다음 후보`
-- 같은 날짜 파일이 이미 있으면 **덮어쓰기** (journal.md가 이미 보강 처리한 결과를 그대로 반영)
+- 같은 날짜 파일이 이미 있으면 **덮어쓰기** (docs/journal.md가 이미 보강 처리한 결과를 그대로 반영)
 
 ### 4.5-D: 60_관계도/ 자동 갱신
 
@@ -189,7 +179,7 @@ sync_obsidian() {
     return 0  # vault 없으면 조용히 스킵
   fi
 
-  # 4.5-A, 4.5-B, 4.5-C, 4.5-D 각각 시도. 하나가 실패해도 다음 단계 시도.
+  # 4.5-B, 4.5-C, 4.5-D 각각 시도. 하나가 실패해도 다음 단계 시도. (4.5-A는 폐지)
   # 각 sub-step 안에서 || true 로 개별 격리.
   ...
 }
@@ -214,11 +204,11 @@ sync_relations || echo "⚠️ 관계도 갱신 일부 실패 (기존 흐름 계
 
 ## 5. 코드 변경 확인 (신설, 2026-07-31)
 
-journal.md·CLAUDE.md·옵시디언 vault 말고, 이 세션에서 남은 코드 변경(추적 중 파일 수정 +
+docs/journal.md·CLAUDE.md·옵시디언 vault 말고, 이 세션에서 남은 코드 변경(추적 중 파일 수정 +
 새 파일)이 있는지 확인한다.
 
-- `git status --short -- . ':!journal.md' ':!CLAUDE.md' ':!obsidian-vault'` 로 목록 확보
-  (journal.md·CLAUDE.md·옵시디언은 3~4.5단계에서 이미 처리되므로 제외)
+- `git status --short -- . ':!docs/journal.md' ':!CLAUDE.md' ':!obsidian-vault'` 로 목록 확보
+  (docs/journal.md·CLAUDE.md·옵시디언은 3~4.5단계에서 이미 처리되므로 제외)
 - 변경이 없으면 이 단계는 "코드 변경 없음"으로 기록하고 6단계로
 - 변경이 있으면 파일 경로 목록을 그대로 6단계 확인 메시지에 포함시킨다 — 요약하지 말고 전부 나열
 - **민감 파일 제외**: 목록에 `.env`류, `*.pem`/`*.key`, 이름에 `secret`·`credential`이 들어간
@@ -227,13 +217,13 @@ journal.md·CLAUDE.md·옵시디언 vault 말고, 이 세션에서 남은 코드
 
 ## 6. 사용자 확인
 
-journal.md / CLAUDE.md에 추가하거나 변경한 내용과, 5단계에서 확인한 코드 변경 파일 목록을
-사용자에게 보여준 뒤 정확히 다음 메시지를 출력:
+docs/journal.md에 추가한 내용(그리고 규칙이 바뀌어 CLAUDE.md를 고쳤다면 그 줄)과,
+5단계에서 확인한 코드 변경 파일 목록을 사용자에게 보여준 뒤 정확히 다음 메시지를 출력:
 
-> **빠진 내용 있나요? journal.md, CLAUDE.md, 코드 변경 목록(있는 경우), 옵시디언 vault(있는 경우)를 확인 후 'yes' 입력**
+> **빠진 내용 있나요? docs/journal.md, 코드 변경 목록(있는 경우), 옵시디언 vault(있는 경우)를 확인 후 'yes' 입력**
 
 응답 처리:
-- 사용자가 추가 항목을 알려주면 → journal.md / CLAUDE.md 다시 보강 후 재확인
+- 사용자가 추가 항목을 알려주면 → docs/journal.md 다시 보강 후 재확인
 - 사용자가 코드 변경 목록 중 일부를 빼달라고 하면 → 그 파일들은 7단계 코드 커밋 대상에서 제외
 - 사용자가 `yes`(또는 `Yes`/`YES`/`네`) 응답 시에만 7단계로 진행
 - 그 외 응답은 보강·재확인 반복
@@ -245,11 +235,11 @@ journal.md / CLAUDE.md에 추가하거나 변경한 내용과, 5단계에서 확
 
 ```bash
 # 1) 코드 변경이 있으면 먼저 별도 커밋 (5단계에서 뺀 민감 파일·사용자가 제외 요청한 파일은 제외)
-git add -A -- . ':!journal.md' ':!CLAUDE.md' ':!obsidian-vault'
+git add -A -- . ':!docs/journal.md' ':!CLAUDE.md' ':!obsidian-vault'
 git commit -m "$(cat <<'EOF'
 chore: YYYY-MM-DD 코드 반영
 
-<CLAUDE.md 4단계에서 쓴 오늘의 핵심 변경 헤드라인을 그대로 재사용>
+<3단계에서 docs/journal.md에 쓴 오늘의 핵심 변경 헤드라인을 그대로 재사용>
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
 EOF
@@ -257,7 +247,7 @@ EOF
 # 5단계에서 코드 변경이 없었으면 이 커밋은 스킵한다(빈 커밋 금지)
 
 # 2) docs 커밋
-git add journal.md CLAUDE.md
+git add docs/journal.md CLAUDE.md   # CLAUDE.md는 규칙이 바뀐 날에만 변경분이 생긴다
 # 옵시디언 vault가 존재하면 변경분도 함께 stage (.gitignore가 캐시는 이미 제외)
 [ -d "$(git rev-parse --show-toplevel)/obsidian-vault" ] && git add obsidian-vault/
 git commit -m "$(cat <<'EOF'
@@ -282,10 +272,10 @@ git push origin main
 
 ```
 ✅ YYYY-MM-DD 일일 정리 완료
-- journal.md: 완료 N건 / 결정 N건 / 미해결 N건 / 다음 후보 N건
-- CLAUDE.md: 최근 변경 갱신
+- docs/journal.md: 완료 N건 / 결정 N건 / 미해결 N건 / 다음 후보 N건
+- CLAUDE.md: 규칙 변경 없음 / 규칙 N줄 수정
 - 코드 변경: N개 파일 커밋 <hash> / 변경 없음 / 제외 M개(민감 파일·사용자 제외)
-- 옵시디언: 작업일지·현황 동기화 완료 / 변경 없음 / vault 없음 (스킵) 중 하나
+- 옵시디언: 작업일지 동기화 완료 / 변경 없음 / vault 없음 (스킵) 중 하나
 - 관계도: 큰 그림 갱신 + 시나리오 N개 / 변경 없음 / 60_관계도 없음 (스킵) 중 하나
 - 커밋 <hash들> 푸시됨 (코드 <hash> + docs <hash>, 코드 변경 없으면 docs <hash>만)
 ```
@@ -294,8 +284,9 @@ git push origin main
 
 ## 주의 사항
 
-- journal.md 형식은 본 문서에 명시된 4-카테고리 구조 — **절대 변경 금지**
-- CLAUDE.md는 "최근 변경" 섹션만 수정하고 다른 섹션은 그대로 둔다
+- docs/journal.md 형식은 본 문서에 명시된 4-카테고리 구조 — **절대 변경 금지**
+- CLAUDE.md는 규칙이 바뀐 경우에만 해당 줄을 고친다. "최근 변경" 섹션을 만들지 않는다.
+  세션 요약·변경 이력은 docs/journal.md에만 쓴다. (CLAUDE.md 「이 파일의 쓰기 정책」이 상위 규칙)
 - 같은 날짜에 두 번 `/wrap-up` 시 기존 섹션 보강 (덮어쓰기 X, 중복 추가 X)
 - 사용자가 `yes` 답하기 전엔 절대 git add/commit/push 하지 않는다 — 코드 변경도 예외 없음
 - 코드 변경은 docs 커밋과 **항상 분리한 별도 커밋**으로 만든다 — "기능 변경"과 "일일 문서 정리"가
