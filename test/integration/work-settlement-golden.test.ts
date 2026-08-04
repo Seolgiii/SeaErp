@@ -119,6 +119,10 @@ describe("작업 정산 등록 골든패스", () => {
     // ── LOT 검증: 수매가 = 실단가(재고원가) ──
     const lot11 = lotBySpec("11")!.fields;
     const lot13 = lotBySpec("13")!.fields;
+    // LOT번호 = YYMMDD-품목코드-규격-미수-일련번호. 규격과 미수는 서로 다른 칸에서 온다.
+    // (2026-08-04 회귀 가드: 등록 화면이 규격 값을 미수에도 복사해 `-11-11-`처럼 나오던 버그)
+    expect(lot11.LOT번호).toBe("260415-MC1-11-26-0001");
+    expect(lot13.LOT번호).toBe("260415-MC1-13-20-0002");
     expect(lot11.수매가).toBe(20_000); // 10,000 + 작업단가 10,000
     expect(lot13.수매가).toBe(18_000); // 8,000 + 10,000
     expect(lot11.재고수량).toBe(30);

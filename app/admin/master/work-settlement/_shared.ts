@@ -74,7 +74,9 @@ export type ProdRow = {
   productId: string;
   gubun: string; // 내부 박스종류
   fat: string;
+  /** 표의 '미수' 칸 → LOT.미수(사이즈). 이름은 spec이지만 규격이 아니다. */
   spec: string;
+  /** 표의 '규격(kg/박스)' 칸 → 문자열 그대로 LOT.규격 + 숫자로 파싱되면 중량kg. 둘로 갈리는 건 의도된 것. */
   weight: string;
   qty: string;
   price: string;
@@ -176,8 +178,9 @@ export function prodRowsFromLines(lines: DetailLine[], destName: (id: string) =>
     productId: l.productId,
     gubun: l.boxType,
     fat: l.fatRatio ? String(l.fatRatio) : '',
-    spec: l.spec,
-    weight: l.weightKg ? String(l.weightKg) : '',
+    spec: l.misu,   // ProdRow.spec = 표의 '미수' 칸
+    weight: l.spec || (l.weightKg ? String(l.weightKg) : ''),   // ProdRow.weight = 표의 '규격(kg/박스)' 칸. 규격 문자열 우선, 없으면 중량kg
+
     qty: l.quantity ? fmt(l.quantity) : '',
     price: l.purchaseUnitPrice ? fmt(l.purchaseUnitPrice) : '',
     use: l.usage || '원물동결',

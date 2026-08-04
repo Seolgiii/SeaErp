@@ -250,7 +250,12 @@ export default function WorkSettlementStep2Page() {
       lines: valid.map((r) => ({
         productId: r.productId, productName: products.find((p) => p.id === r.productId)?.name,
         boxType: r.gubun || undefined, fatRatio: pn(r.fat) || undefined,
-        spec: r.spec || undefined, misu: r.spec || undefined, weightKg: pn(r.weight) || undefined,
+        // 규격·미수는 서로 다른 칸에서 온다. 통일하지 말 것.
+        //   r.weight = 표의 '규격(kg/박스)' 칸 → 문자열 그대로 LOT.규격(번호 표기값, `21.5/22`·`L` 가능)
+        //              + 숫자로 파싱되면 중량kg(계산용). 한 입력이 두 필드로 갈리는 건 의도된 것.
+        //   r.spec   = 표의 '미수' 칸 → LOT.미수 (사이즈)
+        // (2026-08-04: 종전엔 r.spec을 규격·미수 양쪽에 복사해 LOT번호가 `-24-24-`로 나왔다)
+        spec: r.weight.trim() || undefined, misu: r.spec.trim() || undefined, weightKg: pn(r.weight) || undefined,
         quantity: pn(r.qty), purchaseUnitPrice: pn(r.price),
         usage: r.use || undefined, destinationId: findStorage(r.dest) || undefined, memo: r.memo || undefined,
       })),
@@ -450,7 +455,7 @@ export default function WorkSettlementStep2Page() {
             <table id="prod">
               <colgroup><col style={{ width: 84 }} /><col style={{ width: 92 }} /><col style={{ width: 56 }} /><col style={{ width: 68 }} /><col style={{ width: 58 }} /><col style={{ width: 60 }} /><col style={{ width: 84 }} /><col style={{ width: 96 }} /><col style={{ width: 88 }} /><col style={{ width: 100 }} /><col style={{ width: 96 }} /><col style={{ width: 108 }} /><col style={{ width: 90 }} /><col style={{ width: 34 }} /></colgroup>
               <thead><tr>
-                <th>품목명</th><th>구분</th><th>지방도</th><th>규격 <span className="dim">(미수)</span></th><th className="ni">단위</th><th className="ni">수량</th><th className="ni">수매단가</th>
+                <th>품목명</th><th>구분</th><th>지방도</th><th>미수</th><th className="ni">규격 <span className="dim">(kg/박스)</span></th><th className="ni">수량</th><th className="ni">수매단가</th>
                 <th className="n">금액</th><th className="n">실단가</th><th className="n">실금액</th><th>용도</th><th>행선지 <span className="dim">(용도별)</span></th><th>비고</th><th />
               </tr></thead>
               <tbody>
@@ -462,7 +467,8 @@ export default function WorkSettlementStep2Page() {
                     <tr className="p-row" key={r.id}>
                       <td className="txt"><Combo value={r.name} placeholder="품목" options={products.map((p) => p.name)} onChange={(v) => {
                         const match = products.find((p) => p.name === v.trim());
-                        patchProd(r.id, { name: v, productId: match?.id ?? '', spec: match && !r.spec ? (match.spec || r.spec) : r.spec });
+                        // r.spec = 미수 칸이므로 품목마스터의 상세규격_표기(미수)를 채운다. (품목마스터의 spec은 규격이라 여기 아님)
+                        patchProd(r.id, { name: v, productId: match?.id ?? '', spec: match && !r.spec ? (match.detailSpec || r.spec) : r.spec });
                       }} /></td>
                       <td className="gubun"><select value={r.gubun} onChange={(e) => patchProd(r.id, { gubun: e.target.value })}>
                         <option value="">—</option>{BOX_INTERNAL.map((b) => <option key={b} value={b}>{BOX_LABEL[b]}</option>)}
