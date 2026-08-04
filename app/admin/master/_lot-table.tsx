@@ -26,9 +26,12 @@ export const cellField =
 // 표시숫자(수량·중량·금액·단가)는 app/admin/_num-cell.tsx 의 NumCell / NumHead 를 쓴다.
 // (옛 NumBox = 셀 왼쪽 고정폭 상자 안 우측정렬 → 앱 전체 표를 '셀 전체 우측정렬'로 통일하며 폐지)
 
-// 입력칸 헤더 — 입력칸 폭(w-24) 상자에 중앙정렬 (경계 있는 상자 위 라벨은 중앙이 정석)
+// 입력칸 헤더 — 입력칸과 같은 폭(w-24)·같은 좌우 패딩(px-2)·우측정렬로 우측선을 일치시킨다.
+// (2026-08-04 실측 정정: 종전엔 '경계 있는 상자 위 라벨은 중앙이 정석'이라 중앙정렬했으나,
+//  헤더 글자 우측끝이 값의 우측선보다 19~24px 안쪽에 맺혀 자릿수 축이 어긋났다.
+//  숫자 열에서 눈은 상자 테두리가 아니라 자릿수를 따라간다 — DESIGN.md §7-6)
 export function NumInputHeader({ children }: { children: ReactNode }) {
-  return <span className="inline-block w-24 text-center">{children}</span>;
+  return <span className="inline-block w-24 px-2 text-right">{children}</span>;
 }
 
 // 섹션 제목 — 상자 없이 작은 아이콘 + 텍스트. anchor=결과물 영역(진하게).

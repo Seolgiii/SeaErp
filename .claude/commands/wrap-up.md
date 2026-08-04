@@ -241,7 +241,7 @@ chore: YYYY-MM-DD 코드 반영
 
 <3단계에서 docs/journal.md에 쓴 오늘의 핵심 변경 헤드라인을 그대로 재사용>
 
-Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 # 5단계에서 코드 변경이 없었으면 이 커밋은 스킵한다(빈 커밋 금지)
@@ -253,7 +253,7 @@ git add docs/journal.md CLAUDE.md   # CLAUDE.md는 규칙이 바뀐 날에만 �
 git commit -m "$(cat <<'EOF'
 docs: YYYY-MM-DD 일일 정리
 
-Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 
@@ -293,6 +293,6 @@ git push origin main
   한 커밋에 섞이면 나중에 `git log`·`git blame`으로 되짚기 어려워진다
 - `.env`·인증서·시크릿으로 보이는 이름의 파일은 6단계 확인 메시지에서 자동 제외로 표시하고,
   사용자가 명시적으로 포함해 달라고 하지 않는 한 절대 스테이징하지 않는다
-- 커밋 메시지 끝에 항상 `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` 포함
+- 커밋 메시지 끝에 항상 `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` 포함
 - 옵시디언 동기화(4.5)는 격리 실행 — 실패해도 1~8단계 흐름은 정상 진행
 - vault 없으면 4.5는 조용히 스킵 (경고 출력 없음)
