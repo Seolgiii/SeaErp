@@ -15,7 +15,7 @@ import { logWarn } from "@/lib/logger";
  *      나갈 때(자사창고가 발행 주체)와 가공공장에서 자사창고로 들어올 때(역시 자사창고가
  *      발행 주체)는 우리 PDF 발행 — 즉 *자사창고 끝점*이 기준임.
  *
- * 영어 매핑 (storage_kind): own / external / processing / other
+ * 영어 매핑 (storage_kind): own / external / processing
  */
 export type StorageKind = "자사창고" | "외부창고" | "가공공장";
 
