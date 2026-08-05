@@ -93,14 +93,9 @@ export function getBaseCredentials() {
   const token = stripWrappingQuotes(rawKey ?? "");
   const baseId = stripWrappingQuotes(rawBase ?? "");
 
-  console.log("[airtable] getBaseCredentials debug:", {
-    AIRTABLE_API_KEY_set: !!rawKey,
-    AIRTABLE_BASE_ID_set: !!rawBase,
-    token_prefix: token.slice(0, 10) || "(empty)",
-    token_length: token.length,
-    baseId_prefix: baseId.slice(0, 6) || "(empty)",
-  });
-
+  // ⚠ 여기에 토큰 진단 로그를 다시 넣지 말 것 (2026-08-05 제거).
+  //   접두 10자 + 정확한 길이 + baseId를 찍고 있었는데, 이 함수는 모든 Airtable 호출의
+  //   진입점이라 요청마다 운영 로그에 쌓였다. 환경변수 누락은 바로 아래 throw가 알려준다.
   if (!token || !baseId) {
     throw new Error("Missing AIRTABLE_API_KEY or AIRTABLE_BASE_ID");
   }
@@ -186,11 +181,9 @@ export async function createAirtableRecord(
   fields: Record<string, unknown>
 ): Promise<{ id: string }> {
   const { token, baseId } = getBaseCredentials();
-  console.log("[Airtable][CREATE] target=", {
-    baseId,
-    tablePath,
-    fields,
-  });
+  // ⚠ `fields`를 로그에 넣지 말 것 — 수매가·단가·금액·출고시점 원가가 통째로 찍힌다.
+  //   어떤 환경에서도 출력하지 않는다. 추적이 필요하면 테이블명·레코드ID까지만.
+  log("[Airtable][CREATE]", { tablePath });
   const res = await fetch(`${API}/${baseId}/${tablePath}`, {
     method: "POST",
     headers: {
@@ -225,12 +218,8 @@ export async function patchAirtableRecord(
   fields: Record<string, unknown>
 ): Promise<void> {
   const { token, baseId } = getBaseCredentials();
-  console.log("[Airtable][PATCH] target=", {
-    baseId,
-    tablePath,
-    recordId,
-    fields,
-  });
+  // ⚠ `fields` 금지 — CREATE 쪽 주석과 같은 이유.
+  log("[Airtable][PATCH]", { tablePath, recordId });
   const res = await fetch(`${API}/${baseId}/${tablePath}/${recordId}`, {
     method: "PATCH",
     headers: {
