@@ -170,7 +170,7 @@ describe("시나리오 17 — 재고보다 많은 출고 거부", () => {
 });
 
 describe("시나리오 18 — zod 스키마 검증 모니터링", () => {
-  test("작업자 fields가 형식 위반이면 [SCHEMA-MISMATCH] console.warn", async () => {
+  test("작업자 fields가 형식 위반이면 [SCHEMA-MISMATCH] 로그", async () => {
     // 비정상 작업자: 활성 필드 타입 위반은 schema의 union으로 통과되지만,
     // PIN을 객체로 넣으면 union(string|number)에 해당 안 됨 → mismatch
     store.seed("사용자", [
@@ -185,7 +185,9 @@ describe("시나리오 18 — zod 스키마 검증 모니터링", () => {
       },
     ]);
 
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // logError → console.error. logWarn(=dev 전용)을 쓰면 이 로그가 운영에서
+    // 사라지므로 채널은 error다 — lib/schemas/common.ts 주석 참조.
+    const warnSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { verifyWorkerPin } = await import("@/lib/airtable");
     // PIN이 깨졌으니 매칭은 실패하지만, 스키마 검증 경고는 발생해야 함

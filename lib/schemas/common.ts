@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { logWarn } from "@/lib/logger";
+import { logError } from "@/lib/logger";
 
 /**
  * Airtable 응답 공통 zod 스키마 헬퍼
@@ -94,13 +94,16 @@ export function reportSchemaIssue(
   });
   // 운영자 grep용 prefix.
   //
-  // ⚠ **logWarn은 개발 환경에서만 출력된다**(lib/logger.ts). 즉 이 [SCHEMA-MISMATCH]
-  //   로그는 지금 production에서 나오지 않는다. "운영자 grep용"이라는 위 설명과
-  //   어긋나므로, 운영에서도 보이게 하려면 `logError`로 바꿔야 한다 (2026-08-05 지시로 logWarn 채택).
+  // ⚠ **`logWarn`을 쓰면 안 된다.** logger.ts 정책상 log/logWarn은 개발 환경에서만
+  //   출력되므로, 그걸 쓰면 이 [SCHEMA-MISMATCH]가 production에서 사라진다 —
+  //   운영에서 스키마 드리프트를 잡자고 만든 로그인데 정반대가 된다.
+  //   전 환경에서 출력되는 래퍼는 `logError` 하나뿐이라 그걸 쓴다.
+  //   (2026-08-05: 실제로 logWarn으로 바꿨다가 시나리오 18 통합 테스트가 깨져서 되돌렸다.
+  //    심각도가 아니라 **출력 환경**을 기준으로 고른 것이다.)
   //
   // 종전 주석의 "logger 의존성 순환 방지" 는 사실이 아니었다 — lib/logger.ts는
   // 아무것도 import하지 않아 순환이 생길 수 없다(2026-08-05 확인).
-  logWarn(
+  logError(
     `[SCHEMA-MISMATCH] ${context}${recordId ? ` (${recordId})` : ""}:`,
     issues.join(" | "),
     error.issues.length > 3 ? `(+${error.issues.length - 3} more)` : "",
