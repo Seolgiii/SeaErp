@@ -19,10 +19,12 @@
  *   하나 더 있다**(2단계 결재). 그래서 이 상수만으로는 지출결의를 다 덮지 못한다.
  *   `["승인 대기", "최종 승인 대기"]` 배열이 코드 4곳에 복제돼 있는 이유가 이것이다
  *   (dashboard.ts · admin.ts · approval-card-shared.ts · my-requests/page.tsx).
- *   이 구멍을 메우는 상수 보강은 아직 안 했다 — docs/RISKS.md 참조.
+ *   그 복제를 단일 출처로 합치는 작업은 아직 안 했다 — docs/RISKS.md 12번.
  */
 export const APPROVAL_STATUS = {
   PENDING: '승인 대기',
+  /** 지출결의 전용 — 2단계 결재의 1차 통과 상태. 다른 4개 테이블에는 이 옵션이 없다. */
+  FINAL_PENDING: '최종 승인 대기',
   APPROVED: '승인 완료',
   REJECTED: '반려',
   CANCELED: '취소',
@@ -50,11 +52,37 @@ export const LOT_STATUS_REASON = {
   TRANSFER_REJECTED: '이동 반려',
   INBOUND_CANCELED: '입고 취소',
   MANUAL_CANCELED: '수동 취소',
+  /** 원물이 가공에 투입돼 소진됨 (상태=소진). master-processing.ts */
+  PROCESSING_IN: '가공 투입',
+  /** 가공 결과물로 새 LOT이 들어옴 (상태=승인 완료). master-processing.ts */
+  PROCESSING_IN_STOCK: '가공 입고',
+} as const;
+
+/**
+ * 가공 배치 상태 (가공 거래.상태) — 2단계 WIP.
+ * 결재 상태가 아니라 가공 작업 자체의 진행 상태다.
+ */
+export const PROCESSING_STATUS = {
+  WIP: '가공 중',
+  DONE: '완료',
+  CANCELED: '취소',
+} as const;
+
+/**
+ * 작업 정산 상태 (작업 정산.상태).
+ * 임시저장=LOT 미생성 초안 / 확정=입고관리·LOT 생성됨 / 취소.
+ */
+export const SETTLEMENT_STATUS = {
+  DRAFT: '임시저장',
+  CONFIRMED: '확정',
+  CANCELED: '취소',
 } as const;
 
 export type ApprovalStatus = (typeof APPROVAL_STATUS)[keyof typeof APPROVAL_STATUS];
 export type LotStatus = (typeof LOT_STATUS)[keyof typeof LOT_STATUS];
 export type LotStatusReason = (typeof LOT_STATUS_REASON)[keyof typeof LOT_STATUS_REASON];
+export type ProcessingStatus = (typeof PROCESSING_STATUS)[keyof typeof PROCESSING_STATUS];
+export type SettlementStatus = (typeof SETTLEMENT_STATUS)[keyof typeof SETTLEMENT_STATUS];
 
 /**
  * 재고 조회·재고장에서 "정상"으로 취급하는 LOT 상태.
