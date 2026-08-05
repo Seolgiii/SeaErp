@@ -952,9 +952,12 @@ async function restoreStockOnOutboundReject(
   //   - 클리어: 단가/냉장료/입출고비/노조비/동결비/손익 — 반려된 거래는 미발생이라 분해 비용·손익 의미 없음
   //   - 제거된 키: "출고시점 판매금액" — currency 컬럼 자체 제거됨 (판매금액 formula로 대체)
   //
-  // 멱등 가드(deductStockOnOutboundApproval)는 여전히 "출고시점 판매원가>0"으로 동작.
-  // 반려 시에도 판매원가가 남아있어 재승인 차단되므로 별도 reset 필요 → 보존하면서도 재승인을 막진 않음.
-  // 사실 반려→재승인은 admin.ts의 currentStatus 분기에서 별도 처리(deductStockOnOutboundApproval 재호출).
+  // 멱등 가드(deductStockOnOutboundApproval)는 "출고시점 단가>0"으로 동작한다 — 위 참조.
+  // ⚠ 2026-08-05 주석 정정: 여기 "여전히 출고시점 판매원가>0으로 동작"이라고 적혀 있었는데
+  //   2026-05-18에 이미 단가 기준으로 바뀐 뒤였다(코드는 그때 함께 고쳐졌고 주석만 남았다).
+  //   판매원가는 아래에서 보존되므로, 그걸 가드로 쓰면 반려 후 재승인이 영구 차단된다.
+  //   그래서 판매원가를 보존하면서도 재승인이 막히지 않는다 — 가드가 단가를 보기 때문이다.
+  // 반려→재승인은 admin.ts의 currentStatus 분기에서 별도 처리(deductStockOnOutboundApproval 재호출).
   const clearOk = await patchRecord("출고 관리", outboundRecordId, {
     "출고시점 단가": null,
     "출고시점 냉장료": null,
