@@ -90,3 +90,46 @@
   저장소를 열게 되고, 그러다 안 고치게 된다). 개정이 뜸해지면 옮긴다.
 - **위치**: `/mnt/c/Users/user/Documents/Obsidian/SEAERP/DESIGN.md` (WSL 기준)
 - **발견일**: 2026-08-04
+
+## 11. 상태 문자열 리터럴 비교가 33개 파일 211곳에 남아 있다
+
+- **증상**: 공백·표기 차이로 조건이 조용히 거짓이 될 수 있다. 2026-07-28 사고와 같은 유형.
+  2026-08-05 전수 대조 결과 **현재 상수값과 어긋난 리터럴은 0건**이다. 다만 상수 테이블이
+  실물보다 좁아 규칙을 지킬 수단이 없는 값이 있다 — Airtable 실물에는 있는데
+  `lib/status.ts`에 없는 것이 `최종 승인 대기`(지출결의 전용) · `가공 투입` · `가공 입고`.
+  코드가 안 쓰는 실물 옵션은 없다(실물 = 코드 사용 집합).
+- **위치**: 상수 사용 3개 파일(`lots/page.tsx`·`lots-depleted/page.tsx`·`StatusBadge.tsx`) /
+  리터럴 33개 파일. 비교 72곳·쓰기 47곳·표시 92곳. 정합성에 직접 걸리는 서버 액션 비교 26곳 —
+  `admin.ts`(12)·`master-cost.ts`(4)·`transfer.ts`(4)·`master-lot-timeline.ts`(2)·
+  `master-processing.ts`(2)·`master-work-settlement.ts`(2)
+- **조치**: 상수 테이블 보강이 먼저다. 그다음 점진 치환 — 다른 작업으로 파일을 열 때 함께 정리.
+- **발견일**: 2026-08-05
+
+## 12. PENDING_STATUSES 배열이 4곳에 복제돼 있다
+
+- **증상**: `["승인 대기", "최종 승인 대기"]`가 4개 파일에 각각 복사돼 있다. 결재 대기 판정의
+  단일 출처가 없어서, 한 곳만 고치면 나머지 3곳이 조용히 어긋난다. 리터럴 오타가 아니라
+  **복제**가 원인인 11번의 변종이다.
+- **위치**: `app/actions/dashboard.ts:10` · `app/actions/admin/admin.ts:50` ·
+  `app/components/approval-card-shared.ts:9` · `app/my-requests/page.tsx:25`
+- **발견일**: 2026-08-05
+
+## 13. status.includes('대기') 부분 문자열 매칭이 4화면에 있다
+
+- **증상**: `'승인 대기'`와 `'최종 승인 대기'`를 한 번에 잡으려고 부분 문자열로 비교한다.
+  지금은 맞지만 **'대기'가 든 상태가 하나라도 늘면 같이 걸린다.** 12번(복제)을 피하려다
+  만들어진 우회로라, 12번을 상수로 풀면 함께 없앨 수 있다.
+- **위치**: `app/admin/master/transactions/` 아래 `inbound`·`outbound`·`expense`·`transfer`
+  각 `page.tsx`의 상태 배지 색 판정
+- **발견일**: 2026-08-05
+
+## 14. Airtable 직접 fetch가 6곳 남아 있다
+
+- **증상**: `lib/airtable.ts` 헬퍼를 우회해 `api.airtable.com`을 직접 호출한다. 인증 헤더·에러
+  처리·zod 검증이 헬퍼와 따로 놀아, 헬퍼 쪽만 고치면 이 6곳은 그대로 남는다.
+- **위치**: `lib/daily-report.ts`(2) · `lib/server-auth.ts`(1) · `app/expense/list/page.tsx`(1) ·
+  `app/api/inventory/product-names/route.ts`(1) · `app/api/inventory/lot-search/route.ts`(1) ·
+  `app/api/inventory/lot-stock/route.ts`(1)
+  (`app/api/debug/*` 3곳은 production 차단 라우트라 의도적 예외 — CLAUDE.md에 명시)
+- **조치**: 일괄 정리하지 않는다. 다른 작업으로 연 파일만 헬퍼로 옮긴다.
+- **발견일**: 2026-08-05
