@@ -27,6 +27,14 @@ const TAG = "master-transactions";
 const num = (v: unknown) => Number(Array.isArray(v) ? v[0] : v) || 0;
 const str = (v: unknown) =>
   Array.isArray(v) ? String(v[0] ?? "").trim() : String(v ?? "").trim();
+/**
+ * 필드가 응답에 실제로 담겨 있는지. **0도 값으로 본다.**
+ *
+ * Airtable은 빈 필드를 응답에서 통째로 뺀다. 그래서 "값이 0"과 "필드가 없음"이
+ * 헷갈리는데, 위 `num()`은 `|| 0` 때문에 둘을 같은 0으로 뭉갠다. 0이 유효값인
+ * 필드를 폴백할 때는 num() 결과가 아니라 이 함수로 **raw를 먼저** 봐야 한다.
+ */
+const present = (v: unknown) => v !== undefined && v !== null && v !== "";
 
 /** link 필드(record id 배열)의 첫 id. */
 const firstId = (v: unknown): string =>
@@ -679,7 +687,18 @@ export async function getOutboundHistory(
       const date = str(f["출고일"]).slice(0, 10);
       if (!date || date < from || date > to) continue;
 
-      const qty = num(f["실출고수량"]) || num(f["출고요청수량"]);
+      // 실출고수량은 formula라 **반려면 의도적으로 0**을 낸다
+      //   `IF({승인상태}='반려', 0, {출고요청수량})`  (docs/airtable-logic.md §1-5)
+      // 종전 `num(실출고수량) || num(출고요청수량)`은 그 0을 falsy로 보고 신청 수량을
+      // 되살려서, 반려된 출고가 수량 합계에 그대로 섞였다(2026-08-05 실측 3건·241박스).
+      //
+      // `??`로는 못 고친다 — num()이 `|| 0`이라 필드 부재도 0으로 만들어서,
+      // num() 결과만 보면 "반려라서 0"과 "필드가 없어서 0"이 구분되지 않는다.
+      // 그래서 raw를 present()로 먼저 본다. (실측 20건 전부 이 필드를 갖고 있어
+      //  폴백 경로는 현재 데이터에서는 안 타지만, 구 레코드 방어로 남긴다.)
+      const qty = present(f["실출고수량"])
+        ? num(f["실출고수량"])
+        : num(f["출고요청수량"]);
       const salePrice = num(f["판매가"]);
       const saleTotal = num(f["판매금액"]) || salePrice * qty;
       const approvalStatus = str(f["승인상태"]) || "(미상)";
