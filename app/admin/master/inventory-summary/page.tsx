@@ -229,9 +229,24 @@ export default function InventorySummaryPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-page text-text">재고 집계</h1>
+          {/* 괄호는 **결재 상태 축**만 설명한다 (위 baseLots ①).
+              전에는 `(승인 완료·소진 LOT 기준)`이었는데, 바로 아래 '소진 LOT 포함' 체크박스가
+              꺼져 있는 상태에서 "소진 LOT 기준"이라고 읽혀 정반대로 오해됐다(2026-08-05).
+              그 '소진'은 재고 0을 뜻한 게 아니라 상태값 '소진'을 나열한 것이었다 —
+              한 화면에서 같은 단어가 두 축을 가리키고 있었다. 상태 축은 '무엇이 빠지는지'로
+              쓰고, 재고 축은 체크박스가 스스로 말하게 둔다.
+
+              재고 축(②)은 여기 쓰지 않는다 — 체크박스와 중복이고, 중복된 두 문장이
+              어긋나는 게 애초에 이 오해의 원인이었다. */}
           <p className="text-body text-text-muted mt-1">
-            {isLoading ? '집계 중...' : `${rows.length}행 · 총 ${formatNum(totals.qty, '박스')} · ${totals.lots}LOT`}
-            <span className="ml-2 text-gray-400">(승인 완료·소진 LOT 기준)</span>
+            {isLoading ? (
+              '집계 중…'
+            ) : (
+              <>
+                {`${rows.length}행 · 총 ${formatNum(totals.qty, '박스')} · ${totals.lots}LOT`}
+                <span className="ml-2 text-gray-400">(반려·취소·승인 대기 제외)</span>
+              </>
+            )}
           </p>
         </div>
       </div>

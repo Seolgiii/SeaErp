@@ -178,7 +178,7 @@ export default function DepletedLotsPage() {
           <h1 className="text-page text-text">소진 LOT</h1>
           <p className="mt-1 text-label text-text-muted">
             재고가 0인 LOT {visible.length}건{isFiltered && ` / 전체 ${items.length}건`}
-            <span className="ml-2">(행을 클릭하면 생애주기 · 조회 전용)</span>
+            <span className="ml-2">· 조회 전용</span>
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

@@ -297,12 +297,28 @@ export default function LotsMasterPage() {
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-page text-text">재고 조회</h1>
+          {/* 순서: 조회 전용 → (건수) → 평가액 합계.
+              `조회 전용`이 늘 앞에 있어 뒤 조각들이 각자 앞에 ` · `를 달면 된다 —
+              구분자가 어디에도 매달리지 않는다.
+
+              건수는 필터가 걸렸을 때만 띄운다 (§6-2 '정상은 조용히').
+              필터가 없으면 `186건 / 전체 186건`이라 스스로를 반복한다.
+
+              ⚠ 반대로 필터가 걸리면 건수는 **필수다.** 평가액 합계는 전체가 아니라
+              `visible` 기준이라(위 totalValuation) 필터만큼 줄어든 금액이 찍힌다. 건수가
+              없으면 그 7억이 전사 재고자산 총액으로 읽힌다. 건수 = "이건 일부다"의 유일한 신호.
+              **그래서 건수는 평가액 바로 앞에 붙인다** — 떼어놓으면 그 연결이 끊긴다.
+
+              '재고가 남은 LOT' 접두어는 뺐다 — 소진 LOT을 별도 화면으로 분리한 뒤로는
+              이 화면에 남은 것만 있다는 게 자명해서 매번 읽히기만 하고 알려주는 게 없었다. */}
           <p className="mt-1 text-label text-text-muted">
-            재고가 남은 LOT {visible.length}건{isFiltered && ` / 전체 ${items.length}건`}
-            {totalValuation > 0 && (
-              <span className="ml-2 text-text">· 평가액 합계 {formatNum(totalValuation, '원')}</span>
+            조회 전용
+            {isFiltered && (
+              <> · <span className="text-text">{visible.length}건 / 전체 {items.length}건</span></>
             )}
-            <span className="ml-2">(행을 클릭하면 생애주기·원가 · 조회 전용)</span>
+            {totalValuation > 0 && (
+              <> · <span className="text-text">평가액 합계 {formatNum(totalValuation, '원')}</span></>
+            )}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
