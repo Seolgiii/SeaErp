@@ -7,6 +7,17 @@
 
 ---
 
+## 0. /api/inbound-receive에 멱등 가드가 없다 (⚠ 런칭 전 필수)
+
+- **증상**: `lib/inbound-airtable.ts:33-42`가 `currentStock + receivedQty`를 그대로 PATCH한다.
+  같은 요청이 두 번 들어오면 **재고가 두 번 더해진다.** 모바일 작업자 경로라
+  더블탭·네트워크 재시도가 실제로 일어난다.
+  `X-Idempotency-Key`도, 도메인 수준 가드(승인상태 재확인 같은)도 없다 —
+  재고를 움직이는 POST 중 유일하게 어느 쪽 보호도 없는 경로다.
+- **위치**: `app/api/inbound-receive/route.ts` → `lib/inbound-airtable.ts:24-53` `receiveInbound()`
+- **조치**: `X-Idempotency-Key` 적용 또는 도메인 수준 가드. 구현은 별도 작업.
+- **발견일**: 2026-08-05
+
 ## 1. 품목마스터에 원물 '갈치'가 없다
 
 - **증상**: 갈치 계열은 `선동갈치 CT1`·`선동알치 CT2`·`육동알치 CT3`·`갈치살 CTF`가 있는데
