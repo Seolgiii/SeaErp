@@ -21,6 +21,7 @@ import QRCode from "qrcode";
 import { NOTO_SANS_KR_REGULAR, NOTO_SANS_KR_BOLD } from "./fonts-base64";
 import { getBaseUrl } from "./base-url";
 import { getCompanyInfo } from "./company-info";
+import { logWarn } from "./logger";
 
 // prebuild 스크립트가 폰트를 base64 data URI 상수로 번들에 포함시킵니다.
 // 파일 시스템 접근이 없으므로 Vercel 서버리스에서도 안정적으로 동작합니다.
@@ -496,7 +497,7 @@ export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> 
         margin: 2,
       });
     } catch (e) {
-      console.warn("[generateInboundPdf] QR 코드 생성 실패 (PDF는 계속 생성):", e);
+      logWarn("[generateInboundPdf] QR 코드 생성 실패 (PDF는 계속 생성):", e);
     }
   }
   return renderToBuffer(<InboundPDF data={data} qrDataUrl={qrDataUrl} />) as Promise<Buffer>;
@@ -523,7 +524,7 @@ export async function generateOutboundPdf(
         margin: 2,
       });
     } catch (e) {
-      console.warn("[generateOutboundPdf] QR 코드 생성 실패 (PDF는 계속 생성):", e);
+      logWarn("[generateOutboundPdf] QR 코드 생성 실패 (PDF는 계속 생성):", e);
     }
   }
   return renderToBuffer(
