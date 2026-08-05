@@ -65,17 +65,30 @@ function pickFault(
  * in-memory store는 formula를 계산하지 않으므로, 실제 Airtable과 동일한 동작을
  * 위해 POST/PATCH 직후 formula 결과 필드를 직접 채워준다.
  *
- *  - 출고 관리.판매금액 = 판매가 × 출고요청수량 (operational formula 필드)
+ *  - 출고 관리.실출고수량 = IF({승인상태}='반려', 0, {출고요청수량})
+ *  - 출고 관리.판매금액   = {판매가} × {실출고수량}
+ *
+ * ⚠ **여기 수식은 실물과 글자 그대로 같아야 한다** (docs/airtable-logic.md §1-5·§1-6).
+ *   2026-08-05 이전에는 판매금액을 `판매가 × 출고요청수량`으로 두고 실출고수량은
+ *   아예 시뮬레이션하지 않았다. 즉 **모의환경이 실물보다 관대했다** — 승인상태가
+ *   무엇이든 판매금액이 양수로 나왔다. 그래서 "반려 → 재승인 때 판매금액 formula가
+ *   0을 낸다"는 실제 버그를 통합 테스트가 구조적으로 잡을 수 없었다.
+ *   Airtable formula를 바꾸면 이 함수도 같이 바꾼다.
  */
 function applyFormulas(table: string, recordId: string): void {
   if (table !== "출고 관리") return;
   const rec = store.get(table, recordId);
   if (!rec) return;
+  const status = String(rec.fields["승인상태"] ?? "").trim();
+  const requested = Number(rec.fields["출고요청수량"]);
+  const actualQty =
+    status === "반려" ? 0 : Number.isFinite(requested) ? requested : 0;
   const salePrice = Number(rec.fields["판매가"]);
-  const qty = Number(rec.fields["출고요청수량"]);
-  const saleAmount =
-    Number.isFinite(salePrice) && Number.isFinite(qty) ? salePrice * qty : 0;
-  store.patch(table, recordId, { 판매금액: saleAmount });
+  const saleAmount = Number.isFinite(salePrice) ? salePrice * actualQty : 0;
+  store.patch(table, recordId, {
+    실출고수량: actualQty,
+    판매금액: saleAmount,
+  });
 }
 
 /**

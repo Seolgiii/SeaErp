@@ -721,7 +721,16 @@ async function deductStockOnOutboundApproval(
       try {
         const num = (v: unknown) =>
           Number(Array.isArray(v) ? v[0] : v) || 0;
-        const saleAmount = num(outFields["판매금액"]);
+        // ⚠ 여기서 `판매금액` formula를 읽지 말 것 (2026-08-05).
+        //   판매금액 = 판매가 × 실출고수량이고, 실출고수량은 승인상태가 '반려'면 0이다.
+        //   이 함수는 **승인상태 PATCH보다 먼저** 실행되므로(updateApprovalStatus:1084),
+        //   반려 → 재승인 경로에서는 :564가 읽은 승인상태가 아직 '반려'다.
+        //   그 상태에서 formula를 읽으면 0이 나오고, 손익이 −원가 전액으로 스냅샷된다.
+        //   출고시점 손익은 PATCH로 저장되는 값이라 나중에 자동으로 바로잡히지 않는다.
+        //
+        //   출고요청수량(outQty, :598에서 검증됨)은 반려되더라도 보존되므로 승인상태와
+        //   무관하다. 승인 후 확정될 금액을 원천값으로 직접 계산한다.
+        const saleAmount = num(outFields["판매가"]) * outQty;
 
         const breakdown = calculateOutboundCost({
           purchasePrice: num(lotFields["수매가"]),
