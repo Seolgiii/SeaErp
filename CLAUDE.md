@@ -10,7 +10,7 @@ Next.js 15 + Airtable + Vercel. 1인 기획·개발 + Claude Code.
   사전 승인을 받는다. 필드 삭제는 어떤 경우에도 직접 하지 않는다. 읽기는 자유.
 
 ## 문서 라우팅
-- UI·화면 작업을 시작하기 전에 DESIGN.md를 읽는다 (WSL: /mnt/c/Users/user/Documents/Obsidian/SEAERP/DESIGN.md).
+- UI·화면 작업을 시작하기 전에 obsidian-vault/DESIGN.md를 읽는다.
 - 업무 흐름·도메인 개념이 필요하면 docs/업무프로세스.md를 읽는다.
 - 미해결 버그·위험은 docs/RISKS.md에 있다. 작업 영역이 거기 걸리는지 먼저 본다.
 - 중장기 목표·단계 계획이 필요하면 docs/ROADMAP.md를 읽는다.
