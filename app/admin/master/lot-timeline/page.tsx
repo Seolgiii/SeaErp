@@ -37,7 +37,7 @@ const EVENT_COLOR: Record<LifecycleEventType, string> = {
   inbound: 'bg-blue-100 text-blue-700',
   'transfer-in': 'bg-emerald-100 text-emerald-700',
   'transfer-out': 'bg-amber-100 text-amber-700',
-  outbound: 'bg-gray-200 text-gray-700',
+  outbound: 'bg-red-100 text-red-700',
 };
 
 const EVENT_ICON: Record<LifecycleEventType, typeof ArrowDownTrayIcon> = {
