@@ -93,6 +93,12 @@ CLAUDE.md에서 이곳으로 옮겼다). 일괄 치환 대상 목록이 아니�
       ※ **대비 미달 실수정**: `#8A9099`(흰 배경 3.22)가 비고·빈 상태·단위 문구에 쓰이고 있었다 → `--muted`(5.36). §2-4 미달이라 §0 "발견 즉시" 예외.
 - [ ] `app/inventory/outbound/page.tsx` — 53곳 (사이즈 33 · 색상 20)
 - [ ] `app/admin/master/lot-timeline/page.tsx` — 51곳 (사이즈 41 · 색상 10)
+      ※ 이 파일을 열 때 `EVENT_COLOR` 4개(`:36-41`)를 **함께** DESIGN 토큰으로 옮긴다 — 지금은 넷 다
+      Tailwind 기본 팔레트(`blue-100`/`emerald-100`/`amber-100`/`red-100`)라 DESIGN.md §"기본 팔레트
+      금지"에 어긋난다. 특히 출고는 `--danger` 계열로 간다. 2026-08-06에 `outbound`를 회색→`red-100`으로
+      바꿀 때 나머지 3개와 맞추려고 기본 팔레트를 그대로 썼다(1개만 토큰화하면 4개 중 1개만 어긋나므로).
+      `statusColor()`(`:615-625`)의 반려 배지도 같이 본다 — DESIGN.md는 반려를 `--danger`로 정의하는데
+      코드는 회색이라, 출고 빨강과 겹쳐 읽히는 문제가 RISKS 17번이다.
 - [ ] `app/inventory/transfer/page.tsx` — 49곳 (사이즈 32 · 색상 17)
 - [ ] `app/inventory/record/page.tsx` — 43곳 (사이즈 35 · 색상 8)
 - [ ] `app/admin/master/approval/inbox/page.tsx` — 39곳 (사이즈 27 · 색상 12)
