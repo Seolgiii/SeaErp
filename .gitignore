@@ -24,6 +24,10 @@ obsidian-vault/.obsidian/workspace.json
 obsidian-vault/.obsidian/cache
 obsidian-vault/.trash/
 obsidian-vault/.obsidian/plugins/*/data.json
+# 저장소 루트를 실수로 vault로 열었을 때 생기는 설정 디렉터리.
+# vault는 obsidian-vault/ 하나뿐이므로 루트의 것은 항상 잘못 생긴 것이다.
+# 루트 한정(/)이라 obsidian-vault/.obsidian/의 추적 중인 설정은 건드리지 않는다.
+/.obsidian/
 .env*.local
 
 # Playwright MCP 검증 산출물(스냅샷·콘솔 로그) — 세션 임시본
